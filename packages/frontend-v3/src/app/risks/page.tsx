@@ -6,53 +6,91 @@ import { useOpportunities } from "@/hooks/use-opportunities";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { RiskDetailPanel } from "@/components/RiskDetailPanel";
-import { PwinWeightsPanel } from "@/components/pwin-weights-panel";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { useColumnFilters } from "@/hooks/use-column-filters";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
-import type { Risk } from "@/lib/types";
+import type { Risk, RiskCategory, RiskSeverity, RiskStatus } from "@/lib/types";
 
-const CATEGORIES = ["operational", "technical", "financial", "schedule", "compliance", "personnel"] as const;
-const STATUSES = ["open", "mitigated", "accepted", "closed"] as const;
-const IMPACTS = [1, 2, 3, 4, 5] as const;
+const CATEGORIES: RiskCategory[] = [
+  "doctrine_violation", "margin", "compliance", "past_performance",
+  "teaming", "incumbent_advantage", "schedule", "staffing",
+  "certification", "price", "technical", "other",
+  "operational", "financial", "competitive", "personnel",
+];
 
-function riskScore(likelihood: number, impact: number): number {
-  return likelihood * impact;
-}
+const SEVERITIES: RiskSeverity[] = ["critical", "high", "medium", "low"];
 
-function scoreColor(score: number): string {
-  if (score >= 15) return "text-red-500";
-  if (score >= 8) return "text-amber-400";
-  return "text-gda-green";
-}
+const STATUSES: RiskStatus[] = ["open", "mitigating", "resolved", "accepted", "mitigated", "closed"];
 
-function scoreBg(score: number): string {
-  if (score >= 15) return "bg-red-500/10 border-red-500/30 text-red-400";
-  if (score >= 8) return "bg-amber-400/10 border-amber-400/30 text-amber-400";
-  return "bg-gda-green/10 border-gda-green/30 text-gda-green";
-}
-
-function statusBadgeVariant(status: string) {
-  switch (status) {
-    case "open": return "destructive";
-    case "mitigated": return "outline";
-    case "accepted": return "secondary";
-    case "closed": return "outline";
-    default: return "outline";
+function severityBadge(severity: string) {
+  switch (severity) {
+    case "critical":
+      return "bg-critical/10 text-critical border-critical/30";
+    case "high":
+      return "bg-red-500/10 text-red-400 border-red-500/30";
+    case "medium":
+      return "bg-amber-400/10 text-amber-400 border-amber-400/30";
+    case "low":
+      return "bg-accent/10 text-accent border-accent/30";
+    default:
+      return "bg-muted/10 text-muted-foreground border-border";
   }
 }
 
-const EMPTY_FORM = {
+function statusBadge(status: string) {
+  switch (status) {
+    case "open":
+      return "bg-red-500/10 text-red-400 border-red-500/30";
+    case "mitigating":
+      return "bg-amber-400/10 text-amber-400 border-amber-400/30";
+    case "resolved":
+      return "bg-accent/10 text-accent border-accent/30";
+    case "accepted":
+      return "bg-muted/10 text-muted-foreground border-border";
+    default:
+      return "bg-muted/10 text-muted-foreground border-border";
+  }
+}
+
+function sourceBadge(source: string) {
+  switch (source) {
+    case "doctrine_rule":
+      return "bg-critical/10 text-critical border-critical/30";
+    case "color_review":
+      return "bg-amber-400/10 text-amber-400 border-amber-400/30";
+    case "sentinel":
+      return "bg-red-500/10 text-red-400 border-red-500/30";
+    case "ai_generated":
+      return "bg-accent/10 text-accent border-accent/30";
+    default:
+      return "bg-muted/10 text-muted-foreground border-border";
+  }
+}
+
+const EMPTY_FORM: {
+  title: string;
+  description: string;
+  category: RiskCategory;
+  severity: RiskSeverity;
+  likelihood: number;
+  impact: number;
+  status: RiskStatus;
+  owner: string;
+  mitigation: string;
+  mitigation_plan: string;
+} = {
   title: "",
   description: "",
-  category: "operational" as string,
+  category: "other",
+  severity: "medium",
   likelihood: 3,
   impact: 3,
-  status: "open" as "open" | "mitigated" | "accepted" | "closed",
+  status: "open",
   owner: "",
   mitigation: "",
+  mitigation_plan: "",
 };
 
 function AiRiskGeneration() {
@@ -63,7 +101,7 @@ function AiRiskGeneration() {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
+      <p className="text-caption text-muted">
         Select an active opportunity to auto-generate risks from its scope, agency, and deadline
         context. Generated risks are added to the risk register as AI-generated entries for your
         review.
@@ -72,7 +110,7 @@ function AiRiskGeneration() {
       <select
         value={selectedOppId ?? ""}
         onChange={(e) => setSelectedOppId(e.target.value || null)}
-        className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+        className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
       >
         <option value="">Select opportunity</option>
         {opportunities.map((o) => (
@@ -86,29 +124,23 @@ function AiRiskGeneration() {
         type="button"
         disabled={!selectedOppId || generateRisks.isPending}
         onClick={() => generateRisks.mutate()}
-        className="rounded border border-gda-green bg-gda-green/10 px-4 py-1.5 text-xs font-mono font-medium text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
+        className="rounded border border-accent bg-accent/10 px-4 py-1.5 text-caption font-medium text-accent hover:bg-accent/20 disabled:opacity-50 transition-colors"
       >
         {generateRisks.isPending ? "Generating..." : "Generate Risks"}
       </button>
 
       {generateRisks.isError && (
-        <p className="text-xs text-red-400">
+        <p className="text-caption text-red-400">
           {generateRisks.error instanceof Error ? generateRisks.error.message : "Failed to generate risks"}
         </p>
       )}
 
       {generateRisks.isSuccess && generateRisks.data && (
-        <div className="rounded border border-gda-green/30 bg-gda-green/5 p-3 space-y-1">
-          <p className="text-xs font-medium text-gda-green">
+        <div className="rounded border border-accent/30 bg-accent/5 p-3 space-y-1">
+          <p className="text-caption font-medium text-accent">
             Generated {generateRisks.data.risks_created} risks and added to register.
           </p>
-          <p className="text-xs text-muted-foreground">{generateRisks.data.generation_summary}</p>
-          <p className="text-[11px] text-muted-foreground">
-            Generated at {new Date(generateRisks.data.generated_at).toLocaleString()}
-          </p>
-          <p className="text-[11px] text-muted-foreground">
-            Review and edit generated risks in the Risk Register above.
-          </p>
+          <p className="text-caption text-muted">{generateRisks.data.generation_summary}</p>
         </div>
       )}
     </div>
@@ -117,18 +149,18 @@ function AiRiskGeneration() {
 
 const RISK_SORT_COLS: ColumnSortConfig[] = [
   { field: "title", type: "string" },
-  { field: "risk_type", type: "enum", enumOrder: ["negative", "positive"] },
+  { field: "severity", type: "enum", enumOrder: ["critical", "high", "medium", "low"] },
   { field: "category", type: "string" },
-  { field: "likelihood", type: "number" },
-  { field: "impact", type: "number" },
-  { field: "score", type: "number", accessor: (r) => ((r.likelihood as number) ?? 3) * ((r.impact as number) ?? 3) },
-  { field: "status", type: "enum", enumOrder: ["open", "mitigated", "accepted", "closed"] },
+  { field: "status", type: "enum", enumOrder: ["open", "mitigating", "resolved", "accepted", "mitigated", "closed"] },
   { field: "owner", type: "string" },
+  { field: "source", type: "string" },
   { field: "opportunity_title", type: "string" },
+  { field: "identified_at", type: "string" },
 ];
 
 function RisksRegisterContent() {
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterSeverity, setFilterSeverity] = useState<string>("");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -140,6 +172,7 @@ function RisksRegisterContent() {
 
   const { data, isLoading } = useRisks({
     status: filterStatus || undefined,
+    severity: filterSeverity || undefined,
     category: filterCategory || undefined,
   });
   const createRisk = useCreateRisk();
@@ -155,6 +188,17 @@ function RisksRegisterContent() {
     if (!sortBy) return filteredItems;
     return sortData(filteredItems as unknown as Record<string, unknown>[], sortBy, sortDir, RISK_SORT_COLS) as unknown as Risk[];
   }, [filteredItems, sortBy, sortDir]);
+
+  // Summary counts
+  const counts = useMemo(() => {
+    const all = data?.items ?? [];
+    return {
+      total: all.length,
+      critical: all.filter((r) => r.severity === "critical" && r.status === "open").length,
+      high: all.filter((r) => r.severity === "high" && r.status === "open").length,
+      open: all.filter((r) => r.status === "open").length,
+    };
+  }, [data?.items]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -182,12 +226,14 @@ function RisksRegisterContent() {
     setForm({
       title: risk.title,
       description: risk.description ?? "",
-      category: risk.category ?? "operational",
+      category: (risk.category ?? "other") as RiskCategory,
+      severity: (risk.severity ?? "medium") as RiskSeverity,
       likelihood: risk.likelihood ?? 3,
       impact: risk.impact ?? 3,
-      status: risk.status ?? "open",
+      status: (risk.status ?? "open") as RiskStatus,
       owner: risk.owner ?? "",
       mitigation: risk.mitigation ?? "",
+      mitigation_plan: risk.mitigation_plan ?? "",
     });
     setEditingId(risk.id);
     setShowForm(true);
@@ -198,28 +244,30 @@ function RisksRegisterContent() {
     await deleteRisk.mutateAsync(id);
   }
 
-  // Build 5x5 matrix — bucket items by (likelihood, impact)
-  const matrixMap: Record<string, Risk[]> = {};
-  for (const r of items) {
-    const key = `${r.likelihood ?? 3}_${r.impact ?? 3}`;
-    if (!matrixMap[key]) matrixMap[key] = [];
-    matrixMap[key].push(r);
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-mono text-lg font-bold text-foreground">Risk Register</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Track, score, and mitigate capture risks
-          </p>
-        </div>
+      {/* Summary row */}
+      <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="font-mono text-xs">
-            {items.length} risks
+          <span className="text-section font-semibold text-ink">Risk Register</span>
+          <Badge variant="outline" className="text-caption">
+            {counts.total} total
           </Badge>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          {counts.critical > 0 && (
+            <span className={cn("rounded border px-2 py-0.5 text-caption font-medium", severityBadge("critical"))}>
+              {counts.critical} critical
+            </span>
+          )}
+          {counts.high > 0 && (
+            <span className={cn("rounded border px-2 py-0.5 text-caption font-medium", severityBadge("high"))}>
+              {counts.high} high
+            </span>
+          )}
+          <span className={cn("rounded border px-2 py-0.5 text-caption font-medium", statusBadge("open"))}>
+            {counts.open} open
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -228,10 +276,10 @@ function RisksRegisterContent() {
               setShowForm((v) => !v);
             }}
             className={cn(
-              "rounded border px-3 py-1 text-xs font-mono font-medium transition-colors",
+              "rounded border px-3 py-1 text-caption font-medium transition-colors",
               showForm
-                ? "border-border bg-gda-panel text-muted-foreground"
-                : "border-gda-green bg-gda-green/10 text-gda-green hover:bg-gda-green/20"
+                ? "border-border bg-bg text-muted"
+                : "border-accent bg-accent/10 text-accent hover:bg-accent/20"
             )}
           >
             {showForm ? "Cancel" : "+ Add Risk"}
@@ -243,115 +291,85 @@ function RisksRegisterContent() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="rounded border border-border bg-gda-panel p-4 space-y-3"
+          className="card p-4 space-y-3"
         >
-          <p className="font-mono text-xs font-semibold text-foreground">
+          <p className="text-body font-semibold text-ink">
             {editingId ? "Edit Risk" : "New Risk"}
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {/* Title */}
             <div className="sm:col-span-2">
-              <label className="block text-[11px] text-muted-foreground mb-1">Title *</label>
+              <label className="block text-caption text-muted mb-1">Title *</label>
               <input
                 required
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 placeholder="e.g. Key personnel departure"
-                className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+                className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent/50"
               />
             </div>
-            {/* Description */}
             <div className="sm:col-span-2">
-              <label className="block text-[11px] text-muted-foreground mb-1">Description</label>
+              <label className="block text-caption text-muted mb-1">Description</label>
               <textarea
                 rows={2}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Details about the risk…"
-                className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 resize-none"
+                placeholder="Details about the risk..."
+                className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent/50 resize-none"
               />
             </div>
-            {/* Category */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Category</label>
+              <label className="block text-caption text-muted mb-1">Category</label>
               <select
                 value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as RiskCategory }))}
+                className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
               >
                 {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                  <option key={c} value={c}>{c.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}</option>
                 ))}
               </select>
             </div>
-            {/* Status */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Status</label>
+              <label className="block text-caption text-muted mb-1">Severity</label>
+              <select
+                value={form.severity}
+                onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as RiskSeverity }))}
+                className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
+              >
+                {SEVERITIES.map((s) => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-caption text-muted mb-1">Status</label>
               <select
                 value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "open" | "mitigated" | "accepted" | "closed" }))}
-                className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as RiskStatus }))}
+                className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
               >
                 {STATUSES.map((s) => (
                   <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                 ))}
               </select>
             </div>
-            {/* Likelihood */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">
-                Likelihood (1–5): <span className="font-mono text-foreground">{form.likelihood}</span>
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={5}
-                step={1}
-                value={form.likelihood}
-                onChange={(e) => setForm((f) => ({ ...f, likelihood: Number(e.target.value) }))}
-                className="w-full accent-gda-green"
-              />
-            </div>
-            {/* Impact */}
-            <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">
-                Impact (1–5): <span className="font-mono text-foreground">{form.impact}</span>
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={5}
-                step={1}
-                value={form.impact}
-                onChange={(e) => setForm((f) => ({ ...f, impact: Number(e.target.value) }))}
-                className="w-full accent-gda-green"
-              />
-            </div>
-            {/* Owner */}
-            <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Owner</label>
+              <label className="block text-caption text-muted mb-1">Owner</label>
               <input
                 value={form.owner}
                 onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
                 placeholder="Person responsible"
-                className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+                className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent/50"
               />
             </div>
-            {/* Score preview */}
-            <div className="flex items-end">
-              <div className={cn("rounded border px-3 py-1.5 text-xs font-mono font-bold", scoreBg(riskScore(form.likelihood, form.impact)))}>
-                Score: {riskScore(form.likelihood, form.impact)} / 25
-              </div>
-            </div>
-            {/* Mitigation */}
             <div className="sm:col-span-2">
-              <label className="block text-[11px] text-muted-foreground mb-1">Mitigation Plan</label>
+              <label className="block text-caption text-muted mb-1">Mitigation Plan</label>
               <textarea
                 rows={2}
-                value={form.mitigation}
-                onChange={(e) => setForm((f) => ({ ...f, mitigation: e.target.value }))}
-                placeholder="Steps to reduce or accept this risk…"
-                className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 resize-none"
+                value={form.mitigation_plan}
+                onChange={(e) => setForm((f) => ({ ...f, mitigation_plan: e.target.value }))}
+                placeholder="Steps to reduce or accept this risk..."
+                className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent/50 resize-none"
               />
             </div>
           </div>
@@ -359,14 +377,14 @@ function RisksRegisterContent() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded border border-gda-green bg-gda-green/10 px-4 py-1.5 text-xs font-mono font-medium text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
+              className="rounded border border-accent bg-accent/10 px-4 py-1.5 text-caption font-medium text-accent hover:bg-accent/20 disabled:opacity-50 transition-colors"
             >
-              {saving ? "Saving…" : editingId ? "Save Changes" : "Add Risk"}
+              {saving ? "Saving..." : editingId ? "Save Changes" : "Add Risk"}
             </button>
             <button
               type="button"
               onClick={() => { setShowForm(false); setEditingId(null); setForm({ ...EMPTY_FORM }); }}
-              className="rounded border border-border px-4 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+              className="rounded border border-border px-4 py-1.5 text-caption text-muted hover:text-ink transition-colors"
             >
               Cancel
             </button>
@@ -379,7 +397,7 @@ function RisksRegisterContent() {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="rounded border border-border bg-gda-panel px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+          className="rounded border border-border bg-bg px-2.5 py-1 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
         >
           <option value="">All Statuses</option>
           {STATUSES.map((s) => (
@@ -387,207 +405,131 @@ function RisksRegisterContent() {
           ))}
         </select>
         <select
+          value={filterSeverity}
+          onChange={(e) => setFilterSeverity(e.target.value)}
+          className="rounded border border-border bg-bg px-2.5 py-1 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
+        >
+          <option value="">All Severities</option>
+          {SEVERITIES.map((s) => (
+            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+          ))}
+        </select>
+        <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
-          className="rounded border border-border bg-gda-panel px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+          className="rounded border border-border bg-bg px-2.5 py-1 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
         >
           <option value="">All Categories</option>
           {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+            <option key={c} value={c}>{c.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}</option>
           ))}
         </select>
-        {(filterStatus || filterCategory) && (
+        {(filterStatus || filterSeverity || filterCategory) && (
           <button
             type="button"
-            onClick={() => { setFilterStatus(""); setFilterCategory(""); }}
-            className="text-[11px] text-muted-foreground hover:text-foreground"
+            onClick={() => { setFilterStatus(""); setFilterSeverity(""); setFilterCategory(""); }}
+            className="text-caption text-muted hover:text-ink"
           >
             Clear filters
           </button>
         )}
       </div>
 
-      {/* Risk Matrix (5×5) */}
-      <CollapseSection id="risk-matrix" title="Risk Matrix" defaultOpen={true}>
-        <div className="overflow-x-auto">
-          <div className="inline-block min-w-[320px]">
-            {/* Y-axis label */}
-            <div className="flex">
-              <div className="w-16 shrink-0" />
-              <div className="flex-1 text-center text-[11px] text-muted-foreground mb-1">
-                Impact →
-              </div>
-            </div>
-            <div className="flex items-center gap-0">
-              {/* Likelihood label rotated */}
-              <div className="w-8 shrink-0 flex items-center justify-center">
-                <span
-                  className="text-[11px] text-muted-foreground"
-                  style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-                >
-                  Likelihood ↑
-                </span>
-              </div>
-              <div className="flex flex-col gap-0">
-                {/* Impact header row */}
-                <div className="flex">
-                  <div className="w-8 shrink-0" />
-                  {IMPACTS.map((imp) => (
-                    <div
-                      key={imp}
-                      className="w-14 text-center text-[11px] text-muted-foreground pb-1"
-                    >
-                      {imp}
-                    </div>
-                  ))}
-                </div>
-                {/* Rows: likelihood 5→1 (high at top) */}
-                {[5, 4, 3, 2, 1].map((lik) => (
-                  <div key={lik} className="flex items-center">
-                    <div className="w-8 shrink-0 text-center text-[11px] text-muted-foreground">
-                      {lik}
-                    </div>
-                    {IMPACTS.map((imp) => {
-                      const score = lik * imp;
-                      const cellItems = matrixMap[`${lik}_${imp}`] ?? [];
-                      const bg =
-                        score >= 15
-                          ? "bg-red-500/20 border-red-500/30"
-                          : score >= 8
-                          ? "bg-amber-400/15 border-amber-400/30"
-                          : "bg-gda-green/10 border-gda-green/20";
-                      return (
-                        <div
-                          key={imp}
-                          title={cellItems.map((r) => r.title).join("\n")}
-                          className={cn(
-                            "w-14 h-10 border flex items-center justify-center text-[11px] font-mono cursor-default",
-                            bg
-                          )}
-                        >
-                          {cellItems.length > 0 ? (
-                            <span className={cn("font-bold", scoreColor(score))}>
-                              {cellItems.length}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground/30 text-[11px]">{score}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-2">
-              Numbers = risk count per cell. Hover for titles. Red ≥ 15 · Amber ≥ 8 · Green {'<'} 8.
-            </p>
-          </div>
-        </div>
-      </CollapseSection>
-
       {/* Risk Table */}
       <div className="rounded border border-border overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-body">
           <thead>
-            <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
+            <tr className="border-b border-border bg-bg text-caption text-muted">
               <SortableHeader label="Risk" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.title ?? "", onChange: (v) => setFilter("title", v) }} />
-              <SortableHeader label="Type" field="risk_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.risk_type ?? "", onChange: (v) => setFilter("risk_type", v) }} />
+              <SortableHeader label="Severity" field="severity" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Category" field="category" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.category ?? "", onChange: (v) => setFilter("category", v) }} />
-              <SortableHeader label="L" field="likelihood" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="I" field="impact" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="Score" field="score" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.status ?? "", onChange: (v) => setFilter("status", v) }} />
+              <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Owner" field="owner" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.owner ?? "", onChange: (v) => setFilter("owner", v) }} />
-              <SortableHeader label="Opportunity" field="opportunity_title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.opportunity_title ?? "", onChange: (v) => setFilter("opportunity_title", v) }} />
-              <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Actions</th>
+              <SortableHeader label="Source" field="source" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Entity" field="opportunity_title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Identified" field="identified_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <th className="px-3 py-2 text-left font-medium bg-bg">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-border animate-pulse">
-                  <td colSpan={10} className="px-3 py-2">
-                    <div className="h-3 bg-gda-panel rounded w-3/4" />
+                  <td colSpan={9} className="px-3 py-2">
+                    <div className="h-3 bg-bg rounded w-3/4" />
                   </td>
                 </tr>
               ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-xs text-muted-foreground">
-                  No risks logged yet — click {'"+"'} Add Risk to create one
+                <td colSpan={9} className="px-3 py-8 text-center text-caption text-muted">
+                  No risks logged yet — click + Add Risk to create one
                 </td>
               </tr>
             ) : (
-              items.map((r) => {
-                const score = riskScore(r.likelihood ?? 3, r.impact ?? 3);
-                return (
-                  <tr key={r.id} className="border-b border-border hover:bg-gda-panel/50 cursor-pointer" onClick={() => setSelectedRisk(r)}>
-                    <td className="px-3 py-2 max-w-[200px]">
-                      <span className="block font-medium text-xs text-foreground truncate" title={r.title}>
-                        {r.title}
+              items.map((r) => (
+                <tr key={r.id} className="border-b border-border hover:bg-bg/50 cursor-pointer" onClick={() => setSelectedRisk(r)}>
+                  <td className="px-3 py-2 max-w-[220px]">
+                    <span className="block font-medium text-caption text-ink truncate" title={r.title}>
+                      {r.title}
+                    </span>
+                    {r.description && (
+                      <span className="block text-caption text-muted truncate" title={r.description}>
+                        {r.description}
                       </span>
-                      {r.mitigation && (
-                        <span className="block text-[11px] text-muted-foreground truncate" title={r.mitigation}>
-                          {r.mitigation}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge className={cn("text-[10px] font-mono font-bold uppercase tracking-wide", r.risk_type === "positive" ? "bg-gda-green/15 text-gda-green border-gda-green/30" : "bg-red-500/15 text-red-400 border-red-500/30")}>
-                        {r.risk_type === "positive" ? "OPPORTUNITY" : "THREAT"}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 text-left text-xs text-muted-foreground capitalize">
-                      {r.category ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-left font-mono text-xs text-foreground">
-                      {r.likelihood ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-left font-mono text-xs text-foreground">
-                      {r.impact ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-left">
-                      <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono font-bold", scoreBg(score))}>
-                        {score}
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={cn("rounded border px-1.5 py-0.5 text-caption font-medium uppercase", severityBadge(r.severity))}>
+                      {r.severity}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-left text-caption text-muted">
+                    {(r.category ?? "other").replace(/_/g, " ")}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={cn("rounded border px-1.5 py-0.5 text-caption font-medium", statusBadge(r.status))}>
+                      {r.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-left text-caption text-muted">
+                    {r.owner ?? "\u2014"}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={cn("rounded border px-1.5 py-0.5 text-caption", sourceBadge(r.source))}>
+                      {r.source.replace(/_/g, " ")}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-left text-caption text-muted max-w-[140px]">
+                    {r.opportunity_title ? (
+                      <span className="truncate block" title={r.opportunity_title}>
+                        {r.opportunity_title}
                       </span>
-                    </td>
-                    <td className="px-3 py-2 text-left">
-                      <Badge variant={statusBadgeVariant(r.status ?? "open") as "outline" | "destructive" | "secondary"} className="text-[11px] capitalize">
-                        {r.status ?? "open"}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 text-left text-xs text-muted-foreground">
-                      {r.owner ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-left text-xs text-muted-foreground max-w-[140px]">
-                      {r.opportunity_title ? (
-                        <span className="truncate block" title={r.opportunity_title}>
-                          {r.opportunity_title}
-                        </span>
-                      ) : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-left">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); startEdit(r); }}
-                          className="text-[11px] text-muted-foreground hover:text-foreground"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
-                          className="text-[11px] text-red-400 hover:text-red-300"
-                        >
-                          Del
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+                    ) : "\u2014"}
+                  </td>
+                  <td className="px-3 py-2 text-left text-caption text-muted tabular-nums">
+                    {r.identified_at ? new Date(r.identified_at).toLocaleDateString() : "\u2014"}
+                  </td>
+                  <td className="px-3 py-2 text-left">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); startEdit(r); }}
+                        className="text-caption text-muted hover:text-ink"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
+                        className="text-caption text-red-400 hover:text-red-300"
+                      >
+                        Del
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
@@ -618,46 +560,18 @@ export default function RisksPage() {
 }
 
 function RisksPageInner() {
-  const [activeTab, setActiveTab] = useState<"register" | "pwin">("register");
-
   return (
     <div className="space-y-6">
-      {/* Tab row */}
-      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
+      <div className="sticky top-0 z-20 bg-bg border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
         <div className="flex items-baseline gap-3">
-          <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">Risks</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            The risk register for your pursuits — what could go wrong, how likely it is, and how hard it would hit.
+          <h1 className="shrink-0 text-section font-semibold text-ink">Risks</h1>
+          <p className="truncate text-caption text-muted">
+            First-class risk register — track, mitigate, and resolve risks across the capture lifecycle
           </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveTab("register")}
-            className={cn(
-              "rounded-t border-b-2 px-4 py-1.5 text-xs font-mono font-medium transition-colors",
-              activeTab === "register"
-                ? "border-gda-green text-gda-green"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Risk Register
-          </button>
-          <button
-            onClick={() => setActiveTab("pwin")}
-            className={cn(
-              "rounded-t border-b-2 px-4 py-1.5 text-xs font-mono font-medium transition-colors",
-              activeTab === "pwin"
-                ? "border-gda-green text-gda-green"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Pwin Weights
-          </button>
         </div>
       </div>
 
-      {activeTab === "register" && <RisksRegisterContent />}
-      {activeTab === "pwin" && <PwinWeightsPanel />}
+      <RisksRegisterContent />
     </div>
   );
 }

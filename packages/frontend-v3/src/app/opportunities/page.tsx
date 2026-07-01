@@ -55,6 +55,7 @@ import { useDoctrineEvaluations } from "@/hooks/use-doctrine-evaluation";
 import { useOpportunityAnalysis } from "@/hooks/use-opportunity-analysis";
 import { DecisionBriefStream } from "@/components/opportunity-analysis/DecisionBriefStream";
 import { CapabilityMatchCard } from "@/components/CapabilityMatchCard";
+import { OpportunityRisksPanel } from "@/components/risks/OpportunityRisksPanel";
 
 const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
 
@@ -1637,6 +1638,9 @@ function OpportunityDetail({ id }: { id: string }) {
               onSuccess={() => setShowOverrideModal(false)}
             />
           )}
+
+          {/* Risks (F-307) */}
+          <OpportunityRisksPanel opportunityId={Number(id)} />
 
           {/* Vault Documents */}
           <VaultDocumentsSection opportunityId={Number(id)} />

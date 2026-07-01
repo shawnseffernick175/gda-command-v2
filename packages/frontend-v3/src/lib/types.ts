@@ -913,31 +913,66 @@ export interface Competitor {
   competitor_analysis: CompetitorAnalysis | null;
 }
 
-/* ── Risks (pending backend) ──────────────────────────────────── */
+/* ── Risks (F-307: First-Class Objects) ───────────────────────── */
+
+export type RiskCategory =
+  | "doctrine_violation" | "margin" | "compliance" | "past_performance"
+  | "teaming" | "incumbent_advantage" | "schedule" | "staffing"
+  | "certification" | "price" | "technical" | "other"
+  | "operational" | "financial" | "competitive" | "personnel";
+
+export type RiskSeverity = "critical" | "high" | "medium" | "low";
+
+export type RiskStatus = "open" | "mitigating" | "resolved" | "accepted" | "mitigated" | "closed";
+
+export type RiskSource = "manual" | "ai_generated" | "doctrine_rule" | "color_review" | "sentinel" | "hook";
 
 export interface Risk {
   id: number;
   title: string;
   description: string | null;
-  category: "operational" | "technical" | "financial" | "compliance" | "schedule" | "competitive" | "personnel" | string;
+  category: RiskCategory | string;
+  severity: RiskSeverity;
   likelihood: number;
   impact: number;
-  score: number;
-  status: "open" | "mitigated" | "accepted" | "closed";
+  status: RiskStatus;
   owner: string | null;
   mitigation: string | null;
   opportunity_id: number | null;
   opportunity_title: string | null;
-  source: "manual" | "ai_generated";
+  related_capture_id: number | null;
+  related_pipeline_item_id: string | null;
+  related_action_item_id: string | null;
+  source: RiskSource;
+  source_event: Record<string, unknown>;
+  mitigation_plan: string | null;
+  mitigation_doc_ids: string[];
+  evidence_grade: string | null;
+  identified_at: string;
+  resolved_at: string | null;
+  due_at: string | null;
+  created_by: string;
   created_at: string;
   updated_at: string;
   risk_type: "negative" | "positive";
   if_condition: string | null;
   then_impact: string | null;
-  mitigation_plan: string | null;
   exploitation_plan: string | null;
   due_date: string | null;
   next_step: string | null;
+}
+
+export interface RiskEvent {
+  id: number;
+  risk_id: number;
+  event_type: string;
+  detail: Record<string, unknown>;
+  actor: string;
+  created_at: string;
+}
+
+export interface RiskWithEvents extends Risk {
+  events: RiskEvent[];
 }
 
 /* ── Sentinel ─────────────────────────────────────────────────── */
