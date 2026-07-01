@@ -172,7 +172,7 @@ function VersionRow({
       <div className="space-y-0.5 min-w-0">
         <div className="flex items-center gap-2">
           {v.active && (
-            <Badge variant="outline" className="border-gda-green text-gda-green text-[10px]">
+            <Badge variant="outline" className="border-gda-green text-gda-green text-[11px]">
               ACTIVE
             </Badge>
           )}
@@ -376,7 +376,7 @@ function VersionDetail({ id, onClose }: { id: string; onClose: () => void }) {
                       <Badge
                         variant="outline"
                         className={cn(
-                          "text-[10px]",
+                          "text-[11px]",
                           r.outcome === "won" && "border-gda-green text-gda-green",
                           r.outcome === "lost" && "border-gda-red text-gda-red",
                           r.outcome === "no_bid" && "border-muted-foreground text-muted-foreground",
@@ -431,7 +431,7 @@ export function FinancialBibleTab() {
           ) : active ? (
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <Badge variant="outline" className="border-gda-green text-gda-green text-[10px]">
+                <Badge variant="outline" className="border-gda-green text-gda-green text-[11px]">
                   ACTIVE
                 </Badge>
                 <span className="text-[12px] font-mono text-muted-foreground">

@@ -41,13 +41,13 @@ function MarginGauge({ marginPct, pass }: { marginPct: number; pass: boolean }) 
         <Badge
           variant="outline"
           className={cn(
-            "text-[10px]",
+            "text-[11px]",
             pass ? "border-gda-green text-gda-green" : "border-gda-red text-gda-red",
           )}
         >
           {pass ? "PASS" : "FAIL"}
         </Badge>
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-[11px] text-muted-foreground">
           {MARGIN_FLOOR}% floor (F-303)
         </span>
       </div>
@@ -336,7 +336,7 @@ export function PricingScenarioCard({
 
         {scenarios.length === 0 && !showForm && hasActiveBible && (
           <p className="text-[11px] text-muted-foreground">
-            No pricing scenarios yet. Click "Build Scenario" to create one.
+            No pricing scenarios yet. Click &ldquo;Build Scenario&rdquo; to create one.
           </p>
         )}
 
