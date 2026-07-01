@@ -1,4 +1,5 @@
 """GovWin IQ search tool (stub until credentials wired)."""
+
 from __future__ import annotations
 
 from src.tools.schemas import GovwinSearchInput, GovwinSearchOutput

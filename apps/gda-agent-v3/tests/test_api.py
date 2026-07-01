@@ -1,4 +1,5 @@
 """API endpoint tests — healthz, tools, auth."""
+
 from __future__ import annotations
 
 import pytest

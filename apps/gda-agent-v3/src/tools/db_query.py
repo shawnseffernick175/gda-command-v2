@@ -1,4 +1,5 @@
 """Read-only database query tool (enforced via gda_agent_ro role)."""
+
 from __future__ import annotations
 
 from src.db import run_readonly_query

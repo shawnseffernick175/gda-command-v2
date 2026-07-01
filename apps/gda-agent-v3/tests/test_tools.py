@@ -1,40 +1,41 @@
 """Unit tests for all 12 tools (mock external APIs)."""
+
 from __future__ import annotations
 
 import json
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 import respx
+from langchain_core.tools import StructuredTool
 
-from src.tools.sam_search import sam_search
-from src.tools.usaspending_search import usaspending_search
-from src.tools.federal_register_search import federal_register_search
-from src.tools.db_query import db_query
-from src.tools.rag_search import rag_search
-from src.tools.web_search import web_search
-from src.tools.doctrine_check import doctrine_check
+from src.agent import _build_langchain_tools
 from src.tools.decision_memory import decision_memory_lookup
+from src.tools.doctrine_check import doctrine_check
+from src.tools.federal_register_search import federal_register_search
 from src.tools.file_read import file_read
-from src.tools.pwin_score import pwin_score
-from src.tools.govwin_search import govwin_search
 from src.tools.govtribe_search import govtribe_search
-
+from src.tools.govwin_search import govwin_search
+from src.tools.pwin_score import pwin_score
+from src.tools.rag_search import rag_search
+from src.tools.registry import TOOL_REGISTRY, get_tool, get_tool_schemas, list_tools
+from src.tools.sam_search import sam_search
 from src.tools.schemas import (
+    DecisionMemoryLookupInput,
+    DoctrineCheckInput,
+    FederalRegisterSearchInput,
+    FileReadInput,
+    GovtribeSearchInput,
+    GovwinSearchInput,
+    PwinScoreInput,
+    RagSearchInput,
     SamSearchInput,
     UsaSpendingSearchInput,
-    FederalRegisterSearchInput,
-    DbQueryInput,
-    RagSearchInput,
     WebSearchInput,
-    DoctrineCheckInput,
-    DecisionMemoryLookupInput,
-    FileReadInput,
-    PwinScoreInput,
-    GovwinSearchInput,
-    GovtribeSearchInput,
 )
-from src.tools.registry import TOOL_REGISTRY, list_tools, get_tool, get_tool_schemas
+from src.tools.usaspending_search import usaspending_search
+from src.tools.web_search import web_search
 
 
 class TestToolRegistry:
@@ -70,20 +71,23 @@ class TestSamSearch:
     @respx.mock
     async def test_sam_search_returns_opportunities(self):
         respx.get("https://api.sam.gov/opportunities/v2/search").mock(
-            return_value=httpx.Response(200, json={
-                "opportunitiesData": [
-                    {
-                        "noticeId": "SAM-001",
-                        "title": "Army IT Services",
-                        "fullParentPathName": "Department of the Army",
-                        "postedDate": "2026-05-01",
-                        "responseDeadLine": "2026-06-01",
-                        "naicsCode": "541512",
-                        "typeOfSetAside": "SBA",
-                        "description": "IT modernization services",
-                    }
-                ]
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "opportunitiesData": [
+                        {
+                            "noticeId": "SAM-001",
+                            "title": "Army IT Services",
+                            "fullParentPathName": "Department of the Army",
+                            "postedDate": "2026-05-01",
+                            "responseDeadLine": "2026-06-01",
+                            "naicsCode": "541512",
+                            "typeOfSetAside": "SBA",
+                            "description": "IT modernization services",
+                        }
+                    ]
+                },
+            )
         )
         result = await sam_search(SamSearchInput(query="Army IT"))
         assert len(result.results) == 1
@@ -105,19 +109,22 @@ class TestUsaSpendingSearch:
     @respx.mock
     async def test_usaspending_returns_awards(self):
         respx.post("https://api.usaspending.gov/api/v2/search/spending_by_award/").mock(
-            return_value=httpx.Response(200, json={
-                "results": [
-                    {
-                        "Award ID": "AWD-001",
-                        "Recipient Name": "Envision",
-                        "Awarding Agency": "Army",
-                        "Award Amount": 1000000,
-                        "Start Date": "2026-01-01",
-                        "NAICS Code": "541512",
-                        "Description": "IT services contract",
-                    }
-                ]
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "Award ID": "AWD-001",
+                            "Recipient Name": "Envision",
+                            "Awarding Agency": "Army",
+                            "Award Amount": 1000000,
+                            "Start Date": "2026-01-01",
+                            "NAICS Code": "541512",
+                            "Description": "IT services contract",
+                        }
+                    ]
+                },
+            )
         )
         result = await usaspending_search(UsaSpendingSearchInput(agency="Army"))
         assert len(result.results) == 1
@@ -129,19 +136,22 @@ class TestFederalRegisterSearch:
     @respx.mock
     async def test_fr_search_returns_notices(self):
         respx.get("https://www.federalregister.gov/api/v1/documents.json").mock(
-            return_value=httpx.Response(200, json={
-                "results": [
-                    {
-                        "document_number": "2026-12345",
-                        "title": "Notice of Proposed Rulemaking",
-                        "agencies": [{"name": "DOD"}],
-                        "publication_date": "2026-05-01",
-                        "type": "Rule",
-                        "abstract": "Defense procurement rule",
-                        "html_url": "https://www.federalregister.gov/d/2026-12345",
-                    }
-                ]
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "document_number": "2026-12345",
+                            "title": "Notice of Proposed Rulemaking",
+                            "agencies": [{"name": "DOD"}],
+                            "publication_date": "2026-05-01",
+                            "type": "Rule",
+                            "abstract": "Defense procurement rule",
+                            "html_url": "https://www.federalregister.gov/d/2026-12345",
+                        }
+                    ]
+                },
+            )
         )
         result = await federal_register_search(
             FederalRegisterSearchInput(query="defense procurement")
@@ -154,21 +164,25 @@ class TestFederalRegisterSearch:
 class TestDbQuery:
     async def test_write_rejected(self):
         from src.db import run_readonly_query
+
         with pytest.raises(PermissionError, match="Only SELECT"):
             await run_readonly_query("DELETE FROM users")
 
     async def test_insert_rejected(self):
         from src.db import run_readonly_query
+
         with pytest.raises(PermissionError, match="Only SELECT"):
             await run_readonly_query("INSERT INTO users VALUES (1)")
 
     async def test_update_rejected(self):
         from src.db import run_readonly_query
+
         with pytest.raises(PermissionError, match="Only SELECT"):
             await run_readonly_query("UPDATE users SET name='x'")
 
     async def test_writable_cte_rejected(self):
         from src.db import run_readonly_query
+
         with pytest.raises(PermissionError, match="disallowed DML keyword"):
             await run_readonly_query(
                 "WITH d AS (DELETE FROM agent_runs RETURNING *) SELECT * FROM d"
@@ -176,11 +190,13 @@ class TestDbQuery:
 
     async def test_drop_rejected(self):
         from src.db import run_readonly_query
+
         with pytest.raises(PermissionError, match="Only SELECT"):
             await run_readonly_query("DROP TABLE agent_runs")
 
     async def test_truncate_rejected(self):
         from src.db import run_readonly_query
+
         with pytest.raises(PermissionError, match="Only SELECT"):
             await run_readonly_query("TRUNCATE agent_runs")
 
@@ -198,6 +214,7 @@ class TestRagSearch:
 class TestWebSearch:
     async def test_web_search_no_keys(self, monkeypatch):
         import src.tools.web_search as ws
+
         monkeypatch.setattr(ws, "TAVILY_API_KEY", "")
         monkeypatch.setattr(ws, "PERPLEXITY_API_KEY", "")
         result = await web_search(WebSearchInput(query="test"))
@@ -208,13 +225,17 @@ class TestWebSearch:
     @respx.mock
     async def test_web_search_tavily(self, monkeypatch):
         import src.tools.web_search as ws
+
         monkeypatch.setattr(ws, "TAVILY_API_KEY", "test-key")
         respx.post("https://api.tavily.com/search").mock(
-            return_value=httpx.Response(200, json={
-                "results": [
-                    {"title": "Result 1", "url": "https://example.com", "content": "snippet"}
-                ]
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {"title": "Result 1", "url": "https://example.com", "content": "snippet"}
+                    ]
+                },
+            )
         )
         result = await web_search(WebSearchInput(query="test"))
         assert len(result.results) == 1
@@ -244,9 +265,7 @@ class TestDecisionMemory:
 class TestFileRead:
     @respx.mock
     async def test_file_read_not_found(self):
-        respx.get("http://localhost:4000/v3/files/doc-999").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get("http://localhost:4000/v3/files/doc-999").mock(return_value=httpx.Response(404))
         result = await file_read(FileReadInput(doc_id="doc-999"))
         assert result.doc_text == ""
         assert "not found" in result.doc_meta.get("error", "")
@@ -254,11 +273,14 @@ class TestFileRead:
     @respx.mock
     async def test_file_read_success(self):
         respx.get("http://localhost:4000/v3/files/doc-001").mock(
-            return_value=httpx.Response(200, json={
-                "text": "Contract document content",
-                "meta": {"type": "pdf"},
-                "source_url": "https://files.gda/doc-001",
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "text": "Contract document content",
+                    "meta": {"type": "pdf"},
+                    "source_url": "https://files.gda/doc-001",
+                },
+            )
         )
         result = await file_read(FileReadInput(doc_id="doc-001"))
         assert result.doc_text == "Contract document content"
@@ -288,28 +310,31 @@ class TestGovtribeSearch:
     @respx.mock
     async def test_govtribe_search_returns_opportunities(self):
         respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(200, json={
-                "success": True,
-                "data": {
-                    "results": [
-                        {
-                            "_id": "gt-001",
-                            "attributes": {
-                                "title": "Cyber Defense Services",
-                                "agency": {"name": "Department of Defense"},
-                                "postedDate": "2026-05-28",
-                                "responseDate": "2026-06-28",
-                                "slug": "cyber-defense-services",
-                                "estimatedValue": {"high": 5000000},
-                                "setAside": "Total Small Business",
-                            },
-                        }
-                    ],
-                    "decision": "called",
-                    "credits_used": 3,
-                    "from_cache": False,
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {
+                        "results": [
+                            {
+                                "_id": "gt-001",
+                                "attributes": {
+                                    "title": "Cyber Defense Services",
+                                    "agency": {"name": "Department of Defense"},
+                                    "postedDate": "2026-05-28",
+                                    "responseDate": "2026-06-28",
+                                    "slug": "cyber-defense-services",
+                                    "estimatedValue": {"high": 5000000},
+                                    "setAside": "Total Small Business",
+                                },
+                            }
+                        ],
+                        "decision": "called",
+                        "credits_used": 3,
+                        "from_cache": False,
+                    },
                 },
-            })
+            )
         )
         result = await govtribe_search(
             GovtribeSearchInput(query="cyber", agency="DoD", posted_within="7d", max_results=5)
@@ -329,27 +354,28 @@ class TestGovtribeSearch:
     @respx.mock
     async def test_govtribe_search_cached(self):
         respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(200, json={
-                "success": True,
-                "data": {
-                    "results": [
-                        {
-                            "_id": "gt-001",
-                            "attributes": {
-                                "title": "Cyber Defense Services",
-                                "slug": "cyber-defense-services",
-                            },
-                        }
-                    ],
-                    "decision": "cached",
-                    "credits_used": 0,
-                    "from_cache": True,
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {
+                        "results": [
+                            {
+                                "_id": "gt-001",
+                                "attributes": {
+                                    "title": "Cyber Defense Services",
+                                    "slug": "cyber-defense-services",
+                                },
+                            }
+                        ],
+                        "decision": "cached",
+                        "credits_used": 0,
+                        "from_cache": True,
+                    },
                 },
-            })
+            )
         )
-        result = await govtribe_search(
-            GovtribeSearchInput(query="cyber", max_results=5)
-        )
+        result = await govtribe_search(GovtribeSearchInput(query="cyber", max_results=5))
         assert len(result.results) == 1
         assert result.decision == "cached"
         assert result.credits_used == 0
@@ -358,19 +384,20 @@ class TestGovtribeSearch:
     @respx.mock
     async def test_govtribe_search_skipped_cycle_cap(self):
         respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(200, json={
-                "success": True,
-                "data": {
-                    "results": None,
-                    "decision": "skipped_cycle_cap",
-                    "credits_used": 0,
-                    "from_cache": False,
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {
+                        "results": None,
+                        "decision": "skipped_cycle_cap",
+                        "credits_used": 0,
+                        "from_cache": False,
+                    },
                 },
-            })
+            )
         )
-        result = await govtribe_search(
-            GovtribeSearchInput(query="cyber")
-        )
+        result = await govtribe_search(GovtribeSearchInput(query="cyber"))
         assert result.results == []
         assert result.decision == "skipped_cycle_cap"
         assert result.warning is not None
@@ -379,19 +406,20 @@ class TestGovtribeSearch:
     @respx.mock
     async def test_govtribe_search_empty_results(self):
         respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(200, json={
-                "success": True,
-                "data": {
-                    "results": [],
-                    "decision": "called",
-                    "credits_used": 3,
-                    "from_cache": False,
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {
+                        "results": [],
+                        "decision": "called",
+                        "credits_used": 3,
+                        "from_cache": False,
+                    },
                 },
-            })
+            )
         )
-        result = await govtribe_search(
-            GovtribeSearchInput(query="nonexistent-query-xyz")
-        )
+        result = await govtribe_search(GovtribeSearchInput(query="nonexistent-query-xyz"))
         assert result.results == []
         assert result.decision == "called"
 
@@ -400,9 +428,7 @@ class TestGovtribeSearch:
         respx.post("http://localhost:4000/v3/govtribe/search").mock(
             return_value=httpx.Response(500, json={"error": "internal"})
         )
-        result = await govtribe_search(
-            GovtribeSearchInput(query="cyber")
-        )
+        result = await govtribe_search(GovtribeSearchInput(query="cyber"))
         assert result.results == []
         assert result.warning is not None
         assert "500" in result.warning
@@ -411,9 +437,6 @@ class TestGovtribeSearch:
 # ---------------------------------------------------------------------------
 # _build_langchain_tools (StructuredTool construction)
 # ---------------------------------------------------------------------------
-from unittest.mock import AsyncMock
-from langchain_core.tools import StructuredTool
-from src.agent import _build_langchain_tools
 
 
 class TestBuildLangchainTools:
@@ -433,8 +456,8 @@ class TestBuildLangchainTools:
     @pytest.mark.anyio
     async def test_tool_coroutine_returns_json(self):
         """Build a tool and invoke its coroutine with a mocked fn."""
-        from src.tools.registry import ToolDef
         from src.agent import _make_tool_coroutine
+        from src.tools.registry import ToolDef
         from src.tools.schemas import SamSearchInput, SamSearchOutput
 
         mock_output = SamSearchOutput(results=[])

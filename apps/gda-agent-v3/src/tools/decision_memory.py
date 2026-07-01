@@ -1,4 +1,5 @@
 """Decision memory lookup tool (F-302 dependency)."""
+
 from __future__ import annotations
 
 from src.tools.schemas import (
