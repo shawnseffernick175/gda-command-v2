@@ -1462,3 +1462,84 @@ export interface WorkshopListResponse {
   page: number;
   totalPages: number;
 }
+
+/* ── Color Team Reviews (F-Color-Team-Reviews) ────────────────── */
+
+export type ColorTeamColor = "pink" | "red" | "black" | "blue" | "white" | "green";
+export type ColorTeamSeverity = "info" | "warning" | "critical" | "blocker";
+export type ColorTeamRunStatus = "queued" | "running" | "complete" | "error";
+
+export interface ColorTeamCitation {
+  source: string;
+  url: string;
+  grade: "A" | "B" | "C";
+}
+
+export interface ColorTeamDoctrineScore {
+  principle: string;
+  score: number;
+  detail: string;
+}
+
+export interface ColorTeamMarginCheck {
+  projected_margin: number;
+  floor: number;
+  pass: boolean;
+}
+
+export interface ColorTeamFinding {
+  id: number;
+  run_id: number;
+  color: ColorTeamColor;
+  severity: ColorTeamSeverity;
+  section_ref: string | null;
+  finding: string;
+  recommended_fix: string | null;
+  citations: ColorTeamCitation[];
+  doctrine_score: ColorTeamDoctrineScore[] | null;
+  exclusion_hits: string[] | null;
+  margin_check: ColorTeamMarginCheck | null;
+  action_item_id: number | null;
+  created_at: string;
+}
+
+export interface ColorTeamColorCount {
+  color: string;
+  count: number;
+}
+
+export interface ColorTeamRun {
+  id: number;
+  document_id: number;
+  linked_rfp_id: number | null;
+  colors: string[];
+  status: ColorTeamRunStatus;
+  triggered_by: string;
+  started_at: string;
+  completed_at: string | null;
+  error_message: string | null;
+  source_id: number | null;
+  created_at: string;
+  finding_counts?: ColorTeamColorCount[];
+}
+
+export interface ColorTeamDocument {
+  id: number;
+  filename: string;
+  mime_type: string;
+  file_size_bytes: number | null;
+  doc_type: string;
+  storage_path: string;
+  uploaded_by: string;
+  opportunity_id: number | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ColorTeamDiffResult {
+  new_findings: ColorTeamFinding[];
+  resolved_findings: ColorTeamFinding[];
+  regressed_findings: ColorTeamFinding[];
+  unchanged_findings: ColorTeamFinding[];
+}
