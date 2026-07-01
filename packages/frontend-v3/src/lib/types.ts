@@ -1543,3 +1543,157 @@ export interface ColorTeamDiffResult {
   regressed_findings: ColorTeamFinding[];
   unchanged_findings: ColorTeamFinding[];
 }
+
+/* ── F-305: Auto-Analysis Brief ───────────────────────────────── */
+
+export interface AnalysisCitation {
+  kind: string;
+  title: string;
+  url: string;
+  retrieved_at: string;
+}
+
+export type AnalysisSectionStatus = "pending" | "running" | "done" | "error" | "stale";
+
+export interface AnalysisSectionBase {
+  section_id: string;
+  section_label: string;
+  status: AnalysisSectionStatus;
+  trace_id: string | null;
+  cached: boolean;
+  stale: boolean;
+  error_message?: string | null;
+  generated_at: string | null;
+}
+
+export interface PwinSectionData {
+  score: number;
+  grade: "Go" | "Reconsider" | "Pass";
+  top_factors: string[];
+  model_version: string;
+  citations: AnalysisCitation[];
+}
+
+export interface DoctrineSectionData {
+  principles: Array<{
+    id: string;
+    name: string;
+    result: "pass" | "fail" | "n/a";
+    reason: string;
+    citations: AnalysisCitation[];
+  }>;
+  exclusions: Array<{
+    id: string;
+    name: string;
+    result: "pass" | "fail" | "n/a";
+    reason: string;
+  }>;
+  margin_floor: {
+    passed: boolean;
+    margin_pct: number | null;
+    threshold: number;
+  };
+  citations: AnalysisCitation[];
+}
+
+export interface IncumbentSectionData {
+  company_name: string | null;
+  contract_number: string | null;
+  ceiling: number | null;
+  end_date: string | null;
+  performance_signals: string[];
+  citations: AnalysisCitation[];
+}
+
+export interface SimilarAwardsSectionData {
+  awards: Array<{
+    title: string;
+    date: string | null;
+    agency: string | null;
+    value: number | null;
+    awardee: string | null;
+    url: string | null;
+  }>;
+  citations: AnalysisCitation[];
+}
+
+export interface CompetitorsSectionData {
+  competitors: Array<{
+    name: string;
+    win_rate: number | null;
+    cleared: boolean | null;
+    ceiling_fit: string | null;
+    threat_level: "high" | "medium" | "low";
+  }>;
+  citations: AnalysisCitation[];
+}
+
+export interface DecisionFactorsSectionData {
+  evaluation_method: string | null;
+  past_performance_weight: string | null;
+  key_personnel_requirements: string | null;
+  other_factors: string[];
+  citations: AnalysisCitation[];
+}
+
+export interface TeamingSectionData {
+  opportunities: Array<{
+    partner: string;
+    ou: string;
+    rationale: string;
+    cert_leverage: string | null;
+  }>;
+  citations: AnalysisCitation[];
+}
+
+export interface WinThemesSectionData {
+  themes: Array<{
+    theme: string;
+    doctrine_anchor: string | null;
+  }>;
+  citations: AnalysisCitation[];
+}
+
+export interface RisksSectionData {
+  risks: Array<{
+    title: string;
+    severity: "HIGH" | "MED" | "LOW";
+    description: string;
+    mitigation: string | null;
+    linked_risk_id: string | null;
+  }>;
+  citations: AnalysisCitation[];
+}
+
+export interface CitationsSectionData {
+  all_citations: AnalysisCitation[];
+}
+
+export type AnalysisSectionDataMap = {
+  pwin: PwinSectionData;
+  doctrine: DoctrineSectionData;
+  incumbent: IncumbentSectionData;
+  similar_awards: SimilarAwardsSectionData;
+  competitors: CompetitorsSectionData;
+  decision_factors: DecisionFactorsSectionData;
+  teaming: TeamingSectionData;
+  win_themes: WinThemesSectionData;
+  risks: RisksSectionData;
+  citations: CitationsSectionData;
+};
+
+export type AnalysisSectionId = keyof AnalysisSectionDataMap;
+
+export type AnalysisSection<K extends AnalysisSectionId = AnalysisSectionId> =
+  AnalysisSectionBase & {
+    section_id: K;
+    data: AnalysisSectionDataMap[K] | null;
+  };
+
+export interface AnalysisBriefComplete {
+  opportunity_id: string;
+  sources_revision_hash: string | null;
+  generated_at: string;
+  cached: boolean;
+  section_count: number;
+}
