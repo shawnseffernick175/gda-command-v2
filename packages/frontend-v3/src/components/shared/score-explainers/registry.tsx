@@ -26,11 +26,16 @@ export type ScoreType =
 
 export type ScoreInputs = Record<string, unknown>;
 
+/* ── Period mode (CY/FY toggle) ───────────────────────────────── */
+
+export type PeriodMode = "CY" | "FY";
+
 /* ── Explainer definition ─────────────────────────────────────── */
 
 export interface Explainer {
-  description: string;
-  renderFormula: (inputs?: ScoreInputs) => ReactNode;
+  description: string | ((periodMode?: PeriodMode) => string);
+  renderFormula: (inputs?: ScoreInputs, periodMode?: PeriodMode) => ReactNode;
+  renderDataSources?: (periodMode?: PeriodMode) => ReactNode;
   renderInputs?: (inputs: ScoreInputs, score: number | string | null) => ReactNode;
 }
 
@@ -288,112 +293,168 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
 
   /* ── 10. KPI: Orders ────────────────────────────────────────── */
   orders: {
-    description:
-      "Total contract value of awards received in the reporting period.",
-    renderFormula: () => (
+    description: (pm) =>
+      `Total contract orders booked in the ${pm === "FY" ? "fiscal year" : "calendar year"} to date.`,
+    renderFormula: (_, pm) => (
       <p>
-        Source: USAspending.gov + capture records. Period: current reporting window.
+        <span className="font-mono">SUM(actual_orders)</span> over{" "}
+        {pm === "FY" ? "FY" : "CY"}-to-date months from{" "}
+        <span className="font-mono">financial_actuals</span>, using{" "}
+        <span className="font-mono">DISTINCT ON (period)</span> with source
+        precedence <span className="font-mono">income_statement {">"}  l1_actual</span>.
       </p>
     ),
-    renderInputs: (inputs) =>
-      inputs.delta != null ? (
-        <p>
-          Period Δ:{" "}
-          <span className="font-mono">
-            {Number(inputs.delta) >= 0 ? "+" : ""}
-            {fmt(inputs.delta)}%
-          </span>
-        </p>
-      ) : null,
+    renderDataSources: (pm) => (
+      <ul className="space-y-0.5">
+        <Bullet>
+          Table: <span className="font-mono">financial_actuals.actual_orders</span>
+        </Bullet>
+        <Bullet>
+          Source precedence: <span className="font-mono">income_statement {">"}  l1_actual</span> (highest-priority source per month)
+        </Bullet>
+        <Bullet>
+          Period convention: <span className="font-mono">{"\""}{pm === "FY" ? "FY" : "CY"}{"<YY> <Mon>\""}</span>
+        </Bullet>
+        <Bullet>
+          Aggregation window: {pm === "FY" ? "FY" : "CY"}-to-date monthly rows
+        </Bullet>
+      </ul>
+    ),
   },
 
   /* ── 10. KPI: Sales ─────────────────────────────────────────── */
   sales: {
-    description: "Revenue recognized from active contracts.",
-    renderFormula: () => (
-      <p>Source: Financial planning system. Period: current reporting window.</p>
+    description: (pm) =>
+      `Recognized revenue in the ${pm === "FY" ? "fiscal year" : "calendar year"} to date.`,
+    renderFormula: (_, pm) => (
+      <p>
+        <span className="font-mono">SUM(actual_sales)</span> over{" "}
+        {pm === "FY" ? "FY" : "CY"}-to-date months from{" "}
+        <span className="font-mono">financial_actuals</span>, using{" "}
+        <span className="font-mono">DISTINCT ON (period)</span> with source
+        precedence <span className="font-mono">income_statement {">"}  l1_actual</span>.
+      </p>
     ),
-    renderInputs: (inputs) =>
-      inputs.delta != null ? (
-        <p>
-          Period Δ:{" "}
-          <span className="font-mono">
-            {Number(inputs.delta) >= 0 ? "+" : ""}
-            {fmt(inputs.delta)}%
-          </span>
-        </p>
-      ) : null,
+    renderDataSources: (pm) => (
+      <ul className="space-y-0.5">
+        <Bullet>
+          Table: <span className="font-mono">financial_actuals.actual_sales</span>
+        </Bullet>
+        <Bullet>
+          Source precedence: <span className="font-mono">income_statement {">"}  l1_actual</span> (highest-priority source per month)
+        </Bullet>
+        <Bullet>
+          Period convention: <span className="font-mono">{"\""}{pm === "FY" ? "FY" : "CY"}{"<YY> <Mon>\""}</span>
+        </Bullet>
+        <Bullet>
+          Aggregation window: {pm === "FY" ? "FY" : "CY"}-to-date monthly rows
+        </Bullet>
+      </ul>
+    ),
   },
 
   /* ── 10. KPI: EBIT ──────────────────────────────────────────── */
   ebit: {
-    description: "Earnings before interest and taxes.",
-    renderFormula: () => (
-      <p>Derived: Sales − direct costs − overhead.</p>
+    description: (pm) =>
+      `Earnings before interest and taxes (operating profit) for the ${pm === "FY" ? "fiscal year" : "calendar year"} to date.`,
+    renderFormula: (_, pm) => (
+      <p>
+        <span className="font-mono">SUM(actual_ebit)</span> over{" "}
+        {pm === "FY" ? "FY" : "CY"}-to-date months; color-coded
+        (green {"\u2265"} 0, red {"<"} 0). Source precedence{" "}
+        <span className="font-mono">income_statement {">"}  l1_actual</span>.
+      </p>
     ),
-    renderInputs: (inputs) =>
-      inputs.delta != null ? (
-        <p>
-          Period Δ:{" "}
-          <span className="font-mono">
-            {Number(inputs.delta) >= 0 ? "+" : ""}
-            {fmt(inputs.delta)}%
-          </span>
-        </p>
-      ) : null,
+    renderDataSources: (pm) => (
+      <ul className="space-y-0.5">
+        <Bullet>
+          Table: <span className="font-mono">financial_actuals.actual_ebit</span>
+        </Bullet>
+        <Bullet>
+          Source precedence: <span className="font-mono">income_statement {">"}  l1_actual</span> (highest-priority source per month)
+        </Bullet>
+        <Bullet>
+          Period convention: <span className="font-mono">{"\""}{pm === "FY" ? "FY" : "CY"}{"<YY> <Mon>\""}</span>
+        </Bullet>
+        <Bullet>
+          Aggregation window: {pm === "FY" ? "FY" : "CY"}-to-date monthly rows
+        </Bullet>
+      </ul>
+    ),
   },
 
   /* ── 10. KPI: Gross Margin ──────────────────────────────────── */
   gross_margin: {
-    description: "Gross Margin percentage = (Sales − COGS) / Sales × 100.",
+    description: "Gross Margin percentage = (Sales \u2212 COGS) / Sales \u00d7 100.",
     renderFormula: () => (
       <p>Source: Financial planning system. Standard accounting formula.</p>
     ),
-    renderInputs: (inputs) =>
-      inputs.delta != null ? (
-        <p>
-          Period Δ:{" "}
-          <span className="font-mono">
-            {Number(inputs.delta) >= 0 ? "+" : ""}
-            {fmt(inputs.delta)}%
-          </span>
-        </p>
-      ) : null,
   },
 
   /* ── 10. KPI: Return on Sales ───────────────────────────────── */
   ros: {
-    description: "Return on Sales = Net Income / Sales × 100.",
+    description: (pm) =>
+      `Return on Sales (operating margin) for the ${pm === "FY" ? "fiscal year" : "calendar year"} to date.`,
     renderFormula: () => (
-      <p>Derived from financial inputs. Standard accounting formula.</p>
+      <p>
+        <span className="font-mono">ROS = (EBIT / Sales) \u00d7 100</span>,
+        shown as a %; returns 0 when sales = 0; color-coded (green {"\u2265"} 0, red {"<"} 0).
+      </p>
     ),
-    renderInputs: (inputs) =>
-      inputs.delta != null ? (
-        <p>
-          Period Δ:{" "}
-          <span className="font-mono">
-            {Number(inputs.delta) >= 0 ? "+" : ""}
-            {fmt(inputs.delta)}%
-          </span>
-        </p>
-      ) : null,
+    renderDataSources: () => (
+      <ul className="space-y-0.5">
+        <Bullet>
+          Derived from EBIT and Sales (no direct table read)
+        </Bullet>
+        <Bullet>
+          EBIT source: <span className="font-mono">financial_actuals.actual_ebit</span>
+        </Bullet>
+        <Bullet>
+          Sales source: <span className="font-mono">financial_actuals.actual_sales</span>
+        </Bullet>
+      </ul>
+    ),
   },
 
   /* ── 11. KPI: Funded Backlog ─────────────────────────────────── */
   funded_backlog: {
     description:
-      "Total funded value remaining on active task orders (is_seed=false).",
+      "Funded value remaining on active task orders.",
     renderFormula: () => (
-      <p>SUM(task_orders.funded_to_date) WHERE is_seed = false.</p>
+      <p>
+        <span className="font-mono">COALESCE(SUM(funded_to_date), 0)</span>
+      </p>
+    ),
+    renderDataSources: () => (
+      <ul className="space-y-0.5">
+        <Bullet>
+          Table: <span className="font-mono">task_orders.funded_to_date</span>
+        </Bullet>
+        <Bullet>
+          Filter: <span className="font-mono">is_seed = false</span> (real data only)
+        </Bullet>
+      </ul>
     ),
   },
 
   /* ── 12. KPI: Backlog ────────────────────────────────────────── */
   backlog: {
     description:
-      "Total ceiling value (funded + unfunded) of active task orders (is_seed=false).",
+      "Total contract ceiling value across active task orders.",
     renderFormula: () => (
-      <p>SUM(task_orders.total_ceiling) WHERE is_seed = false.</p>
+      <p>
+        <span className="font-mono">COALESCE(SUM(total_ceiling), 0)</span>
+      </p>
+    ),
+    renderDataSources: () => (
+      <ul className="space-y-0.5">
+        <Bullet>
+          Table: <span className="font-mono">task_orders.total_ceiling</span>
+        </Bullet>
+        <Bullet>
+          Filter: <span className="font-mono">is_seed = false</span> (real data only)
+        </Bullet>
+      </ul>
     ),
   },
 

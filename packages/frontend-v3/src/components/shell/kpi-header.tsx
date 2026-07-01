@@ -6,7 +6,7 @@ import { useKpiHeader } from "@/hooks/use-kpi";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { ScoreExplain } from "@/components/shared/score-explainers";
-import type { ScoreType } from "@/components/shared/score-explainers";
+import type { ScoreType, PeriodMode } from "@/components/shared/score-explainers";
 
 type CalendarMode = "CY" | "FY";
 
@@ -119,6 +119,7 @@ export function KpiHeader() {
                   score={value != null ? tile.format(value) : null}
                   label={tile.label}
                   scoreType={tile.scoreType}
+                  periodMode={mode as PeriodMode}
                   className="absolute top-0.5 right-0"
                 />
               </span>
