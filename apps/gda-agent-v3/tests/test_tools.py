@@ -39,12 +39,12 @@ from src.tools.web_search import web_search
 
 
 class TestToolRegistry:
-    def test_all_12_tools_registered(self):
-        assert len(TOOL_REGISTRY) == 12
+    def test_all_15_tools_registered(self):
+        assert len(TOOL_REGISTRY) == 15
 
     def test_list_tools(self):
         names = list_tools()
-        assert len(names) == 12
+        assert len(names) == 15
         assert "sam_search" in names
         assert "govwin_search" in names
         assert "govtribe_search" in names
@@ -59,7 +59,7 @@ class TestToolRegistry:
 
     def test_get_tool_schemas(self):
         schemas = get_tool_schemas()
-        assert len(schemas) == 12
+        assert len(schemas) == 15
         for s in schemas:
             assert "name" in s
             assert "input_schema" in s
