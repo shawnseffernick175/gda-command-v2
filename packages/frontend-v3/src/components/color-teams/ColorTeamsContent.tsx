@@ -113,13 +113,13 @@ export function ColorTeamsContent() {
   return (
     <div className="mx-auto max-w-[1280px] px-8 py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="font-mono text-xl font-bold text-foreground">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
             Color Team Reviews
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Upload a document, run a multi-color Shipley review, and track findings
+          <p className="truncate text-xs text-muted-foreground">
+            Upload a document, run a multi-color Shipley review, and track findings.
           </p>
         </div>
         <button

@@ -331,11 +331,8 @@ function OpportunityList() {
           <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
             Opportunities
           </h1>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Every government opportunity in your wheelhouse — forecasts, sources
-            sought, and active solicitations. Search and filter the list, open one
-            to see its automatic analysis and PWin, and advance the ones worth
-            pursuing into capture.
+          <p className="truncate text-xs text-muted-foreground">
+            Every government opportunity in your wheelhouse — forecasts, sources sought, and active solicitations.
           </p>
         </div>
 

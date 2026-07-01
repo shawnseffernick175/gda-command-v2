@@ -108,12 +108,12 @@ export function WorkshopContent() {
     <div className="mx-auto flex max-w-7xl gap-6 px-8 py-6">
       {/* Left: Document Library */}
       <div className="w-80 shrink-0 space-y-4">
-        <h1 className="font-mono text-lg font-bold text-foreground">Workshop</h1>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          A hands-on space to upload solicitation and reference documents, have
-          the system classify and tear them down, and generate analysis you can
-          feed back into your captures.
-        </p>
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">Workshop</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Upload solicitation and reference documents, classify and tear them down, and generate analysis for captures.
+          </p>
+        </div>
 
         {/* Upload */}
         <UploadDropzone onFiles={handleFiles} disabled={upload.isPending} />
