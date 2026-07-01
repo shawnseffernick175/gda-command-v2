@@ -336,7 +336,7 @@ export function PricingScenarioCard({
 
         {scenarios.length === 0 && !showForm && hasActiveBible && (
           <p className="text-[11px] text-muted-foreground">
-            No pricing scenarios yet. Click &ldquo;Build Scenario&rdquo; to create one.
+            No pricing scenarios yet. Click {"\u201C"}Build Scenario{"\u201D"} to create one.
           </p>
         )}
 
