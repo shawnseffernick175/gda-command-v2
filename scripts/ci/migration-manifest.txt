@@ -130,3 +130,4 @@ v3_121_lifecycle_stage_qualified.sql
 v3_122_ingest_jobs.sql
 v3_123_ingest_backfill_existing.sql
 v3_124_capabilities.sql
+v3_125_analysis_briefs.sql

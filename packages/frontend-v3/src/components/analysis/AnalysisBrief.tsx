@@ -121,7 +121,7 @@ function SectionWrapper({
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium text-ink flex items-center gap-2">
             {section.section_label}
-            {section.stale && <StaleBadge />}
+            {section.source_changed && <StaleBadge />}
             {section.cached && (
               <span className="text-[11px] text-muted font-normal">
                 cached

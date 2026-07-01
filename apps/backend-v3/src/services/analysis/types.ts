@@ -7,10 +7,10 @@ import type { SourceRef } from '../../lib/sources.js';
 export interface AnalysisSectionBase {
   section_id: string;
   section_label: string;
-  status: 'pending' | 'running' | 'done' | 'error' | 'stale';
+  status: 'pending' | 'running' | 'done' | 'error' | 'outdated';
   trace_id: string | null;
   cached: boolean;
-  stale: boolean;
+  source_changed: boolean;
   error_message?: string | null;
   generated_at: string | null;
 }

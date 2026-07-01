@@ -1553,7 +1553,7 @@ export interface AnalysisCitation {
   retrieved_at: string;
 }
 
-export type AnalysisSectionStatus = "pending" | "running" | "done" | "error" | "stale";
+export type AnalysisSectionStatus = "pending" | "running" | "done" | "error" | "outdated";
 
 export interface AnalysisSectionBase {
   section_id: string;
@@ -1561,7 +1561,7 @@ export interface AnalysisSectionBase {
   status: AnalysisSectionStatus;
   trace_id: string | null;
   cached: boolean;
-  stale: boolean;
+  source_changed: boolean;
   error_message?: string | null;
   generated_at: string | null;
 }

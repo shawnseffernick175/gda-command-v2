@@ -79,7 +79,7 @@ export function useAnalysisStream(
         status: "pending",
         trace_id: null,
         cached: false,
-        stale: false,
+        source_changed: false,
         generated_at: null,
         data: null,
       };
@@ -117,6 +117,7 @@ export function useAnalysisStream(
 
       const decoder = new TextDecoder();
       let buffer = "";
+      let currentEvent = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -127,7 +128,6 @@ export function useAnalysisStream(
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
-        let currentEvent = "";
         for (const line of lines) {
           if (line.startsWith("event: ")) {
             currentEvent = line.slice(7).trim();
@@ -160,15 +160,13 @@ export function useAnalysisStream(
         }
       }
 
-      if (status !== "error") {
-        setStatus("done");
-      }
+      setStatus((prev) => prev === "error" ? prev : "done");
     } catch (err) {
       if (controller.signal.aborted) return;
       setStatus("error");
       setError(err instanceof Error ? err.message : "Connection failed");
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!opportunityId) return;

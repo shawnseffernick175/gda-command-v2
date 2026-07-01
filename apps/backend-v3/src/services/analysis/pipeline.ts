@@ -66,7 +66,7 @@ function makePendingSection(sectionId: SectionId): AnalysisSection {
     status: 'pending',
     trace_id: null,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: null,
     data: null,
   } as AnalysisSection;
@@ -79,7 +79,7 @@ function makeRunningSection(sectionId: SectionId): AnalysisSection {
     status: 'running',
     trace_id: null,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: null,
     data: null,
   } as AnalysisSection;
@@ -133,7 +133,7 @@ async function executePwinSection(ctx: OpportunityContext): Promise<PwinSection>
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: {
       score,
@@ -200,7 +200,7 @@ function executeDoctrineSection(ctx: OpportunityContext): DoctrineSection {
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: {
       principles,
@@ -250,7 +250,7 @@ function executeIncumbentSection(ctx: OpportunityContext): IncumbentSection {
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: {
       company_name: incumbent,
@@ -268,6 +268,28 @@ async function executeSimilarAwardsSection(ctx: OpportunityContext): Promise<Sim
   const now = new Date().toISOString();
 
   // Query for similar awards based on agency + NAICS
+  // Guard: require at least one filter to avoid returning unrelated awards
+  if (!ctx.agency && !ctx.naics) {
+    return {
+      section_id: 'similar_awards',
+      section_label: SECTION_LABELS.similar_awards,
+      status: 'done',
+      trace_id: traceId,
+      cached: false,
+      source_changed: false,
+      generated_at: now,
+      data: {
+        awards: [],
+        citations: [{
+          kind: 'internal',
+          title: 'No similar awards found — agency and NAICS both unknown',
+          url: '/audit/analysis/similar-awards',
+          retrieved_at: now,
+        }],
+      },
+    };
+  }
+
   const awardsRes = await pool.query<{
     awardee_name: string | null;
     agency_name: string | null;
@@ -314,7 +336,7 @@ async function executeSimilarAwardsSection(ctx: OpportunityContext): Promise<Sim
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: { awards, citations },
   };
@@ -368,7 +390,7 @@ function executeCompetitorsSection(ctx: OpportunityContext): CompetitorsSection 
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: { competitors, citations },
   };
@@ -403,7 +425,7 @@ function executeDecisionFactorsSection(ctx: OpportunityContext): DecisionFactors
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: {
       evaluation_method: evaluationMethod,
@@ -464,7 +486,7 @@ function executeTeamingSection(ctx: OpportunityContext): TeamingSection {
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: {
       opportunities,
@@ -523,7 +545,7 @@ function executeWinThemesSection(ctx: OpportunityContext): WinThemesSection {
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: {
       themes: themes.slice(0, 5),
@@ -627,7 +649,7 @@ function executeRisksSection(ctx: OpportunityContext): RisksSection {
     status: 'done',
     trace_id: traceId,
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: now,
     data: {
       risks: risks.slice(0, 5),
@@ -710,7 +732,13 @@ export async function runAnalysisPipeline(
   const cached = await getCachedBrief(opportunityId);
   if (cached && cached.sources_revision_hash === currentHash) {
     // Serve from cache — mark sections as cached
-    const sections = cached.sections.map((s) => ({ ...s, cached: true, stale: false }));
+    const sections = cached.sections.map((s) => ({ ...s, cached: true, source_changed: false }));
+    // Emit cached sections through the callback so SSE clients receive them
+    if (onSection) {
+      for (const section of sections) {
+        onSection(section as AnalysisSection);
+      }
+    }
     return {
       opportunity_id: opportunityId,
       sections: sections as AnalysisSection[],
@@ -773,7 +801,7 @@ export async function runAnalysisPipeline(
     status: 'done',
     trace_id: crypto.randomUUID(),
     cached: false,
-    stale: false,
+    source_changed: false,
     generated_at: new Date().toISOString(),
     data: { all_citations: allCitations },
   };
