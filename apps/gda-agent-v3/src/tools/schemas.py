@@ -262,3 +262,37 @@ class GovtribeSearchOutput(BaseModel):
     credits_used: int = 0
     from_cache: bool = False
     warning: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# F-313: Output Generators
+# ---------------------------------------------------------------------------
+class GeneratedDocResult(BaseModel):
+    doc_id: str
+    doc_type: str
+    title: str
+    download_url: str
+
+
+class GenerateBriefingInput(BaseModel):
+    opportunity_id: str = Field(description="ID of the opportunity to generate a briefing for")
+
+
+class GenerateBriefingOutput(BaseModel):
+    result: GeneratedDocResult
+
+
+class GenerateCapturePlanInput(BaseModel):
+    capture_id: str = Field(description="ID of the capture to generate a plan for")
+
+
+class GenerateCapturePlanOutput(BaseModel):
+    result: GeneratedDocResult
+
+
+class GenerateWinThemesInput(BaseModel):
+    capture_id: str = Field(description="ID of the capture to generate win themes for")
+
+
+class GenerateWinThemesOutput(BaseModel):
+    result: GeneratedDocResult

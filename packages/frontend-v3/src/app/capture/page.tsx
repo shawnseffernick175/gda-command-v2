@@ -35,6 +35,7 @@ import { MyOpenReviews } from "@/components/capture/MyOpenReviews";
 import { CapturePlanDrawer } from "@/components/capture/CapturePlanDrawer";
 import { ScoringWorkspace } from "@/components/capture/ScoringWorkspace";
 import { useCaptureReviews } from "@/hooks/use-capture-reviews";
+import { CaptureOutputGenerators } from "@/components/output-generators/CaptureOutputGenerators";
 import type {
   CaptureColorStage,
   CaptureStageAnnotation,
@@ -460,6 +461,9 @@ function CaptureDetail({ oppId }: { oppId: string }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* F-313: Output Generators — Capture Plan + Win Themes */}
+      {capture.id && <CaptureOutputGenerators captureId={String(capture.id)} />}
 
       <ColorTeamWorkflow captureId={oppId} />
 

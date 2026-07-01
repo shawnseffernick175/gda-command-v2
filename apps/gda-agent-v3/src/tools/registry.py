@@ -41,6 +41,17 @@ from src.tools.schemas import (
     UsaSpendingSearchOutput,
     WebSearchInput,
     WebSearchOutput,
+    GenerateBriefingInput,
+    GenerateBriefingOutput,
+    GenerateCapturePlanInput,
+    GenerateCapturePlanOutput,
+    GenerateWinThemesInput,
+    GenerateWinThemesOutput,
+)
+from src.tools.output_generators import (
+    generate_briefing,
+    generate_capture_plan,
+    generate_win_themes,
 )
 from src.tools.usaspending_search import usaspending_search
 from src.tools.web_search import web_search
@@ -168,6 +179,27 @@ _register(
     GovtribeSearchInput,
     GovtribeSearchOutput,
     govtribe_search,
+)
+_register(
+    "generate_briefing",
+    "Generate an Opportunity Briefing PDF for a given opportunity (F-313)",
+    GenerateBriefingInput,
+    GenerateBriefingOutput,
+    generate_briefing,
+)
+_register(
+    "generate_capture_plan",
+    "Generate a Capture Plan PDF for a given capture (F-313)",
+    GenerateCapturePlanInput,
+    GenerateCapturePlanOutput,
+    generate_capture_plan,
+)
+_register(
+    "generate_win_themes",
+    "Generate a Win Theme deck PDF for a given capture (F-313)",
+    GenerateWinThemesInput,
+    GenerateWinThemesOutput,
+    generate_win_themes,
 )
 
 
