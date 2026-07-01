@@ -44,13 +44,15 @@ import {
 import type {
   DoctrineFitLabel,
   LlmAnalysis,
-  ShipleyDimension,
   OpportunitySummary,
 } from "@/lib/types";
-import { DoctrineAlignmentPanel } from "@/components/shared/DoctrineAlignmentPanel";
+// DoctrineAlignmentPanel superseded by F-305 10-section SSE brief
+// import { DoctrineAlignmentPanel } from "@/components/shared/DoctrineAlignmentPanel";
 import { MarginFloorBanner } from "@/components/shared/MarginFloorBanner";
 import { DoctrineOverrideModal } from "@/components/shared/DoctrineOverrideModal";
 import { useDoctrineEvaluations } from "@/hooks/use-doctrine-evaluation";
+import { useOpportunityAnalysis } from "@/hooks/use-opportunity-analysis";
+import { DecisionBriefStream } from "@/components/opportunity-analysis/DecisionBriefStream";
 
 const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
 
@@ -1231,6 +1233,9 @@ function OpportunityDetail({ id }: { id: string }) {
   const { data: doctrineEvals } = useDoctrineEvaluations("opportunity", id);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
 
+  // F-305: Auto-trigger SSE analysis stream on mount (R2 compliance — no click-to-analyze)
+  const analysisStream = useOpportunityAnalysis(id);
+
   const llmForEffect = opp?.llm_analysis as LlmAnalysis | null | undefined;
   useEffect(() => {
     if (
@@ -1268,7 +1273,6 @@ function OpportunityDetail({ id }: { id: string }) {
     return <ErrorState message={`Record mismatch: requested id ${id} but received id ${opp.id}`} />;
   }
 
-  const llm = opp.llm_analysis as LlmAnalysis | null | undefined;
   const currentStage = opp.pipeline_stage ? stageKeyToLabel(opp.pipeline_stage) : (opp.stage ?? "Interest");
   const timeline = opp.analysis?.timeline;
   const doctrine = opp.doctrine_badge;
@@ -1406,20 +1410,17 @@ function OpportunityDetail({ id }: { id: string }) {
       <div className="grid gap-6 lg:grid-cols-[55%_1fr]">
         {/* ═══ COLUMN A ═══ */}
         <div className="space-y-4">
-          {/* Decision Brief */}
-          <DecisionBriefPanel llm={llm} oppId={id} canonicalPwin={opp.pwin?.score ?? null} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} relevanceStatus={opp.relevance_status} relevanceReason={opp.relevance_reason} />
-
-          {/* Competitive Intelligence */}
-          <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
-
-          {/* Risks */}
-          <RisksPanel llm={llm} />
+          {/* F-305: 10-section Decision Brief via SSE (R2: auto on open, R1: source citations) */}
+          <DecisionBriefStream
+            sections={analysisStream.sections}
+            isStreaming={analysisStream.isStreaming}
+            isDone={analysisStream.isDone}
+            error={analysisStream.error}
+            traceId={analysisStream.traceId}
+          />
 
           {/* Ask AI — inline, always open */}
           <AskAiInline id={id} title={opp.title} agency={opp.agency} pwin={opp.pwin?.score} />
-
-          {/* Doctrine Alignment Panel */}
-          <DoctrineAlignmentPanel entityId={id} />
 
           {/* Margin Floor Banner */}
           {latestDoctrineEval?.margin_check && (
@@ -1667,326 +1668,9 @@ function isUrgent(date?: string | null): boolean {
   return diff > 0 && diff <= 7 * 86400 * 1000;
 }
 
-const SHIPLEY_DIMENSIONS: Array<{
-  key: keyof import("@/lib/types").ShipleyBidNoBid;
-  label: string;
-}> = [
-  { key: "customer_knowledge", label: "Customer Knowledge" },
-  { key: "solution_match", label: "Solution Match" },
-  { key: "competitive_position", label: "Competitive Position" },
-  { key: "past_performance", label: "Past Performance" },
-];
+// F-305: DecisionBriefPanel, CompetitiveIntelPanel, RisksPanel removed —
+// replaced by DecisionBriefStream (10-section SSE progressive rendering).
 
-const BID_BADGE_COLORS: Record<string, string> = {
-  Bid: "bg-gda-green/20 border-gda-green text-gda-green",
-  "No Bid": "bg-gda-red/10 border-gda-red text-gda-red",
-  Conditional: "bg-gda-amber/10 border-gda-amber text-gda-amber",
-};
-
-function DecisionBriefPanel({
-  llm,
-  canonicalPwin,
-  analyzing,
-  llmErrorKind,
-  relevanceStatus,
-  relevanceReason,
-}: {
-  llm?: LlmAnalysis | null;
-  oppId: string;
-  canonicalPwin?: number | null;
-  analyzing: boolean;
-  llmErrorKind?: string | null;
-  relevanceStatus?: string | null;
-  relevanceReason?: string | null;
-}) {
-  const isPreAssessed =
-    relevanceStatus === "off_profile" ||
-    relevanceStatus === "auto_pass" ||
-    relevanceStatus === "unknown_naics";
-
-  const preAssessmentBlock = isPreAssessed ? (() => {
-    const preLabel =
-      relevanceStatus === "auto_pass"
-        ? "Auto-passed"
-        : relevanceStatus === "off_profile"
-          ? "Off profile"
-          : "NAICS unverified";
-    const preColor =
-      relevanceStatus === "auto_pass"
-        ? "border-gda-amber/40 text-gda-amber"
-        : "border-gda-red/40 text-gda-red";
-    return (
-      <div className="space-y-1">
-        <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">
-          Pre-Assessment
-        </p>
-        <span className="inline-flex items-center gap-1">
-          <Badge className={cn("text-sm font-mono font-bold px-3 py-1 border", preColor)}>
-            {preLabel}
-          </Badge>
-          <ScoreExplain
-            score={preLabel}
-            label="Relevance"
-            scoreType="relevance"
-            inputs={{ status: relevanceStatus, reason: relevanceReason }}
-          />
-        </span>
-        {relevanceReason && (
-          <p className="text-xs text-muted-foreground leading-relaxed font-mono">
-            {relevanceReason}
-          </p>
-        )}
-      </div>
-    );
-  })() : null;
-
-  if (!llm) {
-    return (
-      <Card className="border-border bg-gda-panel">
-        <CardHeader className="pb-2">
-          <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
-            Decision Brief
-          </CardTitle>
-        </CardHeader>
-        <CardContent className={cn("space-y-3", isPreAssessed ? "py-4" : "text-center py-6")}>
-          {preAssessmentBlock}
-          {analyzing ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="flex items-center gap-2">
-                <span className="inline-block h-3 w-3 rounded-full bg-gda-cyan animate-pulse" />
-                <p className="text-xs text-gda-cyan font-mono font-semibold">
-                  Analyzing... (thinking)
-                </p>
-              </div>
-              <p className="text-[11px] text-muted-foreground/60 font-mono">
-                AI analysis in progress - results will appear shortly
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-xs text-muted-foreground font-mono">
-                Analysis pending
-              </p>
-              {llmErrorKind && (
-                <p className="text-[11px] text-gda-red/80 font-mono">
-                  Error: {llmErrorKind}
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const bidRec = llm.bid_recommendation ?? llm.shipley_bid_no_bid.overall;
-  const bidColor = BID_BADGE_COLORS[bidRec] ?? "border-border text-muted-foreground";
-  // Use canonical pwin (single source of truth, #849) — same value shown on list
-  const pwinScore = canonicalPwin ?? llm.win_probability;
-  const pwinColor = pwinScore >= 70 ? "text-gda-green" : pwinScore >= 40 ? "text-gda-amber" : "text-gda-red";
-
-  return (
-    <Card className="border-border bg-gda-panel">
-      <CardHeader className="pb-2">
-        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
-          Decision Brief
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {preAssessmentBlock}
-        {/* Recommendation badge */}
-        <div>
-          <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Recommendation</p>
-          <Badge className={cn("text-sm font-mono font-bold px-3 py-1 border", bidColor)}>
-            {bidRec}
-          </Badge>
-        </div>
-
-        {/* Executive summary */}
-        {llm.executive_summary && (
-          <p className="text-xs text-foreground leading-relaxed">
-            {llm.executive_summary}
-          </p>
-        )}
-
-        {/* Win Probability */}
-        <div>
-          <div className="flex items-center gap-1 mb-1">
-            <p className="text-[11px] font-mono text-muted-foreground uppercase">Win Probability</p>
-            <ScoreExplain
-              score={pwinScore}
-              label="Pwin"
-              scoreType="pwin"
-              inputs={{ top_drivers: [] }}
-            />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className={cn("font-mono text-4xl font-bold", pwinColor)}>
-              {pwinScore}%
-            </span>
-          </div>
-          {llm.win_probability_reasoning && (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {llm.win_probability_reasoning}
-            </p>
-          )}
-        </div>
-
-        {/* Shipley Dimensions */}
-        <div>
-          <p className="text-[11px] font-mono text-muted-foreground uppercase mb-2">Shipley Dimensions</p>
-          <div className="space-y-1.5">
-            {SHIPLEY_DIMENSIONS.map((dim) => {
-              const d = llm.shipley_bid_no_bid[dim.key] as ShipleyDimension | undefined;
-              if (!d) return null;
-              return (
-                <div key={dim.key} className="flex items-center gap-2 text-xs">
-                  <span className="w-40 text-muted-foreground">{dim.label}</span>
-                  <span className="font-mono text-foreground w-10">{d.score}/10</span>
-                  <div className="flex-1 h-1.5 rounded bg-gda-panel overflow-hidden border border-border">
-                    <div
-                      className="h-full rounded bg-gda-green"
-                      style={{ width: `${d.score * 10}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function CompetitiveIntelPanel({
-  llm,
-  incumbent,
-}: {
-  llm?: LlmAnalysis | null;
-  incumbent?: string | null;
-}) {
-  const competitors = llm?.competitive_landscape ?? [];
-
-  if (!llm) return null;
-
-  return (
-    <Card className="border-border bg-gda-panel">
-      <CardHeader className="pb-2">
-        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
-          Competitive Intelligence
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {competitors.length > 0 ? (
-          <>
-            <div>
-              <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Likely Competitors</p>
-              <div className="space-y-1">
-                {competitors.map((c, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs">
-                    <span className="font-mono text-foreground whitespace-nowrap font-medium">
-                      {c.name}
-                    </span>
-                    {c.threat_level && (
-                      <Badge variant="outline" className={cn(
-                        "text-[11px]",
-                        c.threat_level === "high" && "text-gda-red border-gda-red/30",
-                        c.threat_level === "medium" && "text-gda-amber border-gda-amber/30",
-                        c.threat_level === "low" && "text-gda-cyan border-gda-cyan/30",
-                      )}>
-                        {c.threat_level}
-                      </Badge>
-                    )}
-                    <span className="text-muted-foreground">{c.our_differentiator}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Competitive landscape not yet analyzed
-          </p>
-        )}
-        <div>
-          <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Incumbent</p>
-          {incumbent ? (
-            <span className="text-xs text-foreground font-mono">{incumbent}</span>
-          ) : (
-            <FieldStatusBadge
-              reason={
-                /* TODO: use opp.pwin?.incumbent_source once issue #793 ships */
-                "no_source_data"
-              }
-            />
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-const RISK_LEVEL_COLORS: Record<string, string> = {
-  HIGH: "bg-gda-red/10 text-gda-red border-gda-red/30",
-  MED: "bg-gda-amber/10 text-gda-amber border-gda-amber/30",
-  LOW: "bg-gda-cyan/10 text-gda-cyan border-gda-cyan/30",
-};
-
-function RisksPanel({ llm }: { llm?: LlmAnalysis | null }) {
-  const risks = llm?.risks ?? [];
-
-  if (!llm) return null;
-  if (risks.length === 0) {
-    return (
-      <Card className="border-border bg-gda-panel">
-        <CardHeader className="pb-2">
-          <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
-            Risks
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground">No risks analyzed yet</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="border-border bg-gda-panel">
-      <CardHeader className="pb-2">
-        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
-          Risks
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {risks.map((risk, i) => (
-          <div key={i} className="text-xs space-y-0.5">
-            <div className="flex items-start gap-2">
-              <Badge className={cn("text-[11px] font-mono border shrink-0", RISK_LEVEL_COLORS[risk.level] ?? "text-muted-foreground")}>
-                {risk.level}
-              </Badge>
-              <span className="text-foreground">{risk.description}</span>
-            </div>
-            {risk.mitigation && (
-              <p className="ml-12 text-muted-foreground">Mitigation: {risk.mitigation}</p>
-            )}
-            {risk.regulatory_citation && (
-              <a
-                href={`https://www.acquisition.gov/far/${risk.regulatory_citation.replace(/\s/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-12 inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] font-mono text-gda-cyan hover:border-gda-cyan/40 transition-colors"
-              >
-                {risk.regulatory_citation}
-              </a>
-            )}
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
 
 function MetaRow({ label, value, mono, className }: { label: string; value: string; mono?: boolean; className?: string }) {
   return (
