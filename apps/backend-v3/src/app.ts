@@ -58,6 +58,7 @@ import { pipelineCoverageRoutes } from './routes/pipeline-coverage.js';
 import { captureReviewRoutes } from './routes/capture-reviews.js';
 import { intakeAssessmentRoutes } from './routes/intake-assessment.js';
 import { qaChecklistRoutes } from './routes/qa-checklist.js';
+import { universalIngestRoutes } from './routes/universal-ingest.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -192,6 +193,7 @@ export async function buildApp() {
   await app.register(captureReviewRoutes);
   await app.register(intakeAssessmentRoutes);
   await app.register(qaChecklistRoutes);
+  await app.register(universalIngestRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

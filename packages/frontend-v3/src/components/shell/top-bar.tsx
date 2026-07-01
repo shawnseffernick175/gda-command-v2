@@ -5,11 +5,13 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { CommandPalette } from "./command-palette";
 import { KpiHeader } from "./kpi-header";
+import { IngestJobsPanel } from "@/components/IngestJobsPanel";
 
 export function TopBar() {
   const { user, logout } = useAuth();
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [ingestOpen, setIngestOpen] = useState(false);
 
   return (
     <>
@@ -41,6 +43,15 @@ export function TopBar() {
               ⌘K
             </kbd>
           </button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setIngestOpen(!ingestOpen)}
+          >
+            Ingest
+          </Button>
 
           <div className="relative">
             <Button
@@ -96,6 +107,7 @@ export function TopBar() {
         </div>
       </div>
       <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
+      <IngestJobsPanel isOpen={ingestOpen} onClose={() => setIngestOpen(false)} />
     </>
   );
 }
