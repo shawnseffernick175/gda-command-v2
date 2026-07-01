@@ -1697,3 +1697,61 @@ export interface AnalysisBriefComplete {
   cached: boolean;
   section_count: number;
 }
+
+/* ── Sentinel Handoff Monitor (F-309) ──────────────────────────── */
+
+export interface SentinelHandoffCard {
+  id: string;
+  title: string;
+  context: string | null;
+  action_label: string | null;
+  action_url: string | null;
+  severity: string;
+  source_key: string | null;
+  due_by: string | null;
+  created_at: string;
+}
+
+export interface SentinelRecentWinCard {
+  id: string;
+  title: string;
+  context: string | null;
+  source_key: string | null;
+  created_at: string;
+}
+
+export interface SentinelUpcomingBreakCard {
+  id: string;
+  title: string;
+  context: string | null;
+  action_label: string | null;
+  action_url: string | null;
+  severity: string;
+  due_by: string | null;
+  created_at: string;
+}
+
+export interface SentinelCreditPacingGovTribe {
+  month: string;
+  credits_used: number;
+  credits_budget: number;
+  pct: number;
+  burn_rate_7d: number;
+  projected_exhaustion_date: string | null;
+  days_remaining_in_month: number;
+  daily_allowance: number;
+  today_spent: number;
+  top_queries: Array<{ tool_name: string; credits: number; call_count: number }>;
+}
+
+export interface SentinelCreditPacingGovWin {
+  month: string;
+  calls_mtd: number;
+  avg_daily_calls: number;
+  last_call_at: string | null;
+  auth_status: {
+    token_valid: boolean;
+    expires_in_minutes: number;
+  };
+  top_endpoints: Array<{ endpoint: string; call_count: number }>;
+}
