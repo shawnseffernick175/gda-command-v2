@@ -67,7 +67,7 @@ export function LaunchpadRisksPanel() {
         <div className="flex items-center gap-2">
           <AlertTriangleIcon className="h-4 w-4 text-red-400" />
           <h3 className="font-mono text-sm font-bold text-foreground">
-            What&apos;s at Risk
+            What's at Risk
           </h3>
         </div>
         <Badge variant="outline" className="text-[11px] font-mono">
