@@ -270,7 +270,7 @@ function BurnRateSparkline({ data }: { data: Array<{ date: string; credits: numb
       data: data.map((d) => d.date.slice(5)),
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { fontSize: 9, color: "#94a3b8" },
+      axisLabel: { fontSize: 9, color: "var(--color-muted-foreground)" },
     },
     yAxis: {
       type: "value" as const,
@@ -291,15 +291,15 @@ function BurnRateSparkline({ data }: { data: Array<{ date: string; credits: numb
         smooth: true,
         symbol: "circle",
         symbolSize: 4,
-        lineStyle: { width: 2, color: "#3b82f6" },
-        itemStyle: { color: "#3b82f6" },
+        lineStyle: { width: 2, color: "var(--color-gda-blue)" },
+        itemStyle: { color: "var(--color-gda-blue)" },
         areaStyle: {
           color: {
             type: "linear",
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: "rgba(59,130,246,0.15)" },
-              { offset: 1, color: "rgba(59,130,246,0)" },
+              { offset: 0, color: "rgba(68,136,255,0.15)" },
+              { offset: 1, color: "rgba(68,136,255,0)" },
             ],
           },
         },
