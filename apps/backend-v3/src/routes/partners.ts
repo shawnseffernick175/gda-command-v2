@@ -193,28 +193,25 @@ export async function partnerRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/partners', async (req, reply) => {
     const dbProfiles = await getAllProfilesFromDb();
 
-    if (dbProfiles.length > 0) {
-      const items = dbProfiles.map((p) => ({
-        ou: p.ou,
-        name: p.name,
-        overview: p.overview,
-        agencies_of_strength: p.agencies_of_strength,
-        certifications: p.certifications,
-        active: p.active,
-        stale: isStale(p.last_reviewed_at),
-        last_reviewed_at: p.last_reviewed_at,
-      }));
-      return reply.status(200).send(successEnvelope({ items }, req.requestId));
-    }
-
-    // Fallback to legacy in-memory data
-    const items = Object.values(LEGACY_PARTNERS).map((p) => ({
-      id: p.id,
-      display_name: p.display_name,
-      anchor_company: p.anchor_company,
-      capabilities: p.capabilities,
-      certifications: p.certifications,
-    }));
+    // Build list items merging DB freshness data with legacy profile info
+    const items = Object.values(LEGACY_PARTNERS).map((p) => {
+      const dbMatch = dbProfiles.find((d) => d.ou === p.id);
+      const certNames = dbMatch?.certifications ?? p.certifications.map((c) => c.name);
+      return {
+        id: p.id,
+        ou: p.id,
+        display_name: p.display_name,
+        name: dbMatch?.name ?? p.display_name,
+        anchor_company: p.anchor_company,
+        overview: dbMatch?.overview ?? '',
+        capabilities: p.capabilities,
+        agencies_of_strength: dbMatch?.agencies_of_strength ?? [],
+        certifications: certNames,
+        active: dbMatch?.active ?? true,
+        stale: dbMatch ? isStale(dbMatch.last_reviewed_at) : false,
+        last_reviewed_at: dbMatch?.last_reviewed_at ?? new Date().toISOString(),
+      };
+    });
     return reply.status(200).send(successEnvelope({ items }, req.requestId));
   });
 
@@ -231,22 +228,36 @@ export async function partnerRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
-    const dbProfile = await getProfileFromDb(ou);
-    if (dbProfile) {
-      return reply.status(200).send(successEnvelope({
-        ...dbProfile,
-        stale: isStale(dbProfile.last_reviewed_at),
-      }, req.requestId));
-    }
-
-    // Fallback to legacy
-    const partner = LEGACY_PARTNERS[ou] ?? LEGACY_PARTNERS[id];
-    if (!partner) {
+    // Always return the legacy profile shape (with source citations per R1)
+    // augmented with DB-sourced freshness data when available
+    const legacy = LEGACY_PARTNERS[ou] ?? LEGACY_PARTNERS[id];
+    if (!legacy) {
       return reply.status(404).send(
         errorEnvelope('NOT_FOUND', `Partner not found. Valid IDs: riverstone, pd_systems`, req.requestId),
       );
     }
-    return reply.status(200).send(successEnvelope(partner, req.requestId));
+
+    const dbProfile = await getProfileFromDb(ou);
+    const stale = dbProfile ? isStale(dbProfile.last_reviewed_at) : false;
+    const lastReviewedAt = dbProfile?.last_reviewed_at ?? new Date().toISOString();
+
+    return reply.status(200).send(successEnvelope({
+      ...legacy,
+      // Overlay DB-sourced fields when available
+      ...(dbProfile ? {
+        ou: dbProfile.ou,
+        name: dbProfile.name,
+        overview: dbProfile.overview,
+        agencies_of_strength: dbProfile.agencies_of_strength,
+        naics_codes: dbProfile.naics_codes,
+        capabilities_summary: dbProfile.capabilities_summary,
+        past_performance_summary_detail: dbProfile.past_performance_summary,
+        key_personnel: dbProfile.key_personnel,
+        active: dbProfile.active,
+      } : {}),
+      stale,
+      last_reviewed_at: lastReviewedAt,
+    }, req.requestId));
   });
 
   // PATCH /v3/partners/:id — restricted to OU owner; Envision context → 403
@@ -355,13 +366,12 @@ export async function partnerRoutes(app: FastifyInstance): Promise<void> {
           id: string;
           title: string;
           naics: string | null;
-          set_aside_code: string | null;
-          set_aside_description: string | null;
+          set_aside: string | null;
           description: string | null;
           agency: string | null;
           department: string | null;
         }>(
-          `SELECT id, title, naics, set_aside_code, set_aside_description, description, agency, department
+          `SELECT id, title, naics, set_aside, description, agency, department
            FROM opportunities WHERE id = $1`,
           [opportunity_id],
         );
@@ -444,8 +454,7 @@ function computeTeamingFit(
   opp: {
     title: string;
     naics: string | null;
-    set_aside_code: string | null;
-    set_aside_description: string | null;
+    set_aside: string | null;
     description: string | null;
     agency: string | null;
     department: string | null;
@@ -457,7 +466,7 @@ function computeTeamingFit(
   const evidence: Array<{ field: string; value: string }> = [];
 
   // 1. Set-aside cert match (strongest signal)
-  const setAside = (opp.set_aside_code ?? opp.set_aside_description ?? '').toLowerCase();
+  const setAside = (opp.set_aside ?? '').toLowerCase();
   if (setAside) {
     const certMap: Record<string, string[]> = {
       hubzone: ['HUBZone'],
