@@ -135,3 +135,4 @@ v3_126_sentinel_events.sql
 v3_127_output_generators.sql
 v3_128_action_item_ai_drafts.sql
 v3_129_risks_first_class.sql
+v3_130_financial_bible.sql

@@ -27,6 +27,7 @@ import { CollapseSection } from "@/components/shared/collapse-section";
 import { AskAiPanel } from "@/components/shared/ask-ai-panel";
 import { useVaultDocuments } from "@/hooks/use-vault";
 import { useGenerateCapturePlan, useGenerateWinThemes, useGeneratedDocuments } from "@/hooks/use-output-generators";
+import { PricingScenarioCard } from "@/components/shared/PricingScenarioCard";
 import { formatMoney } from "@/lib/format-money";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
@@ -468,6 +469,9 @@ function CaptureDetail({ oppId }: { oppId: string }) {
       <ColorTeamWorkflow captureId={oppId} />
 
       <AskAiPanel objectType="capture" objectId={oppId} />
+
+      {/* Financial Bible Pricing Scenario (F-311) */}
+      <PricingScenarioCard entityId={oppId} entityKind="capture" />
 
       {/* Vault Documents (F-614) */}
       <CaptureVaultDocs captureId={Number(oppId)} />

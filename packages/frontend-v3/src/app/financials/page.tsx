@@ -14,6 +14,7 @@ import { ArTab } from "@/components/financials/tabs/ArTab";
 import { TrialBalanceTab } from "@/components/financials/tabs/TrialBalanceTab";
 import { ProjectRevenueTab } from "@/components/financials/tabs/ProjectRevenueTab";
 import { IngestionCoverageTab } from "@/components/financials/tabs/IngestionCoverageTab";
+import { FinancialBibleTab } from "@/components/financials/tabs/FinancialBibleTab";
 import {
   useAiAnalyze,
   useP2Financials,
@@ -32,7 +33,8 @@ type Tab =
   | "trial-balance"
   | "project-revenue"
   | "ingestion-coverage"
-  | "definitions";
+  | "definitions"
+  | "financial-bible";
 
 interface TabGroup {
   label: string;
@@ -67,6 +69,12 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { id: "waterfall", label: "Contract Waterfall" },
       { id: "project-revenue", label: "Project Revenue" },
+    ],
+  },
+  {
+    label: "Pricing",
+    tabs: [
+      { id: "financial-bible", label: "Financial Bible" },
     ],
   },
   {
@@ -125,6 +133,8 @@ function tabTitle(tab: Tab): string {
       return "Ingestion Coverage";
     case "definitions":
       return "Definitions";
+    case "financial-bible":
+      return "Financial Bible";
     default:
       return String(tab);
   }
@@ -296,6 +306,7 @@ export default function FinancialsPage() {
         {activeTab === "project-revenue" && <ProjectRevenueTab />}
         {activeTab === "ingestion-coverage" && <IngestionCoverageTab />}
         {activeTab === "definitions" && <DefinitionsTab />}
+        {activeTab === "financial-bible" && <FinancialBibleTab />}
       </div>
 
       {/* AI Analyze Modal */}
