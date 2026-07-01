@@ -16,11 +16,12 @@
  *      (no_naics / out_of_naics / deadline_lt_30d / commodity_purchase /
  *       low_pwin → pass; otherwise → ops_tracker, ranked by pWin/fit).
  *
- *   2. PURGE — DELETES the ~5,245 junk pipeline_items that were auto-created
- *      with capture_owner = 'system' and stage = 'no_bid'. It KEEPS every
- *      user-owned pipeline item (the 12 real CEO items in qualify / pursue /
- *      solicitation, etc.). It will NEVER delete a row whose capture_owner is
- *      anything other than the literal string 'system'.
+ *   2. (REMOVED — F-600) Previously purged system/no_bid pipeline_items.
+ *      Bulk DELETE on pipeline_items is now permanently blocked by the
+ *      v3_106 BEFORE DELETE trigger. All pipeline items are owner-promoted
+ *      decisions; terminal stages (no_bid, won, lost, gov_cancelled) are
+ *      explicit owner verdicts, not junk. The trigger raises an exception
+ *      on any DELETE unless SET LOCAL gda.allow_pipeline_delete = 'true'.
  *
  * SAFETY:
  *   - Runs in DRY-RUN by default: prints what WOULD change, writes nothing.
@@ -172,17 +173,15 @@ async function main(): Promise<void> {
     console.log(`[classify]   → ops_tracker: ${toOps}`);
     console.log(`[classify]   by reason: ${JSON.stringify(tally)}`);
 
-    // ── 2. PURGE junk system no_bid pipeline_items ───────────────────────────
-    const { rows: junkCount } = await client.query<{ n: string }>(
-      `SELECT COUNT(*)::text AS n FROM pipeline_items
-        WHERE capture_owner = 'system' AND stage = 'no_bid'`,
+    // ── 2. (REMOVED — F-600) pipeline_items DELETE is permanently blocked ──
+    // Owner rule: every pipeline_item is an owner-promoted decision. The
+    // v3_106 BEFORE DELETE trigger on pipeline_items raises an exception on
+    // any DELETE. No automated/bulk process may remove rows from this table.
+    // Stage transitions are the ONLY valid mutation — rows are NEVER removed.
+    const { rows: pipelineCount } = await client.query<{ n: string }>(
+      `SELECT COUNT(*)::text AS n FROM pipeline_items`,
     );
-    const { rows: keepCount } = await client.query<{ n: string }>(
-      `SELECT COUNT(*)::text AS n FROM pipeline_items
-        WHERE NOT (capture_owner = 'system' AND stage = 'no_bid')`,
-    );
-    console.log(`\n[purge] system/no_bid pipeline_items to DELETE: ${junkCount[0]?.n ?? '0'}`);
-    console.log(`[purge] user-owned pipeline_items to KEEP:      ${keepCount[0]?.n ?? '0'}`);
+    console.log(`\n[pipeline] total pipeline_items (protected by F-600 trigger): ${pipelineCount[0]?.n ?? '0'}`);
 
     if (!apply) {
       console.log('\nDRY-RUN complete. No changes written. Re-run with --apply --i-understand-this-is-destructive to commit.');
@@ -204,13 +203,9 @@ async function main(): Promise<void> {
       classified++;
     }
 
-    const del = await client.query(
-      `DELETE FROM pipeline_items WHERE capture_owner = 'system' AND stage = 'no_bid'`,
-    );
-
     await client.query('COMMIT');
     console.log(`\n[apply] classified ${classified} opportunities.`);
-    console.log(`[apply] deleted ${del.rowCount} junk system/no_bid pipeline_items.`);
+    console.log('[apply] pipeline_items untouched (F-600: DELETE permanently blocked).');
     console.log('APPLY complete.');
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch { /* ignore */ }
