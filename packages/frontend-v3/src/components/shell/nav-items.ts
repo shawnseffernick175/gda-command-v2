@@ -22,6 +22,7 @@ import {
   FolderKanban,
   Palette,
   Crosshair,
+  Handshake,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -49,6 +50,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Color Team", href: "/color-teams", icon: Palette },
   { label: "Workshop", href: "/workshop", icon: Hammer },
   { label: "Overrides", href: "/overrides", icon: GitCompare },
+  { label: "Partner Intel", href: "/partners", icon: Handshake },
   { label: "Contacts", href: "/contacts", icon: Users },
   { label: "Competitors", href: "/competitors", icon: Shield },
   { label: "Risks", href: "/risks", icon: AlertTriangle },

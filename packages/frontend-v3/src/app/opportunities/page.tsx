@@ -54,6 +54,7 @@ import { DoctrineOverrideModal } from "@/components/shared/DoctrineOverrideModal
 import { useDoctrineEvaluations } from "@/hooks/use-doctrine-evaluation";
 import { useOpportunityAnalysis } from "@/hooks/use-opportunity-analysis";
 import { DecisionBriefStream } from "@/components/opportunity-analysis/DecisionBriefStream";
+import { TeamingFitCard } from "@/components/opportunity-analysis/TeamingFitCard";
 import { CapabilityMatchCard } from "@/components/CapabilityMatchCard";
 import { useGenerateBriefing, useGeneratedDocuments } from "@/hooks/use-output-generators";
 import { PricingScenarioCard } from "@/components/shared/PricingScenarioCard";
@@ -1546,6 +1547,9 @@ function OpportunityDetail({ id }: { id: string }) {
               <TimelineEntry label="Award Estimate" date={timeline?.award_estimate} filled={false} />
             </CardContent>
           </Card>
+
+          {/* F-312: Teaming Opportunities — partner fit from partner_profiles */}
+          <TeamingFitCard opportunityId={id} />
 
           {/* Stage Actions */}
           <Card className="border-border bg-gda-panel">
