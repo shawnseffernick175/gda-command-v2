@@ -56,6 +56,7 @@ import { useOpportunityAnalysis } from "@/hooks/use-opportunity-analysis";
 import { DecisionBriefStream } from "@/components/opportunity-analysis/DecisionBriefStream";
 import { CapabilityMatchCard } from "@/components/CapabilityMatchCard";
 import { useGenerateBriefing, useGeneratedDocuments } from "@/hooks/use-output-generators";
+import { PricingScenarioCard } from "@/components/shared/PricingScenarioCard";
 
 const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
 
@@ -1435,6 +1436,9 @@ function OpportunityDetail({ id }: { id: string }) {
 
           {/* Capability Match Card (F-306) */}
           <CapabilityMatchCard opportunityId={id} />
+
+          {/* Financial Bible Pricing Scenario (F-311) */}
+          <PricingScenarioCard entityId={id} entityKind="opportunity" />
 
           {/* Margin Floor Banner */}
           {latestDoctrineEval?.margin_check && (
