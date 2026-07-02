@@ -480,6 +480,11 @@ CREATE TABLE action_items (
   capture_id      BIGINT        REFERENCES captures(id) ON DELETE CASCADE,
   award_id        BIGINT        REFERENCES awards(id) ON DELETE CASCADE,
   review_stage_id INTEGER       REFERENCES capture_color_stages(id) ON DELETE CASCADE,
+  draft_text      TEXT,                        -- F-310: AI-generated draft response text
+  draft_evidence_ids JSONB      DEFAULT '[]'::jsonb, -- F-310: R1 evidence citation refs (array of {kind,title,url,retrieved_at})
+  draft_generated_at TIMESTAMPTZ,              -- F-310: when draft was last generated
+  draft_status    TEXT          CHECK (draft_status IS NULL OR draft_status IN (
+                                  'pending', 'ready', 'approved', 'sent', 'rejected', 'no_context')),
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
@@ -513,6 +518,10 @@ CREATE INDEX idx_action_items_doctrine_source ON action_items (doctrine_source) 
 | `linked_record_type` | v3: entity type for linked record (mirrors `source_type`) |
 | `linked_record_id` | v3: text entity id for linked record (avoids legacy bigint `source_id` FK) |
 | `source_id` | **R1 FK** — cites the source of the action item (nullable after v3_062) |
+| `draft_text` | F-310: AI-generated draft response text |
+| `draft_evidence_ids` | F-310: JSONB array of R1 evidence citation refs (`{kind, title, url, retrieved_at}`) |
+| `draft_generated_at` | F-310: when draft was last generated |
+| `draft_status` | F-310: `pending` → `ready` → `approved` / `rejected` / `no_context` (human-in-the-loop gate; never auto-sent) |
 
 **Indexes:** Partial indexes on `status != 'done'` — active items are the hot set. Due date index supports launchpad "overdue items" queries.
 
@@ -552,6 +561,38 @@ CREATE INDEX idx_drafts_source       ON action_item_drafts (source_id);
 | `source_id` | **R1 FK** — cites the source context the LLM used |
 
 **Why this choice:** Legacy `action_item_drafts` (migration 130) used `draft_kind` and `draft_status` enums that never landed in prod. V3 uses CHECK constraints instead of custom enum types — simpler to manage, no migration needed to add values.
+
+### 2.8b `action_item_draft_edits` — F-302 voice training data
+
+```sql
+CREATE TABLE action_item_draft_edits (
+  id              BIGSERIAL     PRIMARY KEY,
+  action_item_id  BIGINT        NOT NULL REFERENCES action_items(id) ON DELETE CASCADE,
+  edit_type       TEXT          NOT NULL
+                                CHECK (edit_type IN ('approve', 'reject', 'edit')),
+  original_text   TEXT,
+  edited_text     TEXT,
+  diff_text       TEXT,
+  rejection_reason TEXT,
+  actor           TEXT          NOT NULL,
+  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_action_item_draft_edits_item ON action_item_draft_edits (action_item_id);
+CREATE INDEX idx_action_item_draft_edits_type ON action_item_draft_edits (edit_type);
+```
+
+| Column | Purpose |
+|---|---|
+| `action_item_id` | FK to parent action item; CASCADE delete |
+| `edit_type` | `approve` / `reject` / `edit` — what the human did |
+| `original_text` | Draft text before human edit |
+| `edited_text` | Draft text after human edit (null for approve/reject) |
+| `diff_text` | Line-level diff for F-302 voice training |
+| `rejection_reason` | Why the human rejected the draft (null for approve/edit) |
+| `actor` | Who performed the action |
+
+**Why this choice:** F-310 requires decision memory (F-302) — every human edit, approval, or rejection of an AI draft is captured so the agent can learn Shawn's voice and decision patterns over time. The diff representation enables fine-grained training on what the human changed.
 
 ### 2.9 `partners` — Lookup-only teaming partner reference
 
