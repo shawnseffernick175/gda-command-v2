@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { successEnvelope } from '../lib/envelope.js';
+import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { computeSummary } from '../services/launchpad/summary.js';
 import { computeFlags } from '../services/launchpad/flags.js';
 import {
@@ -19,6 +19,11 @@ import {
   getDraftsByActionItem,
   toDraftApiShape,
 } from '../services/drafts/index.js';
+import { getDailyNews } from '../services/launchpad/daily-news.js';
+import { getDay1Banners, dismissBanner } from '../services/launchpad/day1-banners.js';
+import { getDoorSummaries } from '../services/launchpad/door-summaries.js';
+import { recordNewsFeedback } from '../services/launchpad/news-feedback.js';
+import type { FeedbackAction } from '../services/launchpad/news-feedback.js';
 
 function getUserId(req: FastifyRequest): string {
   return (req as FastifyRequest & { user?: JwtPayload }).user?.sub ?? 'anonymous';
@@ -154,5 +159,84 @@ export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(200).send(
       successEnvelope({ items: shaped, generated_at: new Date().toISOString() }, req.requestId)
     );
+  });
+
+  // ── F-308: GET /v3/launchpad/daily-news ──
+  app.get<{
+    Querystring: { limit?: string; show_excluded?: string };
+  }>('/v3/launchpad/daily-news', async (req, reply) => {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 15;
+    const showExcluded = req.query.show_excluded === 'true';
+    const result = await getDailyNews({ limit, showExcluded });
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
+  // ── F-308: GET /v3/launchpad/day-1-banners ──
+  app.get('/v3/launchpad/day-1-banners', async (req, reply) => {
+    const result = await getDay1Banners();
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
+  // ── F-308: POST /v3/launchpad/day-1-banners/:id/dismiss ──
+  app.post<{
+    Params: { id: string };
+  }>('/v3/launchpad/day-1-banners/:id/dismiss', async (req, reply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'Invalid banner id', req.requestId));
+    }
+    await dismissBanner(id);
+    return reply.status(200).send(successEnvelope({ dismissed: true }, req.requestId));
+  });
+
+  // ── F-308: GET /v3/launchpad/door-summaries ──
+  app.get('/v3/launchpad/door-summaries', async (req, reply) => {
+    const result = await getDoorSummaries();
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
+  // ── F-308: GET /v3/launchpad/risks-roll-up — same as /v3/risks/launchpad ──
+  app.get<{
+    Querystring: { limit?: string };
+  }>('/v3/launchpad/risks-roll-up', async (req, reply) => {
+    const limit = req.query.limit ? Math.min(Number(req.query.limit || 5), 20) : 5;
+
+    const { rows } = await pool.query(
+      `SELECT r.*, o.title AS opportunity_title
+       FROM risks r
+       LEFT JOIN opportunities o ON o.id = r.opportunity_id
+       WHERE r.status = 'open' AND r.severity IN ('critical', 'high')
+       ORDER BY
+         CASE r.severity WHEN 'critical' THEN 0 ELSE 1 END,
+         r.score DESC,
+         r.identified_at ASC
+       LIMIT $1`,
+      [limit],
+    );
+
+    const totalRes = await pool.query<{ total: number }>(
+      `SELECT COUNT(*)::int AS total FROM risks WHERE status = 'open' AND severity IN ('critical', 'high')`,
+    );
+
+    return reply.status(200).send(successEnvelope({
+      items: rows,
+      total: totalRes.rows[0]?.total ?? 0,
+    }, req.requestId));
+  });
+
+  // ── F-308: POST /v3/launchpad/news-feedback ──
+  app.post<{
+    Body: { news_id: number; action: string };
+  }>('/v3/launchpad/news-feedback', async (req, reply) => {
+    const { news_id, action } = req.body;
+    const validActions: FeedbackAction[] = ['clicked', 'dismissed', 'saved'];
+    if (!validActions.includes(action as FeedbackAction)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', `Invalid action. Must be one of: ${validActions.join(', ')}`, req.requestId),
+      );
+    }
+    const userId = getUserId(req);
+    await recordNewsFeedback({ news_id, action: action as FeedbackAction, user_id: userId });
+    return reply.status(200).send(successEnvelope({ recorded: true }, req.requestId));
   });
 }

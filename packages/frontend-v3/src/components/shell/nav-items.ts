@@ -23,6 +23,7 @@ import {
   Palette,
   Crosshair,
   Handshake,
+  Rocket,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -33,6 +34,7 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
+  { label: "Launchpad", href: "/launchpad", icon: Rocket },
   { label: "Digest", href: "/digest", icon: Radio },
   { label: "FasTrac", href: "/fastrac", icon: Zap },
   { label: "Opportunities", href: "/opportunities", icon: Search },

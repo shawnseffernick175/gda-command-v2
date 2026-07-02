@@ -11,6 +11,7 @@ import { QaChecklistDrawer } from "@/components/qa-checklist/QaChecklistDrawer";
 import { UniversalDropZone } from "@/components/UniversalDropZone";
 
 const PATH_TO_SURFACE: Record<string, string> = {
+  "/launchpad": "digest",
   "/digest": "digest",
   "/opportunities": "opportunities",
   "/pipeline": "pipeline",
