@@ -303,7 +303,7 @@ export function startCronScheduler(): void {
   const soakMetricsRefreshTask = cron.schedule('30 2 * * *', async () => {
     try {
       logger.info('[cron] soak-metrics-refresh starting');
-      await pool.query('REFRESH MATERIALIZED VIEW soak_metrics;');
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY soak_metrics;');
       logger.info('[cron] soak_metrics materialized view refreshed');
     } catch (err) {
       logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_soak_metrics_refresh_error');
