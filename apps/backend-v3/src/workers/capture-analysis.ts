@@ -114,7 +114,7 @@ export function computeCaptureAnalysis(input: CaptureAnalysisInput): CaptureAnal
   }
 
   for (const item of input.complianceItems) {
-    if (item.evidence) {
+    if (item.response_notes) {
       sources.push({
         kind: 'internal',
         title: `Compliance evidence: ${item.requirement}`,
