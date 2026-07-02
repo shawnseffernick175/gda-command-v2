@@ -35,7 +35,12 @@ export async function runAnalyzerSelfCheck(pool: pg.Pool): Promise<SelfCheckResu
       (SELECT count(*) FROM opportunities WHERE analysis_version = $1)::text AS total_current,
       (SELECT count(*) FROM opportunities WHERE analysis_version = $1 AND analysis->'llm_analysis' IS NOT NULL)::text AS with_llm,
       (SELECT count(*) FROM opportunities WHERE analysis_version = $1 AND analysis->>'llm_error_kind' IS NOT NULL)::text AS errored,
-      (SELECT count(*) FROM opportunities WHERE analysis_version LIKE '%stub%')::text AS stub_remaining,
+      -- Passed/dispositioned opportunities (assessment_status='pass') are intentionally
+      -- not analyzed and must never count as analyzer backlog.
+      (SELECT count(*) FROM opportunities
+        WHERE (analysis_version IS NULL OR analysis_version LIKE '%stub%')
+          AND assessment_status IS DISTINCT FROM 'pass'
+      )::text AS stub_remaining,
       (SELECT max(ai_analyzed_at) FROM opportunities)::text AS last_written
   `, [version]);
 
