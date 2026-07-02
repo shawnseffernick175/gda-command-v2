@@ -8,7 +8,7 @@ export interface ComplianceItem {
   id: string;
   requirement: string;
   status: ComplianceStatus;
-  evidence: string | null;
+  response_notes: string | null;
 }
 
 export interface ComplianceSummary {

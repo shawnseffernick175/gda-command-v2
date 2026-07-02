@@ -692,7 +692,7 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
     }
 
     const compItemsRes = await pool.query<ComplianceItem>(
-      'SELECT id, requirement, status, evidence FROM compliance_items WHERE capture_id = $1',
+      'SELECT id, requirement, status, response_notes FROM compliance_items WHERE capture_id = $1',
       [entityId],
     );
     const complianceItems = compItemsRes.rows;
