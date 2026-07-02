@@ -5,6 +5,7 @@
 
 import { logger } from '../../lib/logger.js';
 import { startRun, finishRun } from './run_logger.js';
+import { onIngestFailure, onIngestSuccess } from '../../services/sentinel/hooks.js';
 
 export interface IngestResult {
   inserted: number;
@@ -71,6 +72,9 @@ export async function runIngest(sourceKey: string): Promise<{
       'ingest_completed',
     );
 
+    // Resolve any open sentinel events for this source on success
+    onIngestSuccess(sourceKey).catch(() => {});
+
     return { runId, result, durationMs };
   } catch (err) {
     const durationMs = Date.now() - start;
@@ -86,6 +90,11 @@ export async function runIngest(sourceKey: string): Promise<{
       },
       'ingest_failed',
     );
+
+    // Create sentinel event for the failure (fire-and-forget)
+    const errorCode = (err as { statusCode?: number })?.statusCode
+      ?? (err as { status?: number })?.status;
+    onIngestFailure(sourceKey, errorText, errorCode).catch(() => {});
 
     throw err;
   }
