@@ -57,6 +57,7 @@ import { DecisionBriefStream } from "@/components/opportunity-analysis/DecisionB
 import { CapabilityMatchCard } from "@/components/CapabilityMatchCard";
 import { useGenerateBriefing, useGeneratedDocuments } from "@/hooks/use-output-generators";
 import { PricingScenarioCard } from "@/components/shared/PricingScenarioCard";
+import { useTeamingFit, type TeamingFitResult } from "@/hooks/use-partners";
 
 const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
 
@@ -1240,6 +1241,8 @@ function OpportunityDetail({ id }: { id: string }) {
   // F-305: Auto-trigger SSE analysis stream on mount (R2 compliance — no click-to-analyze)
   const analysisStream = useOpportunityAnalysis(id);
 
+  const { data: teamingData } = useTeamingFit(id);
+
   const llmForEffect = opp?.llm_analysis as LlmAnalysis | null | undefined;
   useEffect(() => {
     if (
@@ -1439,6 +1442,9 @@ function OpportunityDetail({ id }: { id: string }) {
 
           {/* Financial Bible Pricing Scenario (F-311) */}
           <PricingScenarioCard entityId={id} entityKind="opportunity" />
+
+          {/* Teaming Opportunities (F-312) */}
+          <TeamingOpportunitiesCard items={teamingData?.items} />
 
           {/* Margin Floor Banner */}
           {latestDoctrineEval?.margin_check && (
@@ -1880,6 +1886,79 @@ function GenerateBriefingButton({ opportunityId }: { opportunityId: string }) {
             ))}
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── Teaming Opportunities Card (F-312) ──────────────────────────── */
+
+const OU_PARTNER_SLUGS: Record<string, string> = {
+  riverstone: "riverstone",
+  pd_systems: "pd-systems",
+};
+
+function TeamingOpportunitiesCard({ items }: { items?: TeamingFitResult[] }) {
+  if (!items || items.length === 0) return null;
+
+  const topFit = items.filter((i) => i.fit_score > 0);
+  if (topFit.length === 0) return null;
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+          Teaming Opportunities
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {topFit.map((fit) => (
+          <div
+            key={fit.ou}
+            className="rounded border border-border bg-gda-bg-base px-3 py-2 space-y-1.5"
+          >
+            <div className="flex items-center justify-between">
+              <Link
+                href={`/partners?ou=${OU_PARTNER_SLUGS[fit.ou] ?? fit.ou}`}
+                className="text-xs font-mono font-semibold text-gda-cyan hover:text-gda-green transition-colors"
+              >
+                {fit.partner_name}
+              </Link>
+              <span
+                className={cn(
+                  "font-mono text-[11px] font-semibold",
+                  fit.fit_score >= 50
+                    ? "text-gda-green"
+                    : fit.fit_score >= 25
+                      ? "text-gda-cyan"
+                      : "text-muted-foreground",
+                )}
+              >
+                {fit.fit_score}% fit
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {fit.reasons.map((reason, idx) => (
+                <p key={idx} className="text-[11px] text-muted-foreground">
+                  {reason}
+                </p>
+              ))}
+            </div>
+            {fit.cited_evidence.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {fit.cited_evidence.map((ev, idx) => (
+                  <Badge
+                    key={idx}
+                    variant="outline"
+                    className="border-border text-[11px] font-mono text-muted-foreground"
+                  >
+                    {ev.kind}: {ev.detail}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </CardContent>
     </Card>
   );
