@@ -1898,6 +1898,7 @@ const OU_PARTNER_SLUGS: Record<string, string> = {
   pd_systems: "pd-systems",
 };
 
+
 function TeamingOpportunitiesCard({ items }: { items?: TeamingFitResult[] }) {
   if (!items || items.length === 0) return null;
 
@@ -1919,7 +1920,7 @@ function TeamingOpportunitiesCard({ items }: { items?: TeamingFitResult[] }) {
           >
             <div className="flex items-center justify-between">
               <Link
-                href={`/partners?ou=${OU_PARTNER_SLUGS[fit.ou] ?? fit.ou}`}
+                href={`/partners/${OU_PARTNER_SLUGS[fit.ou] ?? fit.ou}`}
                 className="text-xs font-mono font-semibold text-gda-cyan hover:text-gda-green transition-colors"
               >
                 {fit.partner_name}
