@@ -55,9 +55,8 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          CASE WHEN o.estimated_value_cents > 1000000000 THEN TRUE ELSE FALSE END
        FROM unified_opportunities o
        LEFT JOIN unified_opportunity_links l ON l.internal_id = o.internal_id AND l.source = 'sam'
-       WHERE o.data_source = 'sam'
+       WHERE o.primary_source = 'sam'
          AND o.created_at > NOW() - INTERVAL '24 hours'
-         AND o.deleted_at IS NULL
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
            WHERE dn.source = 'sam' AND dn.source_id = o.internal_id
@@ -88,9 +87,8 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          CASE WHEN o.estimated_value_cents > 5000000000 THEN TRUE ELSE FALSE END
        FROM unified_opportunities o
        LEFT JOIN unified_opportunity_links l ON l.internal_id = o.internal_id AND l.source = 'usaspending'
-       WHERE o.data_source = 'usaspending'
+       WHERE o.primary_source = 'usaspending'
          AND o.created_at > NOW() - INTERVAL '24 hours'
-         AND o.deleted_at IS NULL
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
            WHERE dn.source = 'usaspending' AND dn.source_id = o.internal_id
@@ -109,18 +107,18 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
       `INSERT INTO launchpad_daily_news (source, source_id, source_url, title, agency, posted_at, relevance_score, is_day1_banner)
        SELECT
          'federal_register',
-         fr.document_number,
-         fr.html_url,
-         fr.title,
-         fr.agencies,
-         fr.publication_date,
+         rn.document_number,
+         rn.html_url,
+         rn.title,
+         array_to_string(rn.agency_names, ', '),
+         rn.publication_date,
          10,
-         CASE WHEN fr.type = 'Rule' THEN TRUE ELSE FALSE END
-       FROM federal_register_notices fr
-       WHERE fr.publication_date > NOW() - INTERVAL '24 hours'
+         CASE WHEN rn.document_type = 'Rule' THEN TRUE ELSE FALSE END
+       FROM regulatory_notices rn
+       WHERE rn.publication_date > CURRENT_DATE - INTERVAL '24 hours'
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
-           WHERE dn.source = 'federal_register' AND dn.source_id = fr.document_number
+           WHERE dn.source = 'federal_register' AND dn.source_id = rn.document_number
              AND dn.posted_at > NOW() - INTERVAL '24 hours'
          )
        RETURNING 1 AS cnt`,
@@ -147,9 +145,8 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          COALESCE(o.pwin, 0) * 80
        FROM unified_opportunities o
        LEFT JOIN unified_opportunity_links l ON l.internal_id = o.internal_id AND l.source = 'govwin'
-       WHERE o.data_source = 'govwin'
+       WHERE o.primary_source = 'govwin'
          AND o.created_at > NOW() - INTERVAL '24 hours'
-         AND o.deleted_at IS NULL
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
            WHERE dn.source = 'govwin' AND dn.source_id = o.internal_id
@@ -179,9 +176,8 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          COALESCE(o.pwin, 0) * 80
        FROM unified_opportunities o
        LEFT JOIN unified_opportunity_links l ON l.internal_id = o.internal_id AND l.source = 'govtribe'
-       WHERE o.data_source = 'govtribe'
+       WHERE o.primary_source = 'govtribe'
          AND o.created_at > NOW() - INTERVAL '24 hours'
-         AND o.deleted_at IS NULL
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
            WHERE dn.source = 'govtribe' AND dn.source_id = o.internal_id
@@ -206,7 +202,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          n.blurb,
          n.published_at,
          CASE WHEN n.is_wheelhouse THEN 30 ELSE 10 END
-       FROM govcon_news n
+       FROM news_items n
        WHERE n.published_at > NOW() - INTERVAL '24 hours'
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn

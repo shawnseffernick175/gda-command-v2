@@ -40,11 +40,10 @@ async function generateSummary(doorKey: string): Promise<string> {
       }>(
         `SELECT
            COUNT(*)::text AS total,
-           COUNT(*) FILTER (WHERE status = 'qualified')::text AS qualified,
+           COUNT(*) FILTER (WHERE doctrine_status = 'qualified')::text AS qualified,
            COUNT(*) FILTER (WHERE lifecycle_stage = 'forecast')::text AS forecast,
            COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::text AS new_24h
-         FROM unified_opportunities
-         WHERE deleted_at IS NULL`,
+         FROM unified_opportunities`,
       );
       const r = res.rows[0];
       return `${r?.total ?? 0} tracked opportunities. ${r?.qualified ?? 0} qualified, ${r?.forecast ?? 0} in forecast stage. ${r?.new_24h ?? 0} new in last 24h.`;
@@ -57,12 +56,12 @@ async function generateSummary(doorKey: string): Promise<string> {
       }>(
         `SELECT
            COUNT(*)::text AS total,
-           COUNT(*) FILTER (WHERE days_in_stage > 30)::text AS stalled,
-           COALESCE(SUM(value_cents), 0)::text AS total_value
+           COUNT(*) FILTER (WHERE updated_at < NOW() - INTERVAL '30 days')::text AS stalled,
+           COALESCE(SUM(estimated_value), 0)::text AS total_value
          FROM pipeline_items`,
       );
       const r = res.rows[0];
-      const val = Number(r?.total_value ?? 0) / 100;
+      const val = Number(r?.total_value ?? 0);
       return `${r?.total ?? 0} pipeline items worth $${(val / 1e6).toFixed(1)}M. ${r?.stalled ?? 0} stalled (>30 days in stage).`;
     }
     case 'capture': {
@@ -123,17 +122,17 @@ async function generateSummary(doorKey: string): Promise<string> {
     case 'sentinel': {
       const res = await pool.query<{
         total: string;
-        healthy: string;
-        stale: string;
+        open: string;
+        critical: string;
       }>(
         `SELECT
            COUNT(*)::text AS total,
-           COUNT(*) FILTER (WHERE status = 'healthy')::text AS healthy,
-           COUNT(*) FILTER (WHERE status IN ('stale', 'error'))::text AS stale
-         FROM source_status`,
+           COUNT(*) FILTER (WHERE resolved_at IS NULL)::text AS open,
+           COUNT(*) FILTER (WHERE severity = 'critical' AND resolved_at IS NULL)::text AS critical
+         FROM sentinel_events`,
       );
       const r = res.rows[0];
-      return `${r?.total ?? 0} sources monitored. ${r?.healthy ?? 0} healthy, ${r?.stale ?? 0} degraded or stale.`;
+      return `${r?.total ?? 0} sentinel events. ${r?.open ?? 0} open, ${r?.critical ?? 0} critical unresolved.`;
     }
     default:
       return 'No summary available.';
