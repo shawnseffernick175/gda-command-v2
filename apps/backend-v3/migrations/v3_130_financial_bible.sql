@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS financial_bible_versions (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_bible_versions_active ON financial_bible_versions (active) WHERE active = TRUE;
-CREATE INDEX idx_bible_versions_uploaded ON financial_bible_versions (uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bible_versions_active ON financial_bible_versions (active) WHERE active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_bible_versions_uploaded ON financial_bible_versions (uploaded_at DESC);
 
 -- Labor rates by category, clearance, effective date range
 CREATE TABLE IF NOT EXISTS financial_rates (
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS financial_rates (
   PRIMARY KEY (version_id, labor_category, clearance, effective_from)
 );
 
-CREATE INDEX idx_bible_rates_lookup ON financial_rates (labor_category, clearance);
+CREATE INDEX IF NOT EXISTS idx_bible_rates_lookup ON financial_rates (labor_category, clearance);
 
 -- Indirect rates by contract type
 CREATE TABLE IF NOT EXISTS financial_indirects (
@@ -92,6 +92,6 @@ CREATE TABLE IF NOT EXISTS pricing_scenarios (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_pricing_scenarios_opp ON pricing_scenarios (opportunity_id) WHERE opportunity_id IS NOT NULL;
-CREATE INDEX idx_pricing_scenarios_capture ON pricing_scenarios (capture_id) WHERE capture_id IS NOT NULL;
-CREATE INDEX idx_pricing_scenarios_version ON pricing_scenarios (bible_version_id);
+CREATE INDEX IF NOT EXISTS idx_pricing_scenarios_opp ON pricing_scenarios (opportunity_id) WHERE opportunity_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pricing_scenarios_capture ON pricing_scenarios (capture_id) WHERE capture_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pricing_scenarios_version ON pricing_scenarios (bible_version_id);

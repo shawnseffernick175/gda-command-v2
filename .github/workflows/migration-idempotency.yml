@@ -1,0 +1,28 @@
+name: Migration Idempotency Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/backend-v3/migrations/**'
+      - 'db/v3/migrations/**'
+      - 'scripts/ci/check-migration-idempotency.sh'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/backend-v3/migrations/**'
+      - 'db/v3/migrations/**'
+      - 'scripts/ci/check-migration-idempotency.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  idempotency-check:
+    name: Migration Idempotency Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check CREATE INDEX uses IF NOT EXISTS (v3_100+)
+        run: bash scripts/ci/check-migration-idempotency.sh
