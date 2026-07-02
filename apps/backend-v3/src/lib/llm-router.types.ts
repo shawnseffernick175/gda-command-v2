@@ -50,7 +50,8 @@ export type Task =
   | 'vault_vehicle_extract'
   | 'workshop_teardown'
   | 'workshop_generate'
-  | 'sitrep_document_analyze';
+  | 'sitrep_document_analyze'
+  | 'action_item_draft';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -266,6 +267,32 @@ export interface SitrepDocumentAnalyzeOutput {
   topic: string;
   discussion: string;
   action_items: string;
+}
+
+export interface ActionItemDraftInput {
+  action_item_id: string;
+  title: string;
+  detail: string | null;
+  owner: string;
+  priority: string;
+  doctrine_source: string;
+  due_date: string | null;
+  linked_record_type: string | null;
+  linked_record_id: string | null;
+}
+
+export interface ActionItemDraftEvidenceRef {
+  kind: 'internal' | 'external';
+  title: string;
+  url: string;
+  retrieved_at: string;
+}
+
+export interface ActionItemDraftOutput {
+  draft_text: string;
+  evidence_refs: ActionItemDraftEvidenceRef[];
+  has_sufficient_context: boolean;
+  no_context_reason: string | null;
 }
 
 export interface BlackHatAnalysisInput {
@@ -968,6 +995,7 @@ export interface TaskInputMap {
   workshop_teardown: WorkshopTeardownInput;
   workshop_generate: WorkshopGenerateInput;
   sitrep_document_analyze: SitrepDocumentAnalyzeInput;
+  action_item_draft: ActionItemDraftInput;
 }
 
 export interface TaskOutputMap {
@@ -1002,6 +1030,7 @@ export interface TaskOutputMap {
   workshop_teardown: WorkshopTeardownOutput;
   workshop_generate: WorkshopGenerateOutput;
   sitrep_document_analyze: SitrepDocumentAnalyzeOutput;
+  action_item_draft: ActionItemDraftOutput;
 }
 
 // ---------------------------------------------------------------------------

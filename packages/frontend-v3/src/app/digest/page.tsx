@@ -22,6 +22,7 @@ import CollapsibleSection from "@/components/digest/CollapsibleSection";
 import GovConNews from "@/components/digest/GovConNews";
 import WeeklySitrep from "@/components/digest/WeeklySitrep";
 import WhatsAtRisk from "@/components/digest/WhatsAtRisk";
+import WhatNeedsMePanel from "@/components/digest/WhatNeedsMePanel";
 
 // ────────────────────────────────────────────────────────────
 // Category filter tabs
@@ -283,6 +284,11 @@ export default function DigestPage() {
             {/* ─── Right column (40%) ────────────────────── */}
             <div className="lg:col-span-2 space-y-4">
               <WhatsAtRisk />
+
+              <CollapsibleSection id="what-needs-me" title="What Needs Me Today">
+                <WhatNeedsMePanel />
+              </CollapsibleSection>
+
 
               <CollapsibleSection id="govcon-news" title="GovCon News">
                 <GovConNews />

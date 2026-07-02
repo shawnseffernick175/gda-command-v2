@@ -5,6 +5,7 @@ import { initBoss, stopBoss, requireBoss, QUEUE_NAMES, ANALYSIS_PRIORITY, type A
 import { startWorker } from './workers/analysis.js';
 import { startSoakDigestWorker } from './workers/soak-digest.js';
 import { subscribeFastTrack } from './workers/fast-track.js';
+import { startActionItemDraftWorker } from './workers/action-item-draft.js';
 import { pool } from './lib/db.js';
 import { startCronScheduler, stopCronScheduler } from './cron/index.js';
 import { initRouter, validateKeys } from './lib/llm-router.js';
@@ -25,6 +26,7 @@ async function main(): Promise<void> {
   const workerBoss = await startWorker();
   await startSoakDigestWorker();
   await subscribeFastTrack();
+  await startActionItemDraftWorker();
 
   startCronScheduler();
 
