@@ -43,6 +43,7 @@ import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
 import { pollAllDueSources } from '../services/idiq-ops/taskOrderIngestService.js';
 import { runAutoPassDeadline } from './auto-pass-deadline.js';
+import { runLaunchpadPreWarmCron } from './launchpad-pre-warm.js';
 import { runIntakeAssessment } from '../services/assessment/index.js';
 import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { runValueDateEnrichment } from '../services/enrichment/value-date.js';
@@ -440,6 +441,13 @@ export function startCronScheduler(): void {
   });
   tasks.push(refreshTokenPruneTask);
   logger.info({ schedule: '30 3 * * *' }, '[cron] registered: refresh-token-prune (30 3 * * *)');
+
+  // F-308: Launchpad pre-warm — hourly, materializes Daily News + door summaries
+  const launchpadPreWarmTask = cron.schedule('10 * * * *', async () => {
+    await runLaunchpadPreWarmCron();
+  });
+  tasks.push(launchpadPreWarmTask);
+  logger.info({ schedule: '10 * * * *' }, '[cron] registered: launchpad-pre-warm (10 * * * *)');
 }
 
 export function stopCronScheduler(): void {
