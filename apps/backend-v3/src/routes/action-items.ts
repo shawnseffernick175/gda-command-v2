@@ -8,6 +8,9 @@ import {
   getTopActionItems,
   getAssignee,
   toApiShape,
+  approveDraft,
+  rejectDraft,
+  editDraft,
   type ActionItemCreateInput,
   type ActionItemUpdateInput,
   type ActionItemListFilters,
@@ -184,5 +187,99 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(201).send(
       successEnvelope(toDraftApiShape(draft), req.requestId)
     );
+  });
+
+  // F-310: Approve draft (does not send)
+  app.post<{
+    Params: { id: string };
+  }>('/v3/action-items/:id/approve-draft', async (req, reply) => {
+    try {
+      const row = await approveDraft(req.params.id, getActor(req));
+      const drafts = await getDraftsByActionItem(row.id);
+      return reply.status(200).send(
+        successEnvelope(toApiShape(row, drafts.map(toDraftApiShape)), req.requestId)
+      );
+    } catch (err) {
+      const e = err as Error & { statusCode?: number };
+      if (e.statusCode === 404) {
+        return reply.status(404).send(
+          errorEnvelope('NOT_FOUND', e.message, req.requestId)
+        );
+      }
+      if (e.statusCode === 400) {
+        return reply.status(400).send(
+          errorEnvelope('VALIDATION_ERROR', e.message, req.requestId)
+        );
+      }
+      throw err;
+    }
+  });
+
+  // F-310: Reject draft with reason (captured for F-302 training)
+  app.post<{
+    Params: { id: string };
+    Body: { reason: string };
+  }>('/v3/action-items/:id/reject-draft', async (req, reply) => {
+    const body = req.body as { reason?: string } | undefined;
+    if (!body?.reason || body.reason.trim().length === 0) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'reason is required', req.requestId)
+      );
+    }
+
+    try {
+      const row = await rejectDraft(req.params.id, body.reason.trim(), getActor(req));
+      const drafts = await getDraftsByActionItem(row.id);
+      return reply.status(200).send(
+        successEnvelope(toApiShape(row, drafts.map(toDraftApiShape)), req.requestId)
+      );
+    } catch (err) {
+      const e = err as Error & { statusCode?: number };
+      if (e.statusCode === 404) {
+        return reply.status(404).send(
+          errorEnvelope('NOT_FOUND', e.message, req.requestId)
+        );
+      }
+      if (e.statusCode === 400) {
+        return reply.status(400).send(
+          errorEnvelope('VALIDATION_ERROR', e.message, req.requestId)
+        );
+      }
+      throw err;
+    }
+  });
+
+  // F-310: Edit draft — diff stored for F-302 voice training
+  app.post<{
+    Params: { id: string };
+    Body: { edited_text: string };
+  }>('/v3/action-items/:id/edit-draft', async (req, reply) => {
+    const body = req.body as { edited_text?: string } | undefined;
+    if (!body?.edited_text || body.edited_text.trim().length === 0) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'edited_text is required', req.requestId)
+      );
+    }
+
+    try {
+      const row = await editDraft(req.params.id, body.edited_text, getActor(req));
+      const drafts = await getDraftsByActionItem(row.id);
+      return reply.status(200).send(
+        successEnvelope(toApiShape(row, drafts.map(toDraftApiShape)), req.requestId)
+      );
+    } catch (err) {
+      const e = err as Error & { statusCode?: number };
+      if (e.statusCode === 404) {
+        return reply.status(404).send(
+          errorEnvelope('NOT_FOUND', e.message, req.requestId)
+        );
+      }
+      if (e.statusCode === 400) {
+        return reply.status(400).send(
+          errorEnvelope('VALIDATION_ERROR', e.message, req.requestId)
+        );
+      }
+      throw err;
+    }
   });
 }

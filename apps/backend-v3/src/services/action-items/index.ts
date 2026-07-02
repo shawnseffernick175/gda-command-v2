@@ -1,5 +1,6 @@
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
+import { getBoss, QUEUE_NAMES } from '../../lib/queue.js';
 
 export type ActionItemStatus = 'open' | 'in_progress' | 'done';
 
@@ -11,6 +12,8 @@ export type DoctrineSource =
   | 'capture_deadline'
   | 'recompete_expiring'
   | 'manual';
+
+export type DraftStatus = 'pending' | 'ready' | 'approved' | 'sent' | 'rejected' | 'no_context';
 
 export interface ActionItemRow {
   id: string;
@@ -31,6 +34,10 @@ export interface ActionItemRow {
   review_stage_id: number | null;
   linked_record_type: string | null;
   linked_record_id: string | null;
+  draft_text: string | null;
+  draft_evidence_ids: object[];
+  draft_generated_at: string | null;
+  draft_status: DraftStatus | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -141,6 +148,10 @@ export function toApiShape(row: ActionItemRow, drafts: object[] = [], assignee?:
     review_stage_id: row.review_stage_id ?? null,
     linked_record_type: row.linked_record_type ?? row.source_type,
     linked_record_id: row.linked_record_id ?? row.source_id,
+    draft_text: row.draft_text ?? null,
+    draft_evidence_ids: row.draft_evidence_ids ?? [],
+    draft_generated_at: row.draft_generated_at ?? null,
+    draft_status: row.draft_status ?? 'pending',
     drafts,
     completed_at: row.completed_at,
     created_at: row.created_at,
@@ -168,8 +179,8 @@ export async function createActionItem(
   const now = new Date().toISOString();
 
   const res = await pool.query<ActionItemRow>(
-    `INSERT INTO action_items (title, detail, owner, owner_email, status, priority, due_date, source, source_type, is_auto, assignee_id, linked_record_type, linked_record_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $3, 'open', $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+    `INSERT INTO action_items (title, detail, owner, owner_email, status, priority, due_date, source, source_type, is_auto, assignee_id, linked_record_type, linked_record_id, draft_status, created_at, updated_at)
+     VALUES ($1, $2, $3, $3, 'open', $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $12)
      RETURNING *`,
     [
       input.title.trim(),
@@ -190,6 +201,25 @@ export async function createActionItem(
   const row = res.rows[0]!;
 
   await logAudit(row.id, 'status', null, 'open', actor);
+
+  // Enqueue draft generation job (F-310)
+  const boss = getBoss();
+  if (boss) {
+    try {
+      await boss.send(QUEUE_NAMES.ACTION_ITEM_DRAFT, {
+        actionItemId: row.id,
+      }, {
+        priority: 1,
+        retryLimit: 3,
+        retryDelay: 5,
+        retryBackoff: true,
+        singletonKey: `ai-draft-${row.id}`,
+      });
+      logger.info({ actionItemId: row.id }, 'Draft generation job enqueued');
+    } catch (err) {
+      logger.warn({ err, actionItemId: row.id }, 'Failed to enqueue draft generation job');
+    }
+  }
 
   logger.info({ actionItemId: row.id, actor }, 'Action item created');
   return row;
@@ -469,6 +499,174 @@ export async function findExistingAutoItem(
     [sourceType, sourceId, `${titlePrefix}%`]
   );
   return parseInt(res.rows[0]?.count ?? '0', 10) > 0;
+}
+
+export async function updateDraft(
+  id: string,
+  draftText: string,
+  evidenceIds: object[],
+  status: DraftStatus,
+): Promise<ActionItemRow> {
+  const res = await pool.query<ActionItemRow>(
+    `UPDATE action_items
+     SET draft_text = $1,
+         draft_evidence_ids = $2::jsonb,
+         draft_generated_at = NOW(),
+         draft_status = $3,
+         updated_at = NOW()
+     WHERE id = $4
+     RETURNING *`,
+    [draftText, JSON.stringify(evidenceIds), status, id]
+  );
+  if (!res.rows[0]) {
+    throw Object.assign(new Error('Resource not found'), { statusCode: 404 });
+  }
+  return res.rows[0];
+}
+
+export async function approveDraft(
+  id: string,
+  actor: string
+): Promise<ActionItemRow> {
+  const existing = await getActionItem(id);
+  if (!existing) {
+    throw Object.assign(new Error('Resource not found'), { statusCode: 404 });
+  }
+  if (existing.draft_status !== 'ready') {
+    throw Object.assign(
+      new Error(`Cannot approve draft in status: ${existing.draft_status ?? 'null'}`),
+      { statusCode: 400 }
+    );
+  }
+
+  const res = await pool.query<ActionItemRow>(
+    `UPDATE action_items
+     SET draft_status = 'approved', updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id]
+  );
+
+  // Record approval for F-302 training
+  await pool.query(
+    `INSERT INTO action_item_draft_edits (action_item_id, edit_type, original_text, actor, created_at)
+     VALUES ($1, 'approve', $2, $3, NOW())`,
+    [id, existing.draft_text, actor]
+  );
+
+  await logAudit(id, 'draft_status', existing.draft_status, 'approved', actor);
+  logger.info({ actionItemId: id, actor }, 'Draft approved');
+  return res.rows[0]!;
+}
+
+export async function rejectDraft(
+  id: string,
+  reason: string,
+  actor: string
+): Promise<ActionItemRow> {
+  const existing = await getActionItem(id);
+  if (!existing) {
+    throw Object.assign(new Error('Resource not found'), { statusCode: 404 });
+  }
+  if (existing.draft_status !== 'ready') {
+    throw Object.assign(
+      new Error(`Cannot reject draft in status: ${existing.draft_status ?? 'null'}`),
+      { statusCode: 400 }
+    );
+  }
+
+  const res = await pool.query<ActionItemRow>(
+    `UPDATE action_items
+     SET draft_status = 'rejected', updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id]
+  );
+
+  // Record rejection for F-302 training
+  await pool.query(
+    `INSERT INTO action_item_draft_edits (action_item_id, edit_type, original_text, rejection_reason, actor, created_at)
+     VALUES ($1, 'reject', $2, $3, $4, NOW())`,
+    [id, existing.draft_text, reason, actor]
+  );
+
+  await logAudit(id, 'draft_status', existing.draft_status, 'rejected', actor);
+  logger.info({ actionItemId: id, actor, reason }, 'Draft rejected');
+  return res.rows[0]!;
+}
+
+export async function editDraft(
+  id: string,
+  editedText: string,
+  actor: string
+): Promise<ActionItemRow> {
+  const existing = await getActionItem(id);
+  if (!existing) {
+    throw Object.assign(new Error('Resource not found'), { statusCode: 404 });
+  }
+  if (!existing.draft_text) {
+    throw Object.assign(
+      new Error('No draft to edit'),
+      { statusCode: 400 }
+    );
+  }
+
+  const originalText = existing.draft_text;
+
+  // Compute a simple line-level diff for F-302 voice training
+  const origLines = originalText.split('\n');
+  const editLines = editedText.split('\n');
+  const diffParts: string[] = [];
+  const maxLen = Math.max(origLines.length, editLines.length);
+  for (let i = 0; i < maxLen; i++) {
+    const orig = origLines[i] ?? '';
+    const edit = editLines[i] ?? '';
+    if (orig !== edit) {
+      if (orig) diffParts.push(`- ${orig}`);
+      if (edit) diffParts.push(`+ ${edit}`);
+    }
+  }
+  const diffText = diffParts.join('\n');
+
+  const res = await pool.query<ActionItemRow>(
+    `UPDATE action_items
+     SET draft_text = $1, draft_status = 'approved', updated_at = NOW()
+     WHERE id = $2
+     RETURNING *`,
+    [editedText, id]
+  );
+
+  // Record edit + diff for F-302 voice training
+  await pool.query(
+    `INSERT INTO action_item_draft_edits (action_item_id, edit_type, original_text, edited_text, diff_text, actor, created_at)
+     VALUES ($1, 'edit', $2, $3, $4, $5, NOW())`,
+    [id, originalText, editedText, diffText, actor]
+  );
+
+  await logAudit(id, 'draft_status', existing.draft_status, 'approved', actor);
+  logger.info({ actionItemId: id, actor }, 'Draft edited and approved');
+  return res.rows[0]!;
+}
+
+export async function getActionItemsWithReadyDrafts(limit: number = 7): Promise<ActionItemRow[]> {
+  const res = await pool.query<ActionItemRow>(
+    `SELECT * FROM action_items
+     WHERE status NOT IN ('done')
+       AND draft_status IN ('ready', 'pending')
+     ORDER BY
+       CASE priority
+         WHEN 'CRITICAL' THEN 0
+         WHEN 'HIGH'     THEN 1
+         WHEN 'MEDIUM'   THEN 2
+         WHEN 'LOW'      THEN 3
+         ELSE 4
+       END,
+       due_date ASC NULLS LAST,
+       created_at DESC
+     LIMIT $1`,
+    [Math.min(Math.max(limit, 1), 20)]
+  );
+  return res.rows;
 }
 
 async function logAudit(

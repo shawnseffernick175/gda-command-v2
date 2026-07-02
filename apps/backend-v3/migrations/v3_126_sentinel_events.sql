@@ -18,6 +18,6 @@ CREATE TABLE IF NOT EXISTS sentinel_events (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_sentinel_events_type_open ON sentinel_events (event_type, created_at DESC)
+CREATE INDEX IF NOT EXISTS idx_sentinel_events_type_open ON sentinel_events (event_type, created_at DESC)
   WHERE resolved_at IS NULL;
-CREATE INDEX idx_sentinel_events_recent ON sentinel_events (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sentinel_events_recent ON sentinel_events (created_at DESC);

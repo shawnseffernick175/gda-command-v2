@@ -499,6 +499,21 @@ export interface ActionItemAssignee {
   email: string;
 }
 
+export type ActionItemDraftStatus =
+  | "pending"
+  | "ready"
+  | "approved"
+  | "sent"
+  | "rejected"
+  | "no_context";
+
+export interface ActionItemEvidenceRef {
+  kind: "internal" | "external";
+  title: string;
+  url: string;
+  retrieved_at: string;
+}
+
 export interface ActionItem {
   id: number;
   title: string;
@@ -515,6 +530,10 @@ export interface ActionItem {
   review_stage_id: number | null;
   linked_record_type: string | null;
   linked_record_id: string | null;
+  draft_text: string | null;
+  draft_evidence_ids: ActionItemEvidenceRef[];
+  draft_generated_at: string | null;
+  draft_status: ActionItemDraftStatus;
   status: "open" | "in_progress" | "done" | "overdue";
   created_at: string;
   drafts?: ActionItemDraft[];
@@ -1851,6 +1870,7 @@ export interface SentinelCreditPacingGovTribe {
   daily_allowance: number;
   today_spent: number;
   top_queries: Array<{ tool_name: string; credits: number; call_count: number }>;
+  daily_burn_history: Array<{ date: string; credits: number }>;
 }
 
 export interface SentinelCreditPacingGovWin {

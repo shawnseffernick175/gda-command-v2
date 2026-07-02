@@ -70,7 +70,7 @@ prevent_pipeline_item_delete
 sitrep_items.source_document_id
 sitrep_items.source_document_url
 
-# F-311: Financial Bible tables added by v3_128
+# F-311: Financial Bible tables added by v3_129
 financial_bible_versions
 financial_rates
 financial_indirects

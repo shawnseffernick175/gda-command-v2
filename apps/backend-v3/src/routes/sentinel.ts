@@ -76,6 +76,7 @@ interface CreditPacingGovTribe {
   daily_allowance: number;
   today_spent: number;
   top_queries: Array<{ tool_name: string; credits: number; call_count: number }>;
+  daily_burn_history: Array<{ date: string; credits: number }>;
 }
 
 interface CreditPacingGovWin {
@@ -287,6 +288,17 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
        LIMIT 5`,
     );
 
+    // 7-day daily burn history for sparkline
+    const { rows: dailyBurnRows } = await pool.query<{ day: string; credits: string }>(
+      `SELECT created_at::date::text AS day,
+              COALESCE(SUM(cost_credits), 0)::text AS credits
+       FROM govtribe_credit_ledger
+       WHERE decision = 'called'
+         AND created_at >= NOW() - INTERVAL '7 days'
+       GROUP BY created_at::date
+       ORDER BY created_at::date ASC`,
+    );
+
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const daysRemainingInMonth = daysInMonth - now.getDate();
@@ -305,6 +317,10 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
         tool_name: q.tool_name,
         credits: parseInt(q.credits, 10),
         call_count: parseInt(q.call_count, 10),
+      })),
+      daily_burn_history: dailyBurnRows.map((r) => ({
+        date: r.day,
+        credits: parseFloat(r.credits),
       })),
     };
 
