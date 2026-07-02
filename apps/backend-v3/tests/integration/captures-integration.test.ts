@@ -277,8 +277,8 @@ describe('Integration: capture re-analysis on opportunity update', () => {
       captureId: 'test-cap-1',
       colorReviewStage: 'red',
       complianceItems: [
-        { id: '1', requirement: 'ISO', status: 'compliant', evidence: 'cert' },
-        { id: '2', requirement: 'CMMI', status: 'partial', evidence: null },
+        { id: '1', requirement: 'ISO', status: 'compliant', response_notes: 'cert' },
+        { id: '2', requirement: 'CMMI', status: 'partial', response_notes: null },
       ],
       pricingMarginPct: 12,
       hasTeamingPartners: true,
@@ -304,7 +304,7 @@ describe('Integration: capture re-analysis on opportunity update', () => {
       captureId: 'test-cap-2',
       colorReviewStage: 'pink',
       complianceItems: [
-        { id: 'ci_1', requirement: 'ISO 9001', status: 'compliant', evidence: 'Certificate valid through 2027' },
+        { id: 'ci_1', requirement: 'ISO 9001', status: 'compliant', response_notes: 'Certificate valid through 2027' },
       ],
       pricingMarginPct: 10,
       hasTeamingPartners: false,
