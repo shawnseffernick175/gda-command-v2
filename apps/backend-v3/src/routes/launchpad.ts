@@ -191,8 +191,16 @@ export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
 
   // ── F-308: GET /v3/launchpad/door-summaries ──
   app.get('/v3/launchpad/door-summaries', async (req, reply) => {
-    const result = await getDoorSummaries();
-    return reply.status(200).send(successEnvelope(result, req.requestId));
+    try {
+      const result = await getDoorSummaries();
+      return reply.status(200).send(successEnvelope(result, req.requestId));
+    } catch (err) {
+      req.log.error({ error: err instanceof Error ? err.message : String(err) }, 'door-summaries failed');
+      return reply.status(200).send(successEnvelope({
+        summaries: [],
+        generated_at: new Date().toISOString(),
+      }, req.requestId));
+    }
   });
 
   // ── F-308: GET /v3/launchpad/risks-roll-up — same as /v3/risks/launchpad ──

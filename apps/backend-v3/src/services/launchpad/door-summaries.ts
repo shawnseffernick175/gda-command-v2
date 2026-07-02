@@ -72,9 +72,10 @@ async function generateSummary(doorKey: string): Promise<string> {
       }>(
         `SELECT
            COUNT(*)::text AS total,
-           COUNT(*) FILTER (WHERE stage NOT IN ('won', 'lost', 'cancelled'))::text AS active,
-           COUNT(*) FILTER (WHERE updated_at < NOW() - INTERVAL '14 days')::text AS stale
-         FROM captures`,
+           COUNT(*) FILTER (WHERE pi.stage NOT IN ('won', 'lost', 'no_bid'))::text AS active,
+           COUNT(*) FILTER (WHERE c.updated_at < NOW() - INTERVAL '14 days')::text AS stale
+         FROM captures c
+         JOIN pipeline_items pi ON pi.id = c.pipeline_item_id`,
       );
       const r = res.rows[0];
       return `${r?.total ?? 0} capture records, ${r?.active ?? 0} active. ${r?.stale ?? 0} have not been updated in over 14 days.`;
@@ -170,7 +171,12 @@ export async function getDoorSummaries(): Promise<DoorSummariesResult> {
       continue;
     }
 
-    const summary = await generateSummary(door.key);
+    let summary: string;
+    try {
+      summary = await generateSummary(door.key);
+    } catch {
+      summary = 'Summary temporarily unavailable.';
+    }
     const now = new Date().toISOString();
 
     await pool.query(
