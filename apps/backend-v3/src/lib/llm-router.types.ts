@@ -935,6 +935,7 @@ export interface GeneratedRisk {
   title: string;
   description: string;
   category: 'technical' | 'schedule' | 'financial' | 'compliance' | 'operational' | 'competitive';
+  severity?: 'critical' | 'high' | 'medium' | 'low';
   likelihood: number;
   impact: number;
   mitigation: string;

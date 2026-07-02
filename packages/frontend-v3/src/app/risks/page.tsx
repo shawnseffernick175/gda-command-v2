@@ -14,8 +14,9 @@ import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
 import type { Risk } from "@/lib/types";
 
-const CATEGORIES = ["operational", "technical", "financial", "schedule", "compliance", "personnel"] as const;
-const STATUSES = ["open", "mitigated", "accepted", "closed"] as const;
+const CATEGORIES = ["operational", "technical", "financial", "schedule", "compliance", "personnel", "doctrine_violation", "margin", "past_performance", "teaming", "incumbent_advantage", "staffing", "certification", "price", "other"] as const;
+const SEVERITIES = ["critical", "high", "medium", "low"] as const;
+const STATUSES = ["open", "mitigating", "mitigated", "resolved", "accepted", "closed"] as const;
 const IMPACTS = [1, 2, 3, 4, 5] as const;
 
 function riskScore(likelihood: number, impact: number): number {
@@ -34,10 +35,22 @@ function scoreBg(score: number): string {
   return "bg-gda-green/10 border-gda-green/30 text-gda-green";
 }
 
+function severityColor(severity: string): string {
+  switch (severity) {
+    case "critical": return "bg-red-500/15 text-red-400 border-red-500/30";
+    case "high": return "bg-amber-400/15 text-amber-400 border-amber-400/30";
+    case "medium": return "bg-blue-400/15 text-blue-400 border-blue-400/30";
+    case "low": return "bg-gda-green/15 text-gda-green border-gda-green/30";
+    default: return "bg-border text-muted-foreground border-border";
+  }
+}
+
 function statusBadgeVariant(status: string) {
   switch (status) {
     case "open": return "destructive";
+    case "mitigating": return "outline";
     case "mitigated": return "outline";
+    case "resolved": return "secondary";
     case "accepted": return "secondary";
     case "closed": return "outline";
     default: return "outline";
@@ -47,10 +60,11 @@ function statusBadgeVariant(status: string) {
 const EMPTY_FORM = {
   title: "",
   description: "",
-  category: "operational" as string,
+  category: "operational" as Risk["category"],
+  severity: "medium" as Risk["severity"],
   likelihood: 3,
   impact: 3,
-  status: "open" as "open" | "mitigated" | "accepted" | "closed",
+  status: "open" as Risk["status"],
   owner: "",
   mitigation: "",
 };
@@ -117,12 +131,13 @@ function AiRiskGeneration() {
 
 const RISK_SORT_COLS: ColumnSortConfig[] = [
   { field: "title", type: "string" },
+  { field: "severity", type: "enum", enumOrder: ["critical", "high", "medium", "low"] },
   { field: "risk_type", type: "enum", enumOrder: ["negative", "positive"] },
   { field: "category", type: "string" },
   { field: "likelihood", type: "number" },
   { field: "impact", type: "number" },
   { field: "score", type: "number", accessor: (r) => ((r.likelihood as number) ?? 3) * ((r.impact as number) ?? 3) },
-  { field: "status", type: "enum", enumOrder: ["open", "mitigated", "accepted", "closed"] },
+  { field: "status", type: "enum", enumOrder: ["open", "mitigating", "mitigated", "resolved", "accepted", "closed"] },
   { field: "owner", type: "string" },
   { field: "opportunity_title", type: "string" },
 ];
@@ -130,6 +145,7 @@ const RISK_SORT_COLS: ColumnSortConfig[] = [
 function RisksRegisterContent() {
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterSeverity, setFilterSeverity] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
@@ -141,6 +157,7 @@ function RisksRegisterContent() {
   const { data, isLoading } = useRisks({
     status: filterStatus || undefined,
     category: filterCategory || undefined,
+    severity: filterSeverity || undefined,
   });
   const createRisk = useCreateRisk();
   const updateRisk = useUpdateRisk();
@@ -182,10 +199,11 @@ function RisksRegisterContent() {
     setForm({
       title: risk.title,
       description: risk.description ?? "",
-      category: risk.category ?? "operational",
+      category: (risk.category ?? "operational") as Risk["category"],
+      severity: (risk.severity ?? "medium") as Risk["severity"],
       likelihood: risk.likelihood ?? 3,
       impact: risk.impact ?? 3,
-      status: risk.status ?? "open",
+      status: (risk.status ?? "open") as Risk["status"],
       owner: risk.owner ?? "",
       mitigation: risk.mitigation ?? "",
     });
@@ -280,7 +298,20 @@ function RisksRegisterContent() {
                 className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
               >
                 {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                  <option key={c} value={c}>{c.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
+                ))}
+              </select>
+            </div>
+            {/* Severity */}
+            <div>
+              <label className="block text-[11px] text-muted-foreground mb-1">Severity</label>
+              <select
+                value={form.severity}
+                onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as Risk["severity"] }))}
+                className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+              >
+                {SEVERITIES.map((s) => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                 ))}
               </select>
             </div>
@@ -377,6 +408,16 @@ function RisksRegisterContent() {
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
         <select
+          value={filterSeverity}
+          onChange={(e) => setFilterSeverity(e.target.value)}
+          className="rounded border border-border bg-gda-panel px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+        >
+          <option value="">All Severities</option>
+          {SEVERITIES.map((s) => (
+            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+          ))}
+        </select>
+        <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           className="rounded border border-border bg-gda-panel px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
@@ -393,13 +434,13 @@ function RisksRegisterContent() {
         >
           <option value="">All Categories</option>
           {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+            <option key={c} value={c}>{c.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
           ))}
         </select>
-        {(filterStatus || filterCategory) && (
+        {(filterStatus || filterCategory || filterSeverity) && (
           <button
             type="button"
-            onClick={() => { setFilterStatus(""); setFilterCategory(""); }}
+            onClick={() => { setFilterStatus(""); setFilterCategory(""); setFilterSeverity(""); }}
             className="text-[11px] text-muted-foreground hover:text-foreground"
           >
             Clear filters
@@ -492,6 +533,7 @@ function RisksRegisterContent() {
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
               <SortableHeader label="Risk" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.title ?? "", onChange: (v) => setFilter("title", v) }} />
+              <SortableHeader label="Severity" field="severity" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.severity ?? "", onChange: (v) => setFilter("severity", v) }} />
               <SortableHeader label="Type" field="risk_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.risk_type ?? "", onChange: (v) => setFilter("risk_type", v) }} />
               <SortableHeader label="Category" field="category" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.category ?? "", onChange: (v) => setFilter("category", v) }} />
               <SortableHeader label="L" field="likelihood" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -507,14 +549,14 @@ function RisksRegisterContent() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-border animate-pulse">
-                  <td colSpan={10} className="px-3 py-2">
+                  <td colSpan={11} className="px-3 py-2">
                     <div className="h-3 bg-gda-panel rounded w-3/4" />
                   </td>
                 </tr>
               ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-xs text-muted-foreground">
+                <td colSpan={11} className="px-3 py-8 text-center text-xs text-muted-foreground">
                   No risks logged yet — click {'"+"'} Add Risk to create one
                 </td>
               </tr>
@@ -532,6 +574,11 @@ function RisksRegisterContent() {
                           {r.mitigation}
                         </span>
                       )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge className={cn("text-[10px] font-mono font-bold uppercase tracking-wide border", severityColor(r.severity ?? "medium"))}>
+                        {r.severity ?? "medium"}
+                      </Badge>
                     </td>
                     <td className="px-3 py-2">
                       <Badge className={cn("text-[10px] font-mono font-bold uppercase tracking-wide", r.risk_type === "positive" ? "bg-gda-green/15 text-gda-green border-gda-green/30" : "bg-red-500/15 text-red-400 border-red-500/30")}>

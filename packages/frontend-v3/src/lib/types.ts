@@ -938,18 +938,29 @@ export interface Risk {
   id: number;
   title: string;
   description: string | null;
-  category: "operational" | "technical" | "financial" | "compliance" | "schedule" | "competitive" | "personnel" | string;
+  category: "operational" | "technical" | "financial" | "compliance" | "schedule" | "competitive" | "personnel" | "doctrine_violation" | "margin" | "past_performance" | "teaming" | "incumbent_advantage" | "staffing" | "certification" | "price" | "other" | string;
+  severity: "critical" | "high" | "medium" | "low";
   likelihood: number;
   impact: number;
   score: number;
-  status: "open" | "mitigated" | "accepted" | "closed";
+  status: "open" | "mitigating" | "mitigated" | "resolved" | "accepted" | "closed";
   owner: string | null;
   mitigation: string | null;
   opportunity_id: number | null;
   opportunity_title: string | null;
+  related_capture_id: number | null;
+  related_pipeline_item_id: number | null;
+  related_action_item_id: number | null;
+  source_event: Record<string, unknown>;
+  mitigation_doc_ids: string[];
+  evidence_grade: "A" | "B" | "C" | null;
   source: "manual" | "ai_generated";
   created_at: string;
   updated_at: string;
+  identified_at: string;
+  resolved_at: string | null;
+  due_at: string | null;
+  created_by: string;
   risk_type: "negative" | "positive";
   if_condition: string | null;
   then_impact: string | null;
@@ -957,6 +968,15 @@ export interface Risk {
   exploitation_plan: string | null;
   due_date: string | null;
   next_step: string | null;
+}
+
+export interface RiskEvent {
+  id: string;
+  risk_id: number;
+  event_type: "created" | "duplicate_fire" | "status_change" | "severity_change" | "owner_assigned" | "mitigation_updated" | "evidence_added" | "auto_archived";
+  payload: Record<string, unknown>;
+  actor: string;
+  created_at: string;
 }
 
 /* ── Sentinel ─────────────────────────────────────────────────── */
