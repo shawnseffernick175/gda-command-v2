@@ -25,22 +25,7 @@ export async function startSoakDigestWorker(): Promise<void> {
     logger.info('Running daily soak digest');
 
     try {
-      await pool.query(`
-        INSERT INTO soak_metrics (day, kind, count, p95_ms, api_version)
-        SELECT
-          created_at::date AS day,
-          kind,
-          COUNT(*)::int AS count,
-          PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,
-          api_version
-        FROM soak_events
-        WHERE created_at::date = CURRENT_DATE - 1
-        GROUP BY created_at::date, kind, api_version
-        ON CONFLICT (day, kind, api_version)
-        DO UPDATE SET
-          count = EXCLUDED.count,
-          p95_ms = EXCLUDED.p95_ms
-      `);
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY soak_metrics');
 
       const purged = await pool.query(
         `DELETE FROM soak_events WHERE created_at < NOW() - INTERVAL '7 days'`,
