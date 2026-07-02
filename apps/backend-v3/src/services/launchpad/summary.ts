@@ -20,6 +20,8 @@ export interface LaunchpadSummary {
   action_items_open_today_sources: SourceCitation[];
   action_items_overdue: number;
   action_items_overdue_sources: SourceCitation[];
+  drafts_ready_for_review: number;
+  drafts_ready_for_review_sources: SourceCitation[];
 }
 
 export async function computeSummary(): Promise<LaunchpadSummary> {
@@ -32,7 +34,7 @@ export async function computeSummary(): Promise<LaunchpadSummary> {
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 7);
 
-  const [qualifiedRes, pipelineNoCaptureRes, staleReviewRes, openTodayRes, overdueRes] =
+  const [qualifiedRes, pipelineNoCaptureRes, staleReviewRes, openTodayRes, overdueRes, draftsReadyRes] =
     await Promise.all([
       pool.query<{ count: string }>(
         `SELECT COUNT(*)::text AS count FROM opportunities
@@ -63,6 +65,11 @@ export async function computeSummary(): Promise<LaunchpadSummary> {
          WHERE status = 'open'
            AND due_date IS NOT NULL
            AND due_date < NOW()`
+      ),
+      pool.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM action_items
+         WHERE status IN ('open', 'in_progress')
+           AND draft_status = 'ready'`
       ),
     ]);
 
@@ -100,6 +107,13 @@ export async function computeSummary(): Promise<LaunchpadSummary> {
       kind: 'internal_query',
       title: 'Action items open and past due',
       url: '/action-items?overdue=1',
+      retrieved_at: retrievedAt,
+    }],
+    drafts_ready_for_review: parseInt(draftsReadyRes.rows[0]?.count ?? '0', 10),
+    drafts_ready_for_review_sources: [{
+      kind: 'internal_query',
+      title: 'AI drafts ready for review',
+      url: '/action-items?draft_status=ready',
       retrieved_at: retrievedAt,
     }],
   };

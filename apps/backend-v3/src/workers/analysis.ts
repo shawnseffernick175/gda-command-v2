@@ -32,6 +32,7 @@ import { QUEUE_NAMES, ANALYSIS_PRIORITY, registerQueues, type AnalysisJobData } 
 import type { SourceRef } from '../lib/sources.js';
 import {
   buildStubDraftText,
+  buildDraftSources,
   type DraftJobData,
   type DraftKind,
 } from '../services/drafts/index.js';
@@ -744,13 +745,27 @@ async function handleIngestPostprocess(jobs: PgBoss.Job<Record<string, unknown>>
       }
 
       const draftText = buildStubDraftText(draftData.kind as DraftKind, actionItem);
+      const evidenceSources = buildDraftSources(draftData.kind as DraftKind);
+      const evidenceIds = evidenceSources.map((s) => (s as { title: string }).title);
 
       await pool.query(
         `UPDATE action_item_drafts
-         SET content    = $1,
-             model_used = $2
+         SET content      = $1,
+             model_used   = $2,
+             evidence_ids = $3
+         WHERE id = $4`,
+        [draftText, 'stub', evidenceIds, draftData.draftId]
+      );
+
+      await pool.query(
+        `UPDATE action_items
+         SET draft_text         = $1,
+             draft_evidence_ids = $2::jsonb,
+             draft_generated_at = NOW(),
+             draft_status       = 'ready',
+             updated_at         = NOW()
          WHERE id = $3`,
-        [draftText, 'stub', draftData.draftId]
+        [draftText, JSON.stringify(evidenceSources), draftData.actionItemId]
       );
 
       logger.info({ draftId: draftData.draftId }, 'Draft generation complete');

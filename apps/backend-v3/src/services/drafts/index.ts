@@ -17,6 +17,10 @@ export interface DraftRow {
   approved_at: string | null;
   source_id: number;
   status: DraftDbStatus;
+  evidence_ids: string[] | null;
+  rejection_reason: string | null;
+  edit_diff: string | null;
+  original_content: string | null;
   created_at: string;
 }
 
@@ -115,6 +119,102 @@ export function toDraftApiShape(row: DraftRow): object {
     content: row.content,
     model_used: row.model_used,
     status: lifecycleStatus(row),
+    evidence_ids: row.evidence_ids ?? [],
+    rejection_reason: row.rejection_reason ?? null,
+    edit_diff: row.edit_diff ?? null,
+    original_content: row.original_content ?? null,
     created_at: row.created_at,
   };
+}
+
+export async function approveDraft(
+  draftId: string,
+  actor: string,
+): Promise<DraftRow> {
+  const res = await pool.query<DraftRow>(
+    `UPDATE action_item_drafts
+     SET status = 'approved', approved_by = $1, approved_at = NOW()
+     WHERE id = $2
+     RETURNING *`,
+    [actor, draftId],
+  );
+  const row = res.rows[0];
+  if (!row) throw Object.assign(new Error('Draft not found'), { statusCode: 404 });
+
+  await pool.query(
+    `UPDATE action_items SET draft_status = 'approved', updated_at = NOW() WHERE id = $1`,
+    [row.action_item_id],
+  );
+
+  logger.info({ draftId, actor }, 'Draft approved');
+  return row;
+}
+
+export async function rejectDraft(
+  draftId: string,
+  reason: string,
+  actor: string,
+): Promise<DraftRow> {
+  const res = await pool.query<DraftRow>(
+    `UPDATE action_item_drafts
+     SET status = 'rejected', rejection_reason = $1
+     WHERE id = $2
+     RETURNING *`,
+    [reason, draftId],
+  );
+  const row = res.rows[0];
+  if (!row) throw Object.assign(new Error('Draft not found'), { statusCode: 404 });
+
+  await pool.query(
+    `UPDATE action_items SET draft_status = 'rejected', updated_at = NOW() WHERE id = $1`,
+    [row.action_item_id],
+  );
+
+  logger.info({ draftId, reason, actor }, 'Draft rejected');
+  return row;
+}
+
+export async function editDraft(
+  draftId: string,
+  newContent: string,
+  actor: string,
+): Promise<DraftRow> {
+  const existing = await getDraft(draftId);
+  if (!existing) throw Object.assign(new Error('Draft not found'), { statusCode: 404 });
+
+  const originalContent = existing.original_content ?? existing.content;
+  const editDiff = computeSimpleDiff(originalContent, newContent);
+
+  const res = await pool.query<DraftRow>(
+    `UPDATE action_item_drafts
+     SET content = $1, original_content = $2, edit_diff = $3, approved_by = $4, approved_at = NOW(), status = 'approved'
+     WHERE id = $5
+     RETURNING *`,
+    [newContent, originalContent, editDiff, actor, draftId],
+  );
+  const row = res.rows[0]!;
+
+  await pool.query(
+    `UPDATE action_items SET draft_text = $1, draft_status = 'approved', updated_at = NOW() WHERE id = $2`,
+    [newContent, row.action_item_id],
+  );
+
+  logger.info({ draftId, actor, diffLen: editDiff.length }, 'Draft edited');
+  return row;
+}
+
+function computeSimpleDiff(original: string, edited: string): string {
+  const origLines = original.split('\n');
+  const editLines = edited.split('\n');
+  const diffs: string[] = [];
+  const maxLen = Math.max(origLines.length, editLines.length);
+  for (let i = 0; i < maxLen; i++) {
+    const origLine = origLines[i] ?? '';
+    const editLine = editLines[i] ?? '';
+    if (origLine !== editLine) {
+      if (origLine) diffs.push(`- ${origLine}`);
+      if (editLine) diffs.push(`+ ${editLine}`);
+    }
+  }
+  return diffs.join('\n');
 }
