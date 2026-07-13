@@ -47,8 +47,8 @@ export default function LaunchpadPage() {
   return (
     <div className="space-y-6 pb-16">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-3">
-        <h1 className="text-sm font-bold text-white uppercase tracking-widest">
+      <div className="flex items-center justify-between border-b border-border pb-3 pt-6">
+        <h1 className="text-sm font-bold text-foreground uppercase tracking-widest">
           GDA Command · Launchpad · {formatHeaderDate()} · {formatHeaderTime()}
         </h1>
       </div>
