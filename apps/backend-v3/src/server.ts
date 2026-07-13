@@ -74,6 +74,10 @@ async function backfillAnalysis(): Promise<void> {
      WHERE deleted_at IS NULL
        AND (analysis IS NULL OR analysis_version != $1)
        AND (relevance_status IS NULL OR relevance_status = 'relevant')
+       -- Passed/dispositioned opps are never analyzed (mirrors self-check.ts).
+       AND assessment_status IS DISTINCT FROM 'pass'
+       -- Binding rule: opps within 30 days of the deadline are auto-passed.
+       AND (response_due_at IS NULL OR response_due_at >= NOW() + INTERVAL '30 days')
      LIMIT 500`,
     [config.analysisVersion],
   );

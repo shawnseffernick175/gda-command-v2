@@ -790,7 +790,7 @@ async function runTeardown(uploadId: string, classification: string): Promise<vo
            teardown_model = $2,
            status = 'analyzed'
        WHERE id = $3`,
-      [JSON.stringify(analysis), result.model_used ?? 'claude-sonnet-4-5', uploadId],
+      [JSON.stringify(analysis), result.model_used ?? 'claude-sonnet-4-5-20250929', uploadId],
     );
   } catch (err) {
     await pool.query(

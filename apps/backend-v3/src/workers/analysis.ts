@@ -45,8 +45,26 @@ import type { OpportunityRow as PwinOpportunityRow } from '../services/pwin/feat
 import { llmRouter } from '../lib/llm-router.js';
 import { getPwinWeights } from '../services/pwin/pwin-weights.js';
 import { resolveUnifiedLink } from '../services/opportunities/unified-mirror.js';
+import { computeRevisionHash, type RevisionHashInput } from '../services/analysis/revision-hash.js';
 
 const { Pool } = pg;
+
+/** Row shape fetched by the periodic-refresh sweep for revision-hash comparison. */
+interface PeriodicRefreshCandidate {
+  id: string;
+  title: string | null;
+  description: string | null;
+  agency: string | null;
+  naics: string | null;
+  set_aside: string | null;
+  value_min: string | null;
+  value_max: string | null;
+  response_due_at: Date | null;
+  incumbent: string | null;
+  updated_at: Date | null;
+  analysis_version: string | null;
+  stored_revision_hash: string | null;
+}
 
 const pool = new Pool({
   connectionString: config.databaseUrl,
@@ -435,6 +453,10 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
 
     const analysis = buildFullAnalysis(row, pwinWeights);
 
+    // Persist the content fingerprint so the periodic-refresh sweep can skip
+    // re-analyzing this opportunity while its inputs are unchanged (cost control).
+    analysis.revision_hash = computeRevisionHash(row as unknown as RevisionHashInput);
+
     // Standing rule: auto-No-Bid when response_due_at is < 30 days away (but still future)
     const responseDueAt = row.response_due_at as string | null;
     let isAutoNoBid = false;
@@ -803,6 +825,10 @@ async function scheduleModelVersionBumpCron(boss: PgBoss): Promise<void> {
        WHERE deleted_at IS NULL
          AND (analysis_version IS NULL OR analysis_version != $1)
          AND (relevance_status IS NULL OR relevance_status = 'relevant')
+         -- Passed/dispositioned opps are never analyzed (mirrors self-check.ts).
+         AND assessment_status IS DISTINCT FROM 'pass'
+         -- Binding rule: opps within 30 days of the deadline are auto-passed.
+         AND (response_due_at IS NULL OR response_due_at >= NOW() + INTERVAL '30 days')
        LIMIT 500`,
       [config.analysisVersion],
     );
@@ -843,14 +869,36 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
       return;
     }
 
-    const res = await pool.query<{ id: string }>(
-      `SELECT id FROM opportunities
+    const res = await pool.query<PeriodicRefreshCandidate>(
+      `SELECT id, title, description, agency, naics, set_aside, value_min, value_max,
+              response_due_at, incumbent, updated_at, analysis_version,
+              analysis->>'revision_hash' AS stored_revision_hash
+       FROM opportunities
        WHERE deleted_at IS NULL
          AND (ai_analyzed_at IS NULL OR ai_analyzed_at < NOW() - INTERVAL '24 hours')
          AND (relevance_status IS NULL OR relevance_status = 'relevant')
+         -- Passed/dispositioned opps are never analyzed (mirrors self-check.ts).
+         AND assessment_status IS DISTINCT FROM 'pass'
+         -- Binding rule: opps within 30 days of the deadline are auto-passed.
+         AND (response_due_at IS NULL OR response_due_at >= NOW() + INTERVAL '30 days')
+       ORDER BY ai_analyzed_at ASC NULLS FIRST
        LIMIT 500`,
     );
+
+    let enqueued = 0;
+    let skippedUnchanged = 0;
     for (const row of res.rows) {
+      // Cost control: skip re-analysis when the opportunity content is unchanged
+      // since its last analysis on the current version. The LLM output would be
+      // identical, so re-running it is pure waste.
+      const currentHash = computeRevisionHash(row);
+      if (
+        row.analysis_version === config.analysisVersion &&
+        row.stored_revision_hash === currentHash
+      ) {
+        skippedUnchanged += 1;
+        continue;
+      }
       await boss.send(QUEUE_NAMES.ANALYSIS_OPPORTUNITY, {
         entityType: 'opportunity' as const,
         entityId: String(row.id),
@@ -863,8 +911,12 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
         retryBackoff: true,
         singletonKey: `opp-${row.id}`,
       });
+      enqueued += 1;
     }
-    logger.info({ count: res.rows.length }, '24h periodic refresh sweep enqueued');
+    logger.info(
+      { candidates: res.rows.length, enqueued, skippedUnchanged },
+      '24h periodic refresh sweep enqueued',
+    );
   });
 }
 
