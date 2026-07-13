@@ -1,15 +1,26 @@
 /**
- * GovWin IQ Web Services API client — typed JSON calls using OAuth2.
+ * GovWin IQ data client — the single import surface used by ingest,
+ * adapters, enrichment and routes.
  *
- * F-332: Replaces the cheerio scraping path. Uses the official REST/JSON
- * API at services.govwin.com/neo/v1 (or whatever base the token discovery
- * reveals at runtime).
+ * P0 (#1099): dispatches on GOVWIN_AUTH_MODE (default 'cas'). In CAS mode the
+ * calls delegate to `cas_client.ts` (JSESSIONID session cookie against the NEO
+ * portal). In 'oauth2' mode they use the official OAuth2 Web Services API at
+ * services.govwin.com/neo-ws. The OAuth2 tier is not provisioned for this
+ * account, so 'cas' is the default; flip GOVWIN_AUTH_MODE=oauth2 if it ever is.
  *
- * Enforces a configurable daily download cap (GOVWIN_DAILY_LIMIT) and
- * backs off cleanly on 429.
+ * The OAuth2 path enforces a configurable daily download cap
+ * (GOVWIN_DAILY_LIMIT) and backs off cleanly on 429.
  */
 
 import { getAccessToken, invalidateOAuth2Token } from './oauth2_auth.js';
+import { isCasMode } from './mode.js';
+import {
+  discoverRecentOpportunitiesApiCas,
+  fetchOpportunityByIdApiCas,
+  fetchOpportunityDetailHtmlCas,
+  searchBySolicitationNumberCas,
+  searchByTitleAgencyCas,
+} from './cas_client.js';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 
@@ -180,6 +191,9 @@ function mapRawToOpp(raw: GovWinRawOpp): GovWinApiOpportunity {
 export async function discoverRecentOpportunitiesApi(
   maxResults = 50,
 ): Promise<GovWinApiOpportunity[]> {
+  if (isCasMode()) {
+    return discoverRecentOpportunitiesApiCas(maxResults);
+  }
   const data = await apiGet<GovWinSearchResult>(
     `/opportunities?sort=updatedDate&order=desc&max=${maxResults}&oppSelectionDateFrom=-30D`,
   );
@@ -194,6 +208,11 @@ export async function discoverRecentOpportunitiesApi(
 export async function fetchOpportunityByIdApi(
   govwinId: string,
 ): Promise<GovWinApiOpportunity | null> {
+  if (isCasMode()) {
+    const viaJson = await fetchOpportunityByIdApiCas(govwinId);
+    if (viaJson) return viaJson;
+    return fetchOpportunityDetailHtmlCas(govwinId);
+  }
   try {
     const raw = await apiGet<GovWinRawOpp>(`/opportunities/${govwinId}`);
     return mapRawToOpp(raw);
@@ -213,6 +232,9 @@ export async function fetchOpportunityByIdApi(
 export async function searchBySolicitationNumber(
   solNumber: string,
 ): Promise<GovWinApiOpportunity | null> {
+  if (isCasMode()) {
+    return searchBySolicitationNumberCas(solNumber);
+  }
   try {
     const data = await apiGet<GovWinSearchResult>(
       `/opportunities?solicitationNumber=${encodeURIComponent(solNumber)}&max=5`,
@@ -237,6 +259,9 @@ export async function searchByTitleAgency(
   title: string,
   agency: string | null,
 ): Promise<GovWinApiOpportunity | null> {
+  if (isCasMode()) {
+    return searchByTitleAgencyCas(title, agency);
+  }
   try {
     const q = agency ? `${title} ${agency}` : title;
     const data = await apiGet<GovWinSearchResult>(

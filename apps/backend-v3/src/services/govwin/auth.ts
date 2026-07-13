@@ -1,14 +1,20 @@
 /**
  * GovWin IQ CAS REST authentication service.
  *
- * ⚠️  F-333: CAS/scrape path is HARD-DISABLED by default.
- *     Set GOVWIN_ALLOW_SCRAPE=true to re-enable (dev/debug only).
- *     Production uses the OAuth2 Web Services API (F-332) instead.
+ * P0 (#1099): CAS session-cookie auth is the DEFAULT GovWin auth path. The
+ * account does NOT have the Deltek OAuth2 Web Services tier (oauth2 returns
+ * 401 invalid_client), and the CAS flow verifiably works: POST /cas/v1/tickets
+ * returns a TGT, the service ticket validates against j_spring_cas_security_check,
+ * and the portal issues a JSESSIONID session cookie for data calls.
  *
  * GovWin uses Apereo CAS (not OAuth2 client-credentials).
  * Flow: POST /cas/v1/tickets with username+password → TGT,
  * then POST /cas/v1/tickets/{TGT} with service URL → ST,
  * then validate ST to get a session cookie for API calls.
+ *
+ * This path is enabled whenever GOVWIN_AUTH_MODE=cas (the default). Set
+ * GOVWIN_AUTH_MODE=oauth2 (or GOVWIN_ALLOW_SCRAPE=true for dev override) to
+ * change behaviour.
  *
  * Credentials are read from env: GOVWIN_USERNAME, GOVWIN_PASSWORD.
  * No secret is ever logged or serialized.
@@ -17,8 +23,11 @@
 import { createHash } from 'node:crypto';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
+import { isCasMode } from './mode.js';
 
-const SCRAPE_ALLOWED = process.env['GOVWIN_ALLOW_SCRAPE'] === 'true';
+function casEnabled(): boolean {
+  return isCasMode() || process.env['GOVWIN_ALLOW_SCRAPE'] === 'true';
+}
 
 const CAS_BASE = 'https://iq.govwin.com/cas/v1/tickets';
 const SERVICE_URL = 'https://iq.govwin.com/neo/j_spring_cas_security_check';
@@ -110,9 +119,9 @@ async function persistAuthState(
 }
 
 export async function authenticate(): Promise<string[]> {
-  if (!SCRAPE_ALLOWED) {
-    logger.error('govwin_scrape_blocked: API-only — scraping disabled (set GOVWIN_ALLOW_SCRAPE=true to override)');
-    throw new Error('API-only — scraping disabled. Use the GovWin Web Services API (F-332) instead.');
+  if (!casEnabled()) {
+    logger.error('govwin_cas_disabled: GOVWIN_AUTH_MODE=oauth2 — CAS session auth is off');
+    throw new Error('GovWin CAS auth disabled (GOVWIN_AUTH_MODE=oauth2). Set GOVWIN_AUTH_MODE=cas.');
   }
 
   if (cached.tgt && cached.cookies.length > 0 && Date.now() < cached.expiresAt) {
