@@ -59,7 +59,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          AND o.created_at > NOW() - INTERVAL '24 hours'
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
-           WHERE dn.source = 'sam' AND dn.source_id = o.internal_id
+           WHERE dn.source = 'sam' AND dn.source_id = o.internal_id::text
              AND dn.posted_at > NOW() - INTERVAL '24 hours'
          )
        RETURNING 1 AS cnt`,
@@ -91,7 +91,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          AND o.created_at > NOW() - INTERVAL '24 hours'
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
-           WHERE dn.source = 'usaspending' AND dn.source_id = o.internal_id
+           WHERE dn.source = 'usaspending' AND dn.source_id = o.internal_id::text
              AND dn.posted_at > NOW() - INTERVAL '24 hours'
          )
        RETURNING 1 AS cnt`,
@@ -149,7 +149,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          AND o.created_at > NOW() - INTERVAL '24 hours'
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
-           WHERE dn.source = 'govwin' AND dn.source_id = o.internal_id
+           WHERE dn.source = 'govwin' AND dn.source_id = o.internal_id::text
              AND dn.posted_at > NOW() - INTERVAL '24 hours'
          )
        RETURNING 1 AS cnt`,
@@ -180,7 +180,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
          AND o.created_at > NOW() - INTERVAL '24 hours'
          AND NOT EXISTS (
            SELECT 1 FROM launchpad_daily_news dn
-           WHERE dn.source = 'govtribe' AND dn.source_id = o.internal_id
+           WHERE dn.source = 'govtribe' AND dn.source_id = o.internal_id::text
              AND dn.posted_at > NOW() - INTERVAL '24 hours'
          )
        RETURNING 1 AS cnt`,
