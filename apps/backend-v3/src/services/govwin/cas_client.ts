@@ -22,13 +22,21 @@ import { parseOpportunityPage } from './client.js';
 import { logger } from '../../lib/logger.js';
 import type { GovWinApiOpportunity } from './api_client.js';
 
-const IQ_BASE = process.env['GOVWIN_CAS_BASE'] ?? 'https://iq.govwin.com';
+function envOrDefault(name: string, fallback: string): string {
+  return process.env[name]?.trim() || fallback;
+}
+
+const IQ_BASE = envOrDefault('GOVWIN_CAS_BASE', 'https://iq.govwin.com');
 
 /** NEO portal JSON data paths. Overridable via env in case Deltek moves them. */
-const OPP_SEARCH_PATH =
-  process.env['GOVWIN_CAS_OPP_SEARCH_PATH'] ?? '/neo/rest/opportunities';
-const OPP_DETAIL_PATH =
-  process.env['GOVWIN_CAS_OPP_DETAIL_PATH'] ?? '/neo/rest/opportunities';
+const OPP_SEARCH_PATH = envOrDefault(
+  'GOVWIN_CAS_OPP_SEARCH_PATH',
+  '/neo/rest/opportunities',
+);
+const OPP_DETAIL_PATH = envOrDefault(
+  'GOVWIN_CAS_OPP_DETAIL_PATH',
+  '/neo/rest/opportunities',
+);
 
 function buildCookieHeader(cookies: string[]): string {
   return cookies.map((c) => c.split(';')[0]).join('; ');
@@ -46,10 +54,22 @@ function looksLikeLogin(contentType: string | null, body: string): boolean {
  * the session has expired (login page returned).
  */
 async function casGetJson<T>(path: string, retry = true): Promise<T> {
-  const cookies = await authenticate();
-  const url = `${IQ_BASE}${path}`;
+  let url: URL;
+  try {
+    const base = new URL(IQ_BASE);
+    url = new URL(path, base);
+    if (!['http:', 'https:'].includes(url.protocol) || !url.host) {
+      throw new Error('unsupported URL protocol');
+    }
+  } catch {
+    throw new Error(
+      `GovWin CAS URL must be absolute: base="${IQ_BASE}", path="${path}"`,
+    );
+  }
 
-  const res = await fetch(url, {
+  const cookies = await authenticate();
+
+  const res = await fetch(url.toString(), {
     headers: {
       Cookie: buildCookieHeader(cookies),
       Accept: 'application/json',
