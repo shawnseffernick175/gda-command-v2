@@ -226,6 +226,13 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     fallback: null,
   },
   {
+    task: 'launchpad_sitrep',
+    provider: 'anthropic',
+    model: 'claude-haiku-4-5',
+    timeout_ms: 20_000,
+    fallback: null,
+  },
+  {
     task: 'action_item_draft',
     provider: 'anthropic',
     model: 'claude-haiku-4-5-20251001',

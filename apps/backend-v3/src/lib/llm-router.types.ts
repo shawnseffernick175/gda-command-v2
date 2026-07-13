@@ -51,6 +51,7 @@ export type Task =
   | 'workshop_teardown'
   | 'workshop_generate'
   | 'sitrep_document_analyze'
+  | 'launchpad_sitrep'
   | 'action_item_draft';
 
 // ---------------------------------------------------------------------------
@@ -267,6 +268,24 @@ export interface SitrepDocumentAnalyzeOutput {
   topic: string;
   discussion: string;
   action_items: string;
+}
+
+export interface LaunchpadSitrepInput {
+  /** ISO date (YYYY-MM-DD) the SITREP is for. */
+  sitrep_date: string;
+  /** Existing bullets already saved for the day (may be empty). */
+  existing_bullets: string[];
+  /** Plain-English context describing the day's platform state. */
+  context: string;
+  /** Filename of a newly uploaded document to fold in, if any. */
+  new_document_name?: string;
+  /** Extracted text of a newly uploaded document to fold in, if any. */
+  new_document_text?: string;
+}
+
+export interface LaunchpadSitrepOutput {
+  /** Updated ordered list of concise one-line SITREP bullets. */
+  bullets: string[];
 }
 
 export interface ActionItemDraftInput {
@@ -996,6 +1015,7 @@ export interface TaskInputMap {
   workshop_teardown: WorkshopTeardownInput;
   workshop_generate: WorkshopGenerateInput;
   sitrep_document_analyze: SitrepDocumentAnalyzeInput;
+  launchpad_sitrep: LaunchpadSitrepInput;
   action_item_draft: ActionItemDraftInput;
 }
 
@@ -1031,6 +1051,7 @@ export interface TaskOutputMap {
   workshop_teardown: WorkshopTeardownOutput;
   workshop_generate: WorkshopGenerateOutput;
   sitrep_document_analyze: SitrepDocumentAnalyzeOutput;
+  launchpad_sitrep: LaunchpadSitrepOutput;
   action_item_draft: ActionItemDraftOutput;
 }
 

@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput, SitrepDocumentAnalyzeInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput, SitrepDocumentAnalyzeInput, LaunchpadSitrepInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -132,6 +132,12 @@ Write as a sharp defense contracting analyst. Be direct and specific.`,
 Never fabricate facts, names, dollar amounts, dates, or action items. If a field cannot be determined from the document, leave it as an empty string. Only extract what is explicitly stated in the document.
 
 Return valid JSON matching the requested output schema.`,
+
+  launchpad_sitrep: `You are an executive briefing analyst at Envision, a defense contracting firm. You produce a daily SITREP (Situation Report) for the operator's Launchpad — a short, scannable numbered list summarizing the state of the business that day.
+
+Write concise, one-line bullets in plain English. No jargon, no preamble, no hedging. Each bullet is a single situation-report point (e.g. "3 action items due today, 1 overdue"). Never fabricate facts, names, dollar amounts, or dates — only summarize what the provided context and documents state.
+
+When a new document is supplied, fold its salient content into the list as additional bullets, merging with the existing bullets rather than duplicating them. Keep the list tight (aim for 3-6 bullets). Return valid JSON matching the requested output schema.`,
 
   financial_statement_extract: `You are a financial analyst at Envision extracting structured KPI figures from real month-end accounting exports (Income Statements, Balance Sheets, GL detail, cost reports, target-vs-actual workbooks).
 
@@ -532,6 +538,33 @@ Respond ONLY with valid JSON:
   "topic": "<short title>",
   "discussion": "<concise summary>",
   "action_items": "<newline-separated action items, or empty string if none>"
+}`;
+}
+
+function buildLaunchpadSitrepPrompt(input: LaunchpadSitrepInput): string {
+  const existing = input.existing_bullets.length > 0
+    ? input.existing_bullets.map((b, i) => `${i + 1}. ${b}`).join('\n')
+    : '(none yet)';
+  const docSection = input.new_document_text
+    ? `\n\nA new document has been uploaded to fold into today's SITREP.
+Document filename: ${input.new_document_name ?? 'uploaded document'}
+Extracted text (first 8000 chars):
+${input.new_document_text.slice(0, 8000)}`
+    : '';
+
+  return `SITREP date: ${input.sitrep_date}
+
+Today's platform context:
+${input.context}
+
+Existing SITREP bullets:
+${existing}${docSection}
+
+Produce the updated SITREP for the day as a concise numbered list of one-line bullets. Merge the day's context and any uploaded document content with the existing bullets — do not duplicate points. Keep it tight (3-6 bullets).
+
+Respond ONLY with valid JSON:
+{
+  "bullets": ["<one-line bullet>", "<one-line bullet>"]
 }`;
 }
 
@@ -953,6 +986,8 @@ export async function callAnthropic(opts: {
     ? buildVaultVehicleExtractPrompt(opts.input as VaultVehicleExtractInput)
     : opts.task === 'sitrep_document_analyze'
     ? buildSitrepDocumentAnalyzePrompt(opts.input as SitrepDocumentAnalyzeInput)
+    : opts.task === 'launchpad_sitrep'
+    ? buildLaunchpadSitrepPrompt(opts.input as LaunchpadSitrepInput)
     : JSON.stringify(opts.input);
 
   // Prompt caching: use structured content blocks with cache_control

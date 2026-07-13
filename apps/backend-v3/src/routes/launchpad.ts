@@ -1,4 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import fastifyMultipart from '@fastify/multipart';
+import { extname } from 'node:path';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { computeSummary } from '../services/launchpad/summary.js';
 import { computeFlags } from '../services/launchpad/flags.js';
@@ -24,12 +26,26 @@ import { getDay1Banners, dismissBanner } from '../services/launchpad/day1-banner
 import { getDoorSummaries } from '../services/launchpad/door-summaries.js';
 import { recordNewsFeedback } from '../services/launchpad/news-feedback.js';
 import type { FeedbackAction } from '../services/launchpad/news-feedback.js';
+import {
+  getSitrep,
+  addSitrepDocument,
+  todayEastern,
+  isValidDate,
+} from '../services/launchpad/sitrep.js';
 
 function getUserId(req: FastifyRequest): string {
   return (req as FastifyRequest & { user?: JwtPayload }).user?.sub ?? 'anonymous';
 }
 
+const SITREP_MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const SITREP_ALLOWED_EXTS = new Set(['.pdf', '.docx', '.txt', '.md']);
+
 export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
+  // F-SITREP: multipart support for the SITREP document upload endpoint.
+  await app.register(fastifyMultipart, {
+    limits: { fileSize: SITREP_MAX_FILE_SIZE },
+  });
+
   app.get('/v3/launchpad/summary', async (req, reply) => {
     const userId = getUserId(req);
     const cached = getSummaryCache(userId);
@@ -246,5 +262,68 @@ export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
     const userId = getUserId(req);
     await recordNewsFeedback({ news_id, action: action as FeedbackAction, user_id: userId });
     return reply.status(200).send(successEnvelope({ recorded: true }, req.requestId));
+  });
+
+  // ── F-SITREP: GET /v3/launchpad/sitrep?date=YYYY-MM-DD ──
+  // Returns the day's SITREP (AI bullets + attached documents), generating and
+  // persisting an initial one from the day's context when none exists yet.
+  app.get<{
+    Querystring: { date?: string };
+  }>('/v3/launchpad/sitrep', async (req, reply) => {
+    const date = req.query.date ?? todayEastern();
+    if (!isValidDate(date)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'date must be formatted as YYYY-MM-DD', req.requestId),
+      );
+    }
+    const sitrep = await getSitrep(date);
+    return reply.status(200).send(successEnvelope(sitrep, req.requestId));
+  });
+
+  // ── F-SITREP: POST /v3/launchpad/sitrep/documents (multipart) ──
+  // Uploads one or more documents (pdf/docx/txt/md), parses each, folds the
+  // salient content into the day's SITREP bullets, and persists both.
+  app.post('/v3/launchpad/sitrep/documents', async (req, reply) => {
+    let date = todayEastern();
+    const files: Array<{ filename: string; buffer: Buffer }> = [];
+
+    for await (const part of req.parts()) {
+      if (part.type === 'file') {
+        const ext = extname(part.filename).toLowerCase();
+        if (!SITREP_ALLOWED_EXTS.has(ext)) {
+          // Drain the stream before responding so the request completes cleanly.
+          await part.toBuffer();
+          return reply.status(400).send(
+            errorEnvelope(
+              'VALIDATION_ERROR',
+              `Unsupported file type "${ext}". Allowed: ${[...SITREP_ALLOWED_EXTS].join(', ')}`,
+              req.requestId,
+            ),
+          );
+        }
+        files.push({ filename: part.filename, buffer: await part.toBuffer() });
+      } else if (part.fieldname === 'date' && typeof part.value === 'string') {
+        date = part.value;
+      }
+    }
+
+    if (!isValidDate(date)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'date must be formatted as YYYY-MM-DD', req.requestId),
+      );
+    }
+    if (files.length === 0) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'No file uploaded', req.requestId),
+      );
+    }
+
+    // Fold each uploaded document into the day's SITREP in turn so later
+    // documents merge with the bullets produced by earlier ones.
+    let sitrep = await getSitrep(date);
+    for (const file of files) {
+      sitrep = await addSitrepDocument({ date, filename: file.filename, buffer: file.buffer });
+    }
+    return reply.status(201).send(successEnvelope(sitrep, req.requestId));
   });
 }
