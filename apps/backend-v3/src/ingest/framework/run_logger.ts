@@ -94,3 +94,35 @@ export async function getIngestStatus(): Promise<IngestStatusRow[]> {
   );
   return rows;
 }
+
+export interface IngestInsertStatusRow {
+  source_key: string;
+  /** Last run that actually authenticated AND wrote rows (success + rows > 0). */
+  last_insert_at: string | null;
+  /** Whether this source has ever written rows — distinguishes a source that
+   *  legitimately produces no new rows on a poll from one that never returns data. */
+  ever_inserted: boolean;
+}
+
+/**
+ * Per-source "did it actually return data" status. A run is only counted as a
+ * successful insert when its status is 'success' AND it wrote rows. 'degraded'
+ * runs (e.g. an auth failure caught and reported as degraded) are NOT counted,
+ * so a source that is 401ing/inserting 0 rows will not look fresh.
+ */
+export async function getIngestInsertStatus(): Promise<IngestInsertStatusRow[]> {
+  const { rows } = await pool.query(
+    `SELECT source_key,
+            MAX(finished_at) FILTER (
+              WHERE status = 'success' AND (rows_inserted + rows_updated) > 0
+            ) AS last_insert_at,
+            COALESCE(
+              bool_or(status = 'success' AND (rows_inserted + rows_updated) > 0),
+              false
+            ) AS ever_inserted
+     FROM ingest_runs
+     GROUP BY source_key
+     ORDER BY source_key`,
+  );
+  return rows;
+}

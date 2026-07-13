@@ -45,12 +45,21 @@ function formatDelta(source: IngestSourceStatus): string {
   return "—";
 }
 
+const STATUS_LABELS: Record<IngestSourceStatus["status"], string> = {
+  healthy: "Healthy",
+  degraded: "Degraded",
+  stale: "Stale",
+  error: "Failed",
+  unknown: "Unknown",
+};
+
 function StatusDot({ status }: { status: IngestSourceStatus["status"] }) {
   return (
     <span
       className={cn(
         "inline-block h-2 w-2 rounded-full shrink-0",
         status === "healthy" && "bg-gda-green",
+        status === "degraded" && "bg-gda-amber",
         status === "stale" && "bg-gda-amber",
         status === "error" && "bg-gda-red",
         status === "unknown" && "bg-muted-foreground",
@@ -65,12 +74,13 @@ function StatusLabel({ status }: { status: IngestSourceStatus["status"] }) {
       className={cn(
         "text-[11px] font-mono capitalize",
         status === "healthy" && "text-gda-green",
+        status === "degraded" && "text-gda-amber",
         status === "stale" && "text-gda-amber",
         status === "error" && "text-gda-red",
         status === "unknown" && "text-muted-foreground",
       )}
     >
-      {status === "healthy" ? "Healthy" : status === "stale" ? "Stale" : status === "error" ? "Error" : "Unknown"}
+      {STATUS_LABELS[status]}
     </span>
   );
 }
@@ -107,6 +117,17 @@ function SourceDetail({
       })
     : "—";
 
+  const lastSuccessFormatted = source.last_success_at
+    ? new Date(source.last_success_at).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short",
+      })
+    : "Never";
+
   return (
     <div className="border-t border-border bg-gda-bg-base/50 px-4 py-3 space-y-2">
       <p className="font-mono text-xs font-semibold text-foreground">
@@ -115,6 +136,11 @@ function SourceDetail({
       <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-[11px]">
         <span className="text-muted-foreground">Last run:</span>
         <span className="text-foreground">{lastRunFormatted}</span>
+
+        <span className="text-muted-foreground">Last successful insert:</span>
+        <span className={cn("text-foreground", source.last_success_at === null && "text-gda-amber")}>
+          {lastSuccessFormatted}
+        </span>
 
         <span className="text-muted-foreground">Duration:</span>
         <span className="text-foreground">
