@@ -15,7 +15,7 @@ export function TopBar() {
 
   return (
     <>
-      <div className="flex h-10 items-center justify-between gap-4 border-b border-border bg-gda-bg-base px-4">
+      <div className="flex min-h-16 items-center justify-between gap-4 border-b border-border bg-gda-bg-base px-4 pb-2 pt-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="flex shrink-0 items-center gap-3">
             <a
