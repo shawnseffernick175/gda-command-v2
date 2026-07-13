@@ -11,7 +11,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import { getRegisteredSourcesWithLabels, runIngest, getRegisteredSources } from '../ingest/framework/registry.js';
-import { getIngestStatus } from '../ingest/framework/run_logger.js';
+import { getIngestInsertStatus } from '../ingest/framework/run_logger.js';
 import { getCreditBudgetStatus } from '../ingest/govtribe/mcp_client.js';
 import type { JwtPayload } from '../middleware/auth.js';
 
@@ -44,15 +44,72 @@ function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
   return true;
 }
 
-function deriveStatus(
-  lagSeconds: number | null,
-  intervalHours: number,
-  hasRecentError: boolean,
-): 'healthy' | 'stale' | 'error' | 'unknown' {
-  if (hasRecentError) return 'error';
-  if (lagSeconds === null) return 'unknown';
-  const threshold = intervalHours * 2 * 3600;
-  return lagSeconds > threshold ? 'stale' : 'healthy';
+type SourceStatus = 'healthy' | 'degraded' | 'stale' | 'error' | 'unknown';
+
+/**
+ * Number of scheduled intervals a source may go without a successful insert
+ * before it is considered stale. Generous to avoid false positives for sources
+ * that legitimately have no new data on some polls.
+ */
+const STALE_INTERVAL_FACTOR = 2;
+
+export interface LatestRun {
+  status: string;
+  rows_inserted: number;
+  rows_updated: number;
+  rows_skipped: number;
+  started_at: string | null;
+  finished_at: string | null;
+  error_text: string | null;
+  log_lines: string[] | null;
+}
+
+/**
+ * Derive a health status that reflects whether the source actually
+ * AUTHENTICATED and RETURNED DATA — not merely that the cron ran.
+ *
+ * Green (healthy) requires the most recent completed run to have succeeded and,
+ * for a source that historically returns rows, a successful insert within the
+ * expected window. A run that errored, was reported degraded (e.g. a caught
+ * 401/403/5xx), or has produced no rows for longer than the expected interval
+ * is surfaced as error/degraded/stale.
+ */
+export function deriveStatus(params: {
+  latest: LatestRun | undefined;
+  lastInsertAt: string | null;
+  everInserted: boolean;
+  intervalHours: number;
+  hasRecentError: boolean;
+  now?: number;
+}): SourceStatus {
+  const { latest, lastInsertAt, everInserted, intervalHours, hasRecentError } = params;
+  const now = params.now ?? Date.now();
+
+  if (!latest) return 'unknown';
+  if (latest.status === 'error' || hasRecentError) return 'error';
+  if (latest.status === 'degraded') return 'degraded';
+  if (latest.status !== 'success') return 'unknown';
+
+  const staleThresholdMs = intervalHours * STALE_INTERVAL_FACTOR * 3600 * 1000;
+  const rowsThisRun = (latest.rows_inserted ?? 0) + (latest.rows_updated ?? 0);
+
+  // Last run authenticated AND returned data — the healthy path.
+  if (rowsThisRun > 0) return 'healthy';
+
+  // Last run succeeded but wrote nothing. For a source that has never produced
+  // rows we can only judge freshness of the run itself.
+  if (!everInserted) {
+    if (latest.finished_at && now - new Date(latest.finished_at).getTime() > staleThresholdMs) {
+      return 'stale';
+    }
+    return 'healthy';
+  }
+
+  // Historically returns rows but this run inserted none: only healthy if a
+  // successful insert happened within the expected window.
+  if (!lastInsertAt) return 'degraded';
+  if (now - new Date(lastInsertAt).getTime() > staleThresholdMs) return 'stale';
+  return 'healthy';
 }
 
 function computeNextRun(lastRunAt: string | null, intervalHours: number): string | null {
@@ -62,47 +119,119 @@ function computeNextRun(lastRunAt: string | null, intervalHours: number): string
   return next.toISOString();
 }
 
+interface ComputedSource {
+  sourceKey: string;
+  label: string;
+  status: SourceStatus;
+  lastRunAt: string | null;
+  durationSeconds: number | null;
+  records: { fetched: number; new: number; updated: number; skipped: number };
+  nextRunAt: string | null;
+  intervalHours: number;
+  lastError: string | null;
+  lastInsertAt: string | null;
+  logLines: string[];
+}
+
+/**
+ * Compute per-source health + timing for every registered source. Shared by the
+ * detailed status endpoint and the lightweight health-count endpoint so both
+ * agree on what "healthy" means.
+ */
+async function computeSources(): Promise<ComputedSource[]> {
+  const registered = getRegisteredSourcesWithLabels();
+  const insertStatus = await getIngestInsertStatus();
+  const insertMap = new Map(insertStatus.map((s) => [s.source_key, s]));
+
+  // Latest COMPLETED run per source — drives status + displayed record counts.
+  const { rows: latestRuns } = await pool.query(
+    `SELECT DISTINCT ON (source_key)
+            source_key, started_at, finished_at,
+            rows_inserted, rows_updated, rows_skipped,
+            status, error_text, log_lines
+     FROM ingest_runs
+     WHERE finished_at IS NOT NULL
+     ORDER BY source_key, finished_at DESC`,
+  );
+  const latestRunMap = new Map(latestRuns.map((r) => [r.source_key, r]));
+
+  // Recent hard errors (last 24h) with no later success/degraded run.
+  const { rows: errorRows } = await pool.query(
+    `SELECT DISTINCT ON (source_key) source_key, error_text
+     FROM ingest_runs e
+     WHERE e.status = 'error'
+       AND e.started_at > NOW() - INTERVAL '24 hours'
+       AND NOT EXISTS (
+         SELECT 1 FROM ingest_runs s
+         WHERE s.source_key = e.source_key
+           AND s.status IN ('success', 'degraded')
+           AND s.started_at > e.started_at
+       )
+     ORDER BY source_key, started_at DESC`,
+  );
+  const recentErrors = new Map<string, string>();
+  for (const r of errorRows) {
+    if (!recentErrors.has(r.source_key)) recentErrors.set(r.source_key, r.error_text);
+  }
+
+  return registered.map(({ key: sourceKey, label }) => {
+    const latest = latestRunMap.get(sourceKey) as LatestRun | undefined;
+    const insert = insertMap.get(sourceKey);
+    const schedule = SCHEDULE_MAP[sourceKey];
+    const intervalHours = schedule?.intervalHours ?? 24;
+    const hasRecentError = recentErrors.has(sourceKey);
+    const lastInsertAt = insert?.last_insert_at ?? null;
+    const everInserted = insert?.ever_inserted ?? false;
+
+    const lastRunAt = latest?.finished_at ?? null;
+    const durationSeconds = latest?.finished_at && latest?.started_at
+      ? Math.round(
+          (new Date(latest.finished_at).getTime() - new Date(latest.started_at).getTime()) / 1000,
+        )
+      : null;
+
+    const status = deriveStatus({
+      latest,
+      lastInsertAt,
+      everInserted,
+      intervalHours,
+      hasRecentError,
+    });
+
+    // Surface the last error text for hard errors AND caught/degraded runs.
+    const lastError =
+      latest && (latest.status === 'error' || latest.status === 'degraded')
+        ? latest.error_text ?? recentErrors.get(sourceKey) ?? null
+        : recentErrors.get(sourceKey) ?? null;
+
+    return {
+      sourceKey,
+      label,
+      status,
+      lastRunAt,
+      durationSeconds,
+      records: {
+        fetched: (latest?.rows_inserted ?? 0) + (latest?.rows_updated ?? 0) + (latest?.rows_skipped ?? 0),
+        new: latest?.rows_inserted ?? 0,
+        updated: latest?.rows_updated ?? 0,
+        skipped: latest?.rows_skipped ?? 0,
+      },
+      nextRunAt: computeNextRun(lastRunAt, intervalHours),
+      intervalHours,
+      lastError,
+      lastInsertAt,
+      logLines: latest?.log_lines ?? [],
+    };
+  });
+}
+
 export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
   /**
    * GET /v3/ingest/status — full pipeline status for all sources.
    * Returns per-source health, timing, record counts, credits.
    */
   app.get('/v3/ingest/status', async (req, reply) => {
-    const registered = getRegisteredSourcesWithLabels();
-    const ingestStatus = await getIngestStatus();
-    const ingestMap = new Map(ingestStatus.map((s) => [s.source_key, s]));
-
-    // Get latest run details per source (records, duration, error)
-    const { rows: latestRuns } = await pool.query(
-      `SELECT DISTINCT ON (source_key)
-              source_key, started_at, finished_at,
-              rows_inserted, rows_updated, rows_skipped,
-              status, error_text, log_lines
-       FROM ingest_runs
-       ORDER BY source_key, started_at DESC`,
-    );
-    const latestRunMap = new Map(latestRuns.map((r) => [r.source_key, r]));
-
-    // Recent errors (last 24h) — only show if no success has occurred since
-    const { rows: errorRows } = await pool.query(
-      `SELECT DISTINCT ON (source_key) source_key, error_text
-       FROM ingest_runs e
-       WHERE e.status = 'error'
-         AND e.started_at > NOW() - INTERVAL '24 hours'
-         AND NOT EXISTS (
-           SELECT 1 FROM ingest_runs s
-           WHERE s.source_key = e.source_key
-             AND s.status IN ('success', 'degraded')
-             AND s.started_at > e.started_at
-         )
-       ORDER BY source_key, started_at DESC`,
-    );
-    const recentErrors = new Map<string, string>();
-    for (const r of errorRows) {
-      if (!recentErrors.has(r.source_key)) {
-        recentErrors.set(r.source_key, r.error_text);
-      }
-    }
+    const computed = await computeSources();
 
     // GovTribe credits
     let govtribeCredits = { credits_used: 0, credits_budget: 1200, pct: 0, last_call_at: null as string | null };
@@ -112,42 +241,22 @@ export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
       // Tables may not exist
     }
 
-    const sources = registered.map(({ key: sourceKey, label }) => {
-      const ingest = ingestMap.get(sourceKey);
-      const latest = latestRunMap.get(sourceKey);
-      const schedule = SCHEDULE_MAP[sourceKey];
-      const intervalHours = schedule?.intervalHours ?? 24;
-      const lagSeconds = ingest?.lag_seconds ?? null;
-      const hasRecentError = recentErrors.has(sourceKey);
-
-      const lastRunAt = latest?.started_at ?? null;
-      const finishedAt = latest?.finished_at ?? null;
-      const durationSeconds = (lastRunAt && finishedAt)
-        ? Math.round((new Date(finishedAt).getTime() - new Date(lastRunAt).getTime()) / 1000)
-        : null;
-
-      const status = deriveStatus(lagSeconds, intervalHours, hasRecentError);
-      const nextRunAt = computeNextRun(ingest?.last_success_at ?? null, intervalHours);
-
+    const sources = computed.map((c) => {
       const entry: Record<string, unknown> = {
-        source_key: sourceKey,
-        display_name: label,
-        status,
-        last_run_at: lastRunAt,
-        last_run_duration_seconds: durationSeconds,
-        records_last_run: {
-          fetched: (latest?.rows_inserted ?? 0) + (latest?.rows_updated ?? 0) + (latest?.rows_skipped ?? 0),
-          new: latest?.rows_inserted ?? 0,
-          updated: latest?.rows_updated ?? 0,
-          skipped: latest?.rows_skipped ?? 0,
-        },
-        next_run_at: nextRunAt,
-        scheduled_interval_hours: intervalHours,
-        last_error: recentErrors.get(sourceKey) ?? null,
-        log_lines: latest?.log_lines ?? [],
+        source_key: c.sourceKey,
+        display_name: c.label,
+        status: c.status,
+        last_run_at: c.lastRunAt,
+        last_run_duration_seconds: c.durationSeconds,
+        records_last_run: c.records,
+        next_run_at: c.nextRunAt,
+        scheduled_interval_hours: c.intervalHours,
+        last_error: c.lastError,
+        last_success_at: c.lastInsertAt,
+        log_lines: c.logLines,
       };
 
-      if (sourceKey === 'govtribe' || sourceKey.startsWith('govtribe.')) {
+      if (c.sourceKey === 'govtribe' || c.sourceKey.startsWith('govtribe.')) {
         entry.credits = {
           used: govtribeCredits.credits_used,
           budget: govtribeCredits.credits_budget,
@@ -162,38 +271,20 @@ export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /**
-   * GET /v3/ingest/health — lightweight stale/error counts (no auth needed).
-   * Used by frontend banner to poll for degraded state.
+   * GET /v3/ingest/health — lightweight degraded/stale/error counts (no auth).
+   * Used by frontend banner to poll for degraded state. Uses the same status
+   * derivation as /status so the two never disagree.
    */
   app.get('/v3/ingest/health', async (req, reply) => {
-    const registered = getRegisteredSourcesWithLabels();
-    const ingestStatus = await getIngestStatus();
-    const ingestMap = new Map(ingestStatus.map((s) => [s.source_key, s]));
-
-    const { rows: errorRows } = await pool.query(
-      `SELECT DISTINCT source_key
-       FROM ingest_runs
-       WHERE status = 'error'
-         AND started_at > NOW() - INTERVAL '24 hours'`,
-    );
-    const errorSources = new Set(errorRows.map((r) => r.source_key));
+    const computed = await computeSources();
 
     let staleCount = 0;
     let errorCount = 0;
 
-    for (const { key: sourceKey } of registered) {
-      const ingest = ingestMap.get(sourceKey);
-      const schedule = SCHEDULE_MAP[sourceKey];
-      const intervalHours = schedule?.intervalHours ?? 24;
-      const lagSeconds = ingest?.lag_seconds ?? null;
-      const hasRecentError = errorSources.has(sourceKey);
-
-      const status = deriveStatus(lagSeconds, intervalHours, hasRecentError);
-
-      // Only count as stale/error if condition persists > 24h
-      if (status === 'error') {
+    for (const c of computed) {
+      if (c.status === 'error' || c.status === 'degraded') {
         errorCount++;
-      } else if (status === 'stale' && lagSeconds !== null && lagSeconds > 86400) {
+      } else if (c.status === 'stale') {
         staleCount++;
       }
     }

@@ -19,13 +19,15 @@ export interface IngestCredits {
 export interface IngestSourceStatus {
   source_key: string;
   display_name: string;
-  status: "healthy" | "stale" | "error" | "unknown";
+  status: "healthy" | "degraded" | "stale" | "error" | "unknown";
   last_run_at: string | null;
   last_run_duration_seconds: number | null;
   records_last_run: IngestRecords;
   next_run_at: string | null;
   scheduled_interval_hours: number;
   last_error: string | null;
+  /** Last run that actually authenticated AND wrote rows. */
+  last_success_at: string | null;
   log_lines: string[];
   credits?: IngestCredits;
 }

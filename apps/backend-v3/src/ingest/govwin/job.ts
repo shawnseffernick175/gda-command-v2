@@ -225,11 +225,17 @@ export async function runGovWinIngest(): Promise<IngestResult> {
   try {
     opps = await discoverRecentOpportunitiesApi();
   } catch (err) {
-    logger.error(
-      { error: err instanceof Error ? err.message : String(err) },
-      'govwin_api_discovery_failed',
-    );
-    return { inserted: 0, updated: 0, skipped: 0, degraded: true, degradedReason: 'API discovery failed' };
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error({ error: message }, 'govwin_api_discovery_failed');
+    // Surface the real error (e.g. HTTP 401 auth failure) so System Health can
+    // show the source as degraded WITH the underlying cause instead of green.
+    return {
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      degraded: true,
+      degradedReason: `API discovery failed: ${message}`,
+    };
   }
 
   logger.info({ count: opps.length }, 'govwin_ingest_discovered');
