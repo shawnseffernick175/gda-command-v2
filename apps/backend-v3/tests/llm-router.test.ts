@@ -80,7 +80,7 @@ describe('Routing Table', () => {
   it('opportunity_analysis has fallback to haiku', () => {
     const entry = getRoutingEntry('opportunity_analysis');
     expect(entry.fallback).not.toBeNull();
-    expect(entry.fallback!.model).toBe('claude-haiku-4-5');
+    expect(entry.fallback!.model).toBe('claude-haiku-4-5-20251001');
   });
 });
 
@@ -230,7 +230,7 @@ describe('Sonnet default — no Opus in routing table defaults', () => {
 
   it('capture_plan defaults to claude-sonnet-4-5', () => {
     const entry = getRoutingEntry('capture_plan');
-    expect(entry.model).toBe('claude-sonnet-4-5');
+    expect(entry.model).toBe('claude-sonnet-4-5-20250929');
   });
 
   it('every Anthropic task defaults to sonnet or haiku', () => {

@@ -35,6 +35,7 @@ import {
 } from './types.js';
 
 import crypto from 'crypto';
+import { computeRevisionHash } from './revision-hash.js';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -83,22 +84,6 @@ function makeRunningSection(sectionId: SectionId): AnalysisSection {
     generated_at: null,
     data: null,
   } as AnalysisSection;
-}
-
-function computeRevisionHash(ctx: OpportunityContext): string {
-  const payload = JSON.stringify({
-    title: ctx.title,
-    description: ctx.description,
-    agency: ctx.agency,
-    naics: ctx.naics,
-    set_aside: ctx.set_aside,
-    value_min: ctx.value_min,
-    value_max: ctx.value_max,
-    response_due_at: ctx.response_due_at,
-    incumbent: ctx.incumbent,
-    updated_at: ctx.updated_at,
-  });
-  return crypto.createHash('sha256').update(payload).digest('hex').slice(0, 16);
 }
 
 // ── Section executors ─────────────────────────────────────────────────────────
