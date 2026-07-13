@@ -385,9 +385,27 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
 
   /* ── 10. KPI: Gross Margin ──────────────────────────────────── */
   gross_margin: {
-    description: "Gross Margin percentage = (Sales \u2212 COGS) / Sales \u00d7 100.",
-    renderFormula: () => (
-      <p>Source: Financial planning system. Standard accounting formula.</p>
+    description: (pm) =>
+      `Sales-weighted Gross Margin percentage for the ${pm === "FY" ? "fiscal year" : "calendar year"} to date.`,
+    renderFormula: (_, pm) => (
+      <p>
+        <span className="font-mono">SUM(monthly sales \u00d7 monthly GM %) / SUM(monthly sales)</span>
+        {" "}over {pm === "FY" ? "FY" : "CY"}-to-date months; color-coded
+        (green {"\u2265"} 0, red {"<"} 0).
+      </p>
+    ),
+    renderDataSources: () => (
+      <ul className="space-y-0.5">
+        <Bullet>
+          Table: <span className="font-mono">financial_actuals.actual_gross_margin</span>
+        </Bullet>
+        <Bullet>
+          Weight: <span className="font-mono">financial_actuals.actual_sales</span>
+        </Bullet>
+        <Bullet>
+          Source precedence: <span className="font-mono">income_statement {">"} l1_actual</span> (highest-priority source per month)
+        </Bullet>
+      </ul>
     ),
   },
 

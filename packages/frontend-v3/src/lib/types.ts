@@ -555,8 +555,8 @@ export interface KpiHeaderData {
   period?: string;
   orders: KpiMetric;
   sales: KpiMetric;
+  gross_margin: KpiMetric;
   ebit: KpiMetric;
-  gross_margin?: KpiMetric;
   ros: KpiMetric;
   funded_backlog: KpiMetric;
   backlog: KpiMetric;

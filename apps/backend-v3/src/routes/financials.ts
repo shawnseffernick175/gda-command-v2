@@ -72,13 +72,15 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     let orders = 0;
     let sales = 0;
     let ebit = 0;
+    let grossProfit = 0;
+    let grossMarginSales = 0;
 
     if (periodStrings.length > 0) {
       const { rows: actualsRows } = await pool.query(
-        `SELECT actual_orders, actual_sales, actual_ebit
+        `SELECT source, actual_orders, actual_sales, actual_ebit, actual_gross_margin
          FROM (
            SELECT DISTINCT ON (period)
-             period, actual_orders, actual_sales, actual_ebit
+             period, source, actual_orders, actual_sales, actual_ebit, actual_gross_margin
            FROM financial_actuals
            WHERE period = ANY($1)
              AND source IN ('income_statement', 'l1_actual')
@@ -91,12 +93,23 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       );
 
       for (const r of actualsRows) {
+        const monthlySales = Number(r.actual_sales) || 0;
+        let monthlyGrossMargin = Number(r.actual_gross_margin);
+        if (r.source === 'l1_actual' && Math.abs(monthlyGrossMargin) <= 1.5) {
+          monthlyGrossMargin *= 100;
+        }
+
         orders += Number(r.actual_orders) || 0;
-        sales += Number(r.actual_sales) || 0;
+        sales += monthlySales;
         ebit += Number(r.actual_ebit) || 0;
+        if (Number.isFinite(monthlyGrossMargin) && monthlySales !== 0) {
+          grossProfit += monthlySales * (monthlyGrossMargin / 100);
+          grossMarginSales += monthlySales;
+        }
       }
     }
 
+    const grossMargin = grossMarginSales !== 0 ? (grossProfit / grossMarginSales) * 100 : 0;
     const ros = sales !== 0 ? (ebit / sales) * 100 : 0;
 
     // Backlog metrics from task_orders (real data only)
@@ -119,6 +132,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       period: periodLabel,
       orders: { value: orders, delta: null, plan: null },
       sales: { value: sales, delta: null, plan: null },
+      gross_margin: { value: grossMargin, delta: null, plan: null },
       ebit: { value: ebit, delta: null, plan: null },
       ros: { value: ros, delta: null, plan: null },
       funded_backlog: { value: fundedBacklog, delta: null, plan: null },

@@ -13,6 +13,7 @@ type CalendarMode = "CY" | "FY";
 type KpiMetricKey =
   | "orders"
   | "sales"
+  | "gross_margin"
   | "ebit"
   | "ros"
   | "funded_backlog"
@@ -29,8 +30,9 @@ interface KpiTile {
 const KPI_TILES: KpiTile[] = [
   { label: "ORDERS", key: "orders", scoreType: "orders", colorCoded: false, format: formatMoney },
   { label: "SALES", key: "sales", scoreType: "sales", colorCoded: false, format: formatMoney },
-  { label: "EBIT", key: "ebit", scoreType: "ebit", colorCoded: true, format: formatMoney },
+  { label: "GM", key: "gross_margin", scoreType: "gross_margin", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
   { label: "ROS", key: "ros", scoreType: "ros", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
+  { label: "EBIT", key: "ebit", scoreType: "ebit", colorCoded: true, format: formatMoney },
   { label: "FUNDED BACKLOG", key: "funded_backlog", scoreType: "funded_backlog", colorCoded: false, format: formatMoney },
   { label: "BACKLOG", key: "backlog", scoreType: "backlog", colorCoded: false, format: formatMoney },
 ];
@@ -77,14 +79,14 @@ export function KpiHeader() {
         >
           FY
         </button>
-        <span className="ml-1 text-[11px] text-gray-500 whitespace-nowrap">
+        <span className="ml-1 text-[11px] text-slate-200 whitespace-nowrap">
           {data?.period ?? (mode === "CY" ? "CY to date" : "FY to date")}
         </span>
       </div>
 
       <Divider />
 
-      {/* 6 KPI Tiles */}
+      {/* 7 KPI Tiles */}
       <div className="flex items-center gap-4 overflow-x-auto">
         {KPI_TILES.map((tile, idx) => {
           const item = data?.[tile.key];
@@ -97,7 +99,7 @@ export function KpiHeader() {
                   href="/financials"
                   className="text-center whitespace-nowrap hover:opacity-80 transition-opacity"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[1px] text-gray-500">
+                  <div className="text-[11px] font-semibold uppercase tracking-[1px] text-slate-100">
                     {tile.label}
                   </div>
                   {isLoading ? (
