@@ -93,11 +93,15 @@ services:
       ENABLE_SBIR_INGEST: ${ENABLE_SBIR_INGEST:-}
       GOVTRIBE_MCP_URL: ${GOVTRIBE_MCP_URL:-}
       GOVTRIBE_CYCLE_WINDOW_HOURS: ${GOVTRIBE_CYCLE_WINDOW_HOURS:-48}
-      # --- GovWin IQ connector — CAS auth (F-Govwin / #561) ---
+      # --- GovWin IQ connector — CAS session auth is the DEFAULT (#1099) ---
+      GOVWIN_AUTH_MODE: ${GOVWIN_AUTH_MODE:-cas}
       GOVWIN_USERNAME: ${GOVWIN_USERNAME:-}
       GOVWIN_PASSWORD: ${GOVWIN_PASSWORD:-}
       GOVWIN_CONNECTOR_V1: ${GOVWIN_CONNECTOR_V1:-}
-      # --- GovWin OAuth2 Web Services API (F-332) ---
+      GOVWIN_CAS_BASE: ${GOVWIN_CAS_BASE:-}
+      GOVWIN_CAS_OPP_SEARCH_PATH: ${GOVWIN_CAS_OPP_SEARCH_PATH:-}
+      GOVWIN_CAS_OPP_DETAIL_PATH: ${GOVWIN_CAS_OPP_DETAIL_PATH:-}
+      # --- GovWin OAuth2 Web Services API (F-332) — gated OFF unless tier is provisioned ---
       GOVWIN_CLIENT_ID: ${GOVWIN_CLIENT_ID:-}
       GOVWIN_CLIENT_SECRET: ${GOVWIN_CLIENT_SECRET:-}
       GOVWIN_API_BASE: ${GOVWIN_API_BASE:-}
@@ -149,11 +153,15 @@ services:
       ENABLE_SBIR_INGEST: ${ENABLE_SBIR_INGEST:-}
       GOVTRIBE_MCP_URL: ${GOVTRIBE_MCP_URL:-}
       GOVTRIBE_CYCLE_WINDOW_HOURS: ${GOVTRIBE_CYCLE_WINDOW_HOURS:-48}
-      # --- GovWin IQ connector — CAS auth (F-Govwin / #561) ---
+      # --- GovWin IQ connector — CAS session auth is the DEFAULT (#1099) ---
+      GOVWIN_AUTH_MODE: ${GOVWIN_AUTH_MODE:-cas}
       GOVWIN_USERNAME: ${GOVWIN_USERNAME:-}
       GOVWIN_PASSWORD: ${GOVWIN_PASSWORD:-}
       GOVWIN_CONNECTOR_V1: ${GOVWIN_CONNECTOR_V1:-}
-      # --- GovWin OAuth2 Web Services API (F-332) ---
+      GOVWIN_CAS_BASE: ${GOVWIN_CAS_BASE:-}
+      GOVWIN_CAS_OPP_SEARCH_PATH: ${GOVWIN_CAS_OPP_SEARCH_PATH:-}
+      GOVWIN_CAS_OPP_DETAIL_PATH: ${GOVWIN_CAS_OPP_DETAIL_PATH:-}
+      # --- GovWin OAuth2 Web Services API (F-332) — gated OFF unless tier is provisioned ---
       GOVWIN_CLIENT_ID: ${GOVWIN_CLIENT_ID:-}
       GOVWIN_CLIENT_SECRET: ${GOVWIN_CLIENT_SECRET:-}
       GOVWIN_API_BASE: ${GOVWIN_API_BASE:-}

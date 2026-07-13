@@ -2,22 +2,22 @@
  * GovWin IQ HTTP client — makes authenticated requests using
  * CAS session cookies obtained via the auth service.
  *
- * ⚠️  F-333: scrape path is HARD-DISABLED by default.
- *     Set GOVWIN_ALLOW_SCRAPE=true to re-enable (dev/debug only).
- *     Production uses the OAuth2 Web Services API (F-332) instead.
+ * P0 (#1099): this HTML path backs the CAS session mode as a fallback for
+ * opportunity detail parsing. Enabled whenever GOVWIN_AUTH_MODE=cas (default)
+ * or GOVWIN_ALLOW_SCRAPE=true.
  */
 
 import * as cheerio from 'cheerio';
 import { authenticate, invalidateAuth } from './auth.js';
 import { logger } from '../../lib/logger.js';
+import { isCasMode } from './mode.js';
 
-const SCRAPE_ALLOWED = process.env['GOVWIN_ALLOW_SCRAPE'] === 'true';
 const IQ_BASE = 'https://iq.govwin.com';
 
 function assertScrapeAllowed(): void {
-  if (!SCRAPE_ALLOWED) {
-    logger.error('govwin_scrape_blocked: API-only — scraping disabled');
-    throw new Error('API-only — scraping disabled. Use the GovWin Web Services API (F-332) instead.');
+  if (!isCasMode() && process.env['GOVWIN_ALLOW_SCRAPE'] !== 'true') {
+    logger.error('govwin_scrape_blocked: GOVWIN_AUTH_MODE=oauth2 — CAS/HTML path disabled');
+    throw new Error('GovWin CAS/HTML path disabled (GOVWIN_AUTH_MODE=oauth2).');
   }
 }
 
