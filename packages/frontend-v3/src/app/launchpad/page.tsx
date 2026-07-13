@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useDailyNews, useNewsFeedback } from "@/hooks/use-launchpad";
 import Day1Banners from "@/components/launchpad/Day1Banners";
+import SitrepBlock from "@/components/launchpad/SitrepBlock";
 import LaunchpadNewsCard from "@/components/launchpad/LaunchpadNewsCard";
 import DoorSummaries from "@/components/launchpad/DoorSummaries";
 import WhatNeedsMePanel from "@/components/digest/WhatNeedsMePanel";
@@ -51,6 +52,9 @@ export default function LaunchpadPage() {
           GDA Command · Launchpad · {formatHeaderDate()} · {formatHeaderTime()}
         </h1>
       </div>
+
+      {/* SITREP — F-SITREP */}
+      <SitrepBlock />
 
       {/* Day-1 Banners */}
       <section>

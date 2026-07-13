@@ -42,6 +42,7 @@ import type {
   WorkshopTeardownOutput,
   WorkshopGenerateOutput,
   SitrepDocumentAnalyzeOutput,
+  LaunchpadSitrepOutput,
   ActionItemDraftOutput,
 } from './llm-router.types.js';
 
@@ -493,6 +494,13 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       discussion: 'Mock discussion summary of the document content.',
       action_items: '',
     } satisfies SitrepDocumentAnalyzeOutput,
+    launchpad_sitrep: {
+      bullets: [
+        'Mock SITREP bullet one.',
+        'Mock SITREP bullet two.',
+        'Mock SITREP bullet three.',
+      ],
+    } satisfies LaunchpadSitrepOutput,
     action_item_draft: {
       draft_text: 'Mock AI-drafted response for the action item. This draft addresses the key requirements and provides recommended next steps.',
       evidence_refs: [

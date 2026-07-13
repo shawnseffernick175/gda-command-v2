@@ -69,3 +69,7 @@ prevent_pipeline_item_delete
 # F-612: sitrep_items.source_document_id + source_document_url added by v3_112
 sitrep_items.source_document_id
 sitrep_items.source_document_url
+
+# F-SITREP: launchpad_sitreps + launchpad_sitrep_documents created by v3_135 (not in CI snapshot yet)
+launchpad_sitreps
+launchpad_sitrep_documents
