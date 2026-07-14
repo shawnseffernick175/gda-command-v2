@@ -46,13 +46,6 @@ function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
 
 type SourceStatus = 'healthy' | 'degraded' | 'stale' | 'error' | 'unknown';
 
-/**
- * Number of scheduled intervals a source may go without a successful insert
- * before it is considered stale. Generous to avoid false positives for sources
- * that legitimately have no new data on some polls.
- */
-const STALE_INTERVAL_FACTOR = 2;
-
 export interface LatestRun {
   status: string;
   rows_inserted: number;
@@ -68,11 +61,8 @@ export interface LatestRun {
  * Derive a health status that reflects whether the source actually
  * AUTHENTICATED and RETURNED DATA — not merely that the cron ran.
  *
- * Green (healthy) requires the most recent completed run to have succeeded and,
- * for a source that historically returns rows, a successful insert within the
- * expected window. A run that errored, was reported degraded (e.g. a caught
- * 401/403/5xx), or has produced no rows for longer than the expected interval
- * is surfaced as error/degraded/stale.
+ * Green (healthy) requires the most recent completed run to have succeeded,
+ * returned data, and successfully inserted rows within the expected interval.
  */
 export function deriveStatus(params: {
   latest: LatestRun | undefined;
@@ -90,25 +80,16 @@ export function deriveStatus(params: {
   if (latest.status === 'degraded') return 'degraded';
   if (latest.status !== 'success') return 'unknown';
 
-  const staleThresholdMs = intervalHours * STALE_INTERVAL_FACTOR * 3600 * 1000;
-  const rowsThisRun = (latest.rows_inserted ?? 0) + (latest.rows_updated ?? 0);
+  const expectedIntervalMs = intervalHours * 3600 * 1000;
+  const rowsThisRun =
+    (latest.rows_inserted ?? 0) +
+    (latest.rows_updated ?? 0) +
+    (latest.rows_skipped ?? 0);
 
-  // Last run authenticated AND returned data — the healthy path.
-  if (rowsThisRun > 0) return 'healthy';
+  if (rowsThisRun === 0) return 'degraded';
+  if (!everInserted || !lastInsertAt) return 'degraded';
 
-  // Last run succeeded but wrote nothing. For a source that has never produced
-  // rows we can only judge freshness of the run itself.
-  if (!everInserted) {
-    if (latest.finished_at && now - new Date(latest.finished_at).getTime() > staleThresholdMs) {
-      return 'stale';
-    }
-    return 'healthy';
-  }
-
-  // Historically returns rows but this run inserted none: only healthy if a
-  // successful insert happened within the expected window.
-  if (!lastInsertAt) return 'degraded';
-  if (now - new Date(lastInsertAt).getTime() > staleThresholdMs) return 'stale';
+  if (now - new Date(lastInsertAt).getTime() > expectedIntervalMs) return 'stale';
   return 'healthy';
 }
 
@@ -174,6 +155,16 @@ async function computeSources(): Promise<ComputedSource[]> {
     if (!recentErrors.has(r.source_key)) recentErrors.set(r.source_key, r.error_text);
   }
 
+  const { rows: lastErrorRows } = await pool.query(
+    `SELECT DISTINCT ON (source_key) source_key, error_text
+     FROM ingest_runs
+     WHERE error_text IS NOT NULL
+     ORDER BY source_key, finished_at DESC NULLS LAST, started_at DESC`,
+  );
+  const lastErrors = new Map<string, string>(
+    lastErrorRows.map((r) => [r.source_key, r.error_text]),
+  );
+
   return registered.map(({ key: sourceKey, label }) => {
     const latest = latestRunMap.get(sourceKey) as LatestRun | undefined;
     const insert = insertMap.get(sourceKey);
@@ -198,11 +189,7 @@ async function computeSources(): Promise<ComputedSource[]> {
       hasRecentError,
     });
 
-    // Surface the last error text for hard errors AND caught/degraded runs.
-    const lastError =
-      latest && (latest.status === 'error' || latest.status === 'degraded')
-        ? latest.error_text ?? recentErrors.get(sourceKey) ?? null
-        : recentErrors.get(sourceKey) ?? null;
+    const lastError = lastErrors.get(sourceKey) ?? null;
 
     return {
       sourceKey,

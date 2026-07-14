@@ -21,28 +21,16 @@ function formatRelativeTime(iso: string | null): string {
   return `${days}d ago`;
 }
 
-function formatNextRun(iso: string | null): string {
-  if (!iso) return "—";
-  const diff = new Date(iso).getTime() - Date.now();
-  if (diff < 0) return "Overdue";
-  const mins = Math.round(diff / 60_000);
-  if (mins < 60) return `In ${mins}m`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `In ${hours}h`;
-  const days = Math.round(hours / 24);
-  return `In ${days}d`;
-}
-
-function formatDelta(source: IngestSourceStatus): string {
-  const records = source.records_last_run;
-  const total = records.new + records.updated;
-  // New records were written -> show the positive delta.
-  if (total > 0) return `+${total}`;
-  // A run actually executed (we have a timestamp) but produced no new records:
-  // confirm it was active rather than rendering an ambiguous "—".
-  if (source.last_run_at) return `${records.fetched} checked`;
-  // No run has ever executed for this source.
-  return "—";
+function formatTimestamp(iso: string | null): string {
+  if (!iso) return "Never";
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short",
+  });
 }
 
 const STATUS_LABELS: Record<IngestSourceStatus["status"], string> = {
@@ -266,7 +254,7 @@ export function IngestPipelineSection() {
   return (
     <div className="space-y-0">
       {/* Header row */}
-      <div className="grid grid-cols-[1fr_80px_80px_80px_50px] gap-2 px-3 py-1.5 border-b border-border">
+      <div className="grid grid-cols-[minmax(160px,1fr)_80px_80px_130px_minmax(180px,1.5fr)] gap-2 px-3 py-1.5 border-b border-border">
         <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide">
           Source
         </span>
@@ -277,21 +265,16 @@ export function IngestPipelineSection() {
           Last Run
         </span>
         <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide">
-          Next Run
+          Last Successful Insert
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide text-right">
-          Δ
+        <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide">
+          Last Error
         </span>
       </div>
 
       {/* Source rows */}
       {sources.map((source) => {
         const isExpanded = expandedRow === source.source_key;
-        const delta = formatDelta(source);
-        const deltaColor = delta.startsWith("+")
-          ? "text-gda-green"
-          : "text-muted-foreground";
-
         return (
           <div key={source.source_key}>
             <button
@@ -299,7 +282,7 @@ export function IngestPipelineSection() {
               onClick={() =>
                 setExpandedRow(isExpanded ? null : source.source_key)
               }
-              className="grid w-full grid-cols-[1fr_80px_80px_80px_50px] gap-2 px-3 py-2 text-left hover:bg-gda-panel/50 transition-colors border-b border-border/50 cursor-pointer"
+              className="grid w-full grid-cols-[minmax(160px,1fr)_80px_80px_130px_minmax(180px,1.5fr)] gap-2 px-3 py-2 text-left hover:bg-gda-panel/50 transition-colors border-b border-border/50 cursor-pointer"
             >
               <span className="flex items-center gap-2 min-w-0">
                 <StatusDot status={source.status} />
@@ -314,20 +297,20 @@ export function IngestPipelineSection() {
               <span
                 className={cn(
                   "font-mono text-[11px]",
-                  formatNextRun(source.next_run_at) === "Overdue"
+                  source.last_success_at === null
                     ? "text-gda-amber"
                     : "text-muted-foreground",
                 )}
               >
-                {formatNextRun(source.next_run_at)}
+                {formatTimestamp(source.last_success_at)}
               </span>
               <span
                 className={cn(
-                  "font-mono text-[11px] text-right",
-                  deltaColor,
+                  "font-mono text-[11px] break-words",
+                  source.last_error ? "text-gda-red" : "text-muted-foreground",
                 )}
               >
-                {delta}
+                {source.last_error ?? "None"}
               </span>
             </button>
 
