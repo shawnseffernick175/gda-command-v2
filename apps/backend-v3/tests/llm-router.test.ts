@@ -242,6 +242,24 @@ describe('Sonnet default — no Opus in routing table defaults', () => {
       expect(isSonnet || isHaiku).toBe(true);
     }
   });
+
+  // #1101: undated model IDs (e.g. 'claude-haiku-4-5') are rejected by the
+  // Anthropic API and 100%-error on every call, silently burning nothing but
+  // wasting the task. Every Anthropic model — primary and fallback — must be
+  // date-pinned (…-YYYYMMDD).
+  it('every Anthropic model id is date-pinned', () => {
+    const datePin = /-\d{8}$/;
+    const anthropicEntries = ROUTING_TABLE.filter((e) => e.provider === 'anthropic');
+    for (const entry of anthropicEntries) {
+      expect(entry.model, `task ${entry.task} primary model must be date-pinned`).toMatch(datePin);
+      if (entry.fallback && entry.fallback.provider === 'anthropic') {
+        expect(
+          entry.fallback.model,
+          `task ${entry.task} fallback model must be date-pinned`,
+        ).toMatch(datePin);
+      }
+    }
+  });
 });
 
 describe('Drift detector — no direct SDK imports outside providers/', () => {

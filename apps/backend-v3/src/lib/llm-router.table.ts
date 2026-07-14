@@ -228,7 +228,7 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
   {
     task: 'launchpad_sitrep',
     provider: 'anthropic',
-    model: 'claude-haiku-4-5',
+    model: 'claude-haiku-4-5-20251001',
     timeout_ms: 20_000,
     fallback: null,
   },
