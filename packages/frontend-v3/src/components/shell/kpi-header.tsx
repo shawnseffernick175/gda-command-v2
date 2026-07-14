@@ -79,7 +79,7 @@ export function KpiHeader() {
         >
           FY
         </button>
-        <span className="ml-1 text-[11px] text-foreground whitespace-nowrap">
+        <span className="ml-1 text-[11px] text-white whitespace-nowrap">
           {data?.period ?? (mode === "CY" ? "CY to date" : "FY to date")}
         </span>
       </div>
@@ -99,7 +99,7 @@ export function KpiHeader() {
                   href="/financials"
                   className="text-center whitespace-nowrap hover:opacity-80 transition-opacity"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[1px] text-foreground">
+                  <div className="text-[11px] font-semibold uppercase tracking-[1px] text-white">
                     {tile.label}
                   </div>
                   {isLoading ? (
