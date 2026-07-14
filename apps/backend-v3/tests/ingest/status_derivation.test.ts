@@ -52,28 +52,27 @@ describe('deriveStatus', () => {
     ).toBe('healthy');
   });
 
-  it('stays healthy on an empty poll when it inserted rows within the window', () => {
+  it('is degraded when the latest run returned zero rows after historical inserts', () => {
     expect(
       deriveStatus({ latest: run({ status: 'success', rows_inserted: 0 }), lastInsertAt: new Date(NOW - 2 * HOUR).toISOString(), everInserted: true, intervalHours: 6, hasRecentError: false, now: NOW }),
-    ).toBe('healthy');
-  });
-
-  it('is stale when a source that returns rows has not inserted within the window', () => {
-    // interval 6h, factor 2 -> 12h window; last insert 30h ago.
-    expect(
-      deriveStatus({ latest: run({ status: 'success', rows_inserted: 0 }), lastInsertAt: new Date(NOW - 30 * HOUR).toISOString(), everInserted: true, intervalHours: 6, hasRecentError: false, now: NOW }),
-    ).toBe('stale');
-  });
-
-  it('is degraded when it historically returns rows but has never had a tracked insert', () => {
-    expect(
-      deriveStatus({ latest: run({ status: 'success', rows_inserted: 0 }), lastInsertAt: null, everInserted: true, intervalHours: 6, hasRecentError: false, now: NOW }),
     ).toBe('degraded');
   });
 
-  it('is healthy for a source that legitimately never inserts and ran recently', () => {
+  it('is stale when the latest run returned data but no insert occurred within the expected interval', () => {
+    expect(
+      deriveStatus({ latest: run({ status: 'success', rows_skipped: 4 }), lastInsertAt: new Date(NOW - 7 * HOUR).toISOString(), everInserted: true, intervalHours: 6, hasRecentError: false, now: NOW }),
+    ).toBe('stale');
+  });
+
+  it('is degraded when it returned data but has never had a tracked insert', () => {
+    expect(
+      deriveStatus({ latest: run({ status: 'success', rows_skipped: 4 }), lastInsertAt: null, everInserted: false, intervalHours: 6, hasRecentError: false, now: NOW }),
+    ).toBe('degraded');
+  });
+
+  it('is degraded when a source has never inserted and the latest run returned zero rows', () => {
     expect(
       deriveStatus({ latest: run({ status: 'success', rows_inserted: 0 }), lastInsertAt: null, everInserted: false, intervalHours: 6, hasRecentError: false, now: NOW }),
-    ).toBe('healthy');
+    ).toBe('degraded');
   });
 });
