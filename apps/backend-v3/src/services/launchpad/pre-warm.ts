@@ -41,7 +41,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
       `INSERT INTO launchpad_daily_news (source, source_id, source_url, title, agency, dollar_value, naics_code, set_aside, posted_at, relevance_score, is_day1_banner)
        SELECT
          'sam',
-         o.internal_id,
+         o.internal_id::text,
          CASE WHEN l.source_native_id IS NOT NULL
               THEN 'https://sam.gov/opp/' || l.source_native_id || '/view'
               ELSE NULL END,
@@ -75,7 +75,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
       `INSERT INTO launchpad_daily_news (source, source_id, source_url, title, agency, dollar_value, posted_at, relevance_score, is_day1_banner)
        SELECT
          'usaspending',
-         o.internal_id,
+         o.internal_id::text,
          CASE WHEN l.source_native_id IS NOT NULL
               THEN 'https://www.usaspending.gov/award/' || l.source_native_id
               ELSE NULL END,
@@ -134,7 +134,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
       `INSERT INTO launchpad_daily_news (source, source_id, source_url, title, agency, dollar_value, posted_at, relevance_score)
        SELECT
          'govwin',
-         o.internal_id,
+         o.internal_id::text,
          CASE WHEN l.source_native_id IS NOT NULL
               THEN 'https://iq.govwin.com/neo/opportunity/' || l.source_native_id
               ELSE NULL END,
@@ -165,7 +165,7 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
       `INSERT INTO launchpad_daily_news (source, source_id, source_url, title, agency, dollar_value, posted_at, relevance_score)
        SELECT
          'govtribe',
-         o.internal_id,
+         o.internal_id::text,
          CASE WHEN l.source_native_id IS NOT NULL
               THEN 'https://govtribe.com/opportunity/' || l.source_native_id
               ELSE NULL END,
