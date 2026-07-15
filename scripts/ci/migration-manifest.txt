@@ -141,3 +141,4 @@ v3_132_action_item_drafts_f310.sql
 v3_133_launchpad_f308.sql
 v3_134_soak_metrics_unique_idx.sql
 v3_135_launchpad_sitrep.sql
+v3_136_capability_matches_opportunity_id_bigint.sql
