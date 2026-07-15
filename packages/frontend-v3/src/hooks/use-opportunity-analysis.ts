@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { sseFetch, ApiError } from "@/lib/api";
 
 /**
  * F-305: SSE hook for progressive 10-section decision brief.
@@ -154,9 +155,6 @@ export function useOpportunityAnalysis(opportunityId: string | undefined): UseOp
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const baseUrl = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_API_BASE ?? "";
-    const url = `${baseUrl}/v3/opportunities/${opportunityId}/analysis`;
-
     // Use microtask to avoid synchronous setState in effect body
     queueMicrotask(() => {
       setIsStreaming(true);
@@ -167,11 +165,13 @@ export function useOpportunityAnalysis(opportunityId: string | undefined): UseOp
 
     async function streamAnalysis() {
       try {
-        const response = await fetch(url, {
-          signal: controller.signal,
-          headers: { Accept: "text/event-stream" },
-          credentials: "include",
-        });
+        // Routes through the shared networking layer: attaches the Bearer token
+        // and, on a 401, silently refreshes + retries once. A hard auth failure
+        // redirects to /login rather than leaving the Opportunities view blank.
+        const response = await sseFetch(
+          `/v3/opportunities/${opportunityId}/analysis`,
+          { signal: controller.signal },
+        );
 
         const responseTraceId = response.headers.get("X-GDA-Trace-Id");
         if (responseTraceId) setTraceId(responseTraceId);
@@ -243,6 +243,13 @@ export function useOpportunityAnalysis(opportunityId: string | undefined): UseOp
         setIsDone(true);
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
+        // A hard 401 (refresh failed) already redirected to /login — surface a
+        // calm session message rather than a raw error, and never blank the view.
+        if (err instanceof ApiError && err.status === 401) {
+          setError("Session expired — redirecting to sign in");
+          setIsStreaming(false);
+          return;
+        }
         setError((err as Error).message ?? "Analysis stream failed");
         setIsStreaming(false);
       }

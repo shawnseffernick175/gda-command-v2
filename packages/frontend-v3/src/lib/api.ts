@@ -221,6 +221,53 @@ function parseSSEResponse<T>(raw: string, status: number): T {
   }
 }
 
+/* ── Streaming (SSE) fetch ────────────────────────────────────── */
+
+/**
+ * Fetch a Server-Sent-Events endpoint with the SAME Bearer auth and one-shot
+ * refresh-on-401 flow as apiFetch, but return the raw Response so the caller
+ * can read `response.body` progressively as it streams.
+ *
+ * The opportunity Decision Brief streams (`/v3/opportunities/:id/analysis`)
+ * must go through here so a stale/expired access token is silently refreshed
+ * and the request retried once — instead of surfacing a hard 401 that blanks
+ * the Opportunities view. On a genuine auth failure (refresh also fails) this
+ * clears the token, redirects to /login, and throws ApiError("UNAUTHORIZED"),
+ * matching apiFetch's behaviour so the whole page never renders blank.
+ *
+ * Kept here so this file remains the only networking layer in the frontend.
+ */
+export async function sseFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const buildHeaders = (): Record<string, string> => {
+    const h: Record<string, string> = {
+      Accept: "text/event-stream",
+      ...(init.headers as Record<string, string> | undefined),
+    };
+    if (accessToken) h["Authorization"] = `Bearer ${accessToken}`;
+    return h;
+  };
+
+  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+
+  let res = await fetch(url, { ...init, headers: buildHeaders() });
+
+  if (res.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      res = await fetch(url, { ...init, headers: buildHeaders() });
+    } else {
+      accessToken = null;
+      redirectToLogin();
+      throw new ApiError("UNAUTHORIZED", "Session expired", 401);
+    }
+  }
+
+  return res;
+}
+
 /* ── Typed helpers ────────────────────────────────────────────── */
 
 export async function apiGet<T>(

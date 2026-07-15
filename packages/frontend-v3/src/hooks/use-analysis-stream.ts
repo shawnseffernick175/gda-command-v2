@@ -6,15 +6,12 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { getToken } from "@/lib/api";
+import { sseFetch, ApiError } from "@/lib/api";
 import type {
   AnalysisSectionBase,
   AnalysisSectionId,
   AnalysisBriefComplete,
 } from "@/lib/types";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech";
 
 const SECTION_ORDER: AnalysisSectionId[] = [
   "pwin",
@@ -90,15 +87,12 @@ export function useAnalysisStream(
     setCached(false);
 
     try {
-      const token = getToken();
-      const headers: Record<string, string> = {
-        Accept: "text/event-stream",
-      };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch(
-        `${API_BASE}/v3/opportunities/${id}/analysis`,
-        { headers, signal: controller.signal },
+      // Routes through the shared networking layer: attaches the Bearer token,
+      // and on a 401 silently refreshes + retries once. A hard auth failure
+      // redirects to /login (throws UNAUTHORIZED) rather than blanking the view.
+      const res = await sseFetch(
+        `/v3/opportunities/${id}/analysis`,
+        { signal: controller.signal },
       );
 
       if (!res.ok) {
@@ -163,6 +157,13 @@ export function useAnalysisStream(
       setStatus((prev) => prev === "error" ? prev : "done");
     } catch (err) {
       if (controller.signal.aborted) return;
+      // A hard 401 (refresh failed) already redirected to /login — surface a
+      // calm session message rather than a raw error, and never blank the view.
+      if (err instanceof ApiError && err.status === 401) {
+        setStatus("error");
+        setError("Session expired — redirecting to sign in");
+        return;
+      }
       setStatus("error");
       setError(err instanceof Error ? err.message : "Connection failed");
     }
