@@ -14,6 +14,7 @@ import { getRegisteredSourcesWithLabels, runIngest, getRegisteredSources } from 
 import { getIngestInsertStatus } from '../ingest/framework/run_logger.js';
 import { getCreditBudgetStatus } from '../ingest/govtribe/mcp_client.js';
 import { isGovTribeEnabled } from '../ingest/govtribe/enabled.js';
+import { isResearchFeedsEnabled } from '../ingest/framework/research-feeds.js';
 import type { JwtPayload } from '../middleware/auth.js';
 
 /** Cron schedules — mirrors apps/backend-v3/src/cron/index.ts JOBS array */
@@ -21,11 +22,15 @@ const SCHEDULE_MAP: Record<string, { cron: string; intervalHours: number }> = {
   'sam.gov': { cron: '0 */4 * * *', intervalHours: 4 },
   'usaspending.gov': { cron: '0 7 * * *', intervalHours: 24 },
   'federalregister.gov': { cron: '15 */6 * * *', intervalHours: 6 },
-  'sbir': { cron: '0 9 * * *', intervalHours: 24 },
-  'nsf': { cron: '0 8 * * *', intervalHours: 24 },
-  'dod_rss': { cron: '30 22 * * *', intervalHours: 24 },
-  'nih': { cron: '0 7 * * 1', intervalHours: 168 },
-  'arxiv': { cron: '0 6 * * 1', intervalHours: 168 },
+  ...(isResearchFeedsEnabled()
+    ? {
+        'sbir': { cron: '0 9 * * *', intervalHours: 24 },
+        'nsf': { cron: '0 8 * * *', intervalHours: 24 },
+        'dod_rss': { cron: '30 22 * * *', intervalHours: 24 },
+        'nih': { cron: '0 7 * * 1', intervalHours: 168 },
+        'arxiv': { cron: '0 6 * * 1', intervalHours: 168 },
+      }
+    : {}),
   ...(isGovTribeEnabled()
     ? {
         'govtribe': { cron: '0 10 * * 1,4', intervalHours: 84 },

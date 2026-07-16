@@ -49,7 +49,9 @@ import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { runValueDateEnrichment } from '../services/enrichment/value-date.js';
 import { pool } from '../lib/db.js';
 import { isGovTribeEnabled } from '../ingest/govtribe/enabled.js';
+import { isResearchFeedsEnabled } from '../ingest/framework/research-feeds.js';
 
+const researchFeedsEnabled = isResearchFeedsEnabled();
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
 const govtribeEnabled = isGovTribeEnabled();
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
@@ -69,13 +71,17 @@ const JOBS: CronJob[] = [
   { sourceKey: 'sam.gov', schedule: '0 */4 * * *', label: 'SAM.gov ingest (every 4 hours)' },
   { sourceKey: 'usaspending.gov', schedule: '0 7 * * *', label: 'USAspending daily awards ingest (03:00 ET)' },
   { sourceKey: 'federalregister.gov', schedule: '15 */6 * * *', label: 'Federal Register ingest (every 6 hours)' },
-  ...(sbirEnabled
-    ? [{ sourceKey: 'sbir', schedule: '0 9 * * *', label: 'DoD SBIR/STTR open topics via DSIP (daily 05:00 ET)' }]
+  ...(researchFeedsEnabled
+    ? [
+        ...(sbirEnabled
+          ? [{ sourceKey: 'sbir', schedule: '0 9 * * *', label: 'DoD SBIR/STTR open topics via DSIP (daily 05:00 ET)' }]
+          : []),
+        { sourceKey: 'nsf', schedule: '0 8 * * *', label: 'NSF research awards ingest (daily 04:00 ET)' },
+        { sourceKey: 'dod_rss', schedule: '30 22 * * *', label: 'DoD contract announcements RSS ingest (daily 18:30 ET, after 5pm ET feed publish)' },
+        { sourceKey: 'nih', schedule: '0 7 * * 1', label: 'NIH RePORTER research awards ingest (weekly Mon 03:00 ET)' },
+        { sourceKey: 'arxiv', schedule: '0 6 * * 1', label: 'arXiv defense/tech papers ingest (weekly Mon 02:00 ET)' },
+      ]
     : []),
-  { sourceKey: 'nsf', schedule: '0 8 * * *', label: 'NSF research awards ingest (daily 04:00 ET)' },
-  { sourceKey: 'dod_rss', schedule: '30 22 * * *', label: 'DoD contract announcements RSS ingest (daily 18:30 ET, after 5pm ET feed publish)' },
-  { sourceKey: 'nih', schedule: '0 7 * * 1', label: 'NIH RePORTER research awards ingest (weekly Mon 03:00 ET)' },
-  { sourceKey: 'arxiv', schedule: '0 6 * * 1', label: 'arXiv defense/tech papers ingest (weekly Mon 02:00 ET)' },
   ...(govtribeEnabled
     ? [
         { sourceKey: 'govtribe', schedule: '0 10 * * 1,4', label: 'GovTribe opps poll (Mon+Thu 6am ET / 10:00 UTC)' },
@@ -135,6 +141,12 @@ export function startCronScheduler(): void {
   }
   if (!govtribeEnabled) {
     logger.info({ flag: 'GOVTRIBE_ENABLED' }, '[cron] GovTribe integration disabled');
+  }
+  if (!researchFeedsEnabled) {
+    logger.info(
+      { flag: 'RESEARCH_FEEDS_ENABLED', sources: ['nsf', 'arxiv', 'nih', 'sbir', 'dod_rss'] },
+      '[cron] research feeds disabled — no jobs scheduled',
+    );
   }
   if (!fastracArmyEnabled) {
     logger.info({ flag: 'ENABLE_FASTRAC_ARMY_INGEST' }, '[cron] fastrac-army.daily skipped — gated behind env flag (default on)');
