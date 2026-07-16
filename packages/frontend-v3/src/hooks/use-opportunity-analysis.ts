@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { sseFetch, ApiError } from "@/lib/api";
+import { splitSSEBuffer, parseSSERecord, type SSERecord } from "@/lib/sse";
 
 /**
  * F-305: SSE hook for progressive 10-section decision brief.
@@ -192,51 +193,89 @@ export function useOpportunityAnalysis(opportunityId: string | undefined): UseOp
 
         const decoder = new TextDecoder();
         let buffer = "";
+        // Only treat the stream as "empty" if NOT A SINGLE section arrived.
+        // A failed/absent individual section must never blank the others.
+        let receivedAnySection = false;
+
+        // Dispatch one complete SSE record. Returns true when the record is the
+        // terminal `done` signal and the stream should stop.
+        const handleRecord = (rec: SSERecord): boolean => {
+          if (rec.event === "done") return true;
+
+          if (rec.event === "error") {
+            // A stream-level error only surfaces if nothing rendered yet;
+            // otherwise the already-streamed sections stay visible (#1119).
+            if (!receivedAnySection) {
+              let msg = "Analysis stream error";
+              try {
+                const e = JSON.parse(rec.data) as { message?: string; error?: string };
+                msg = e.message ?? e.error ?? msg;
+              } catch {
+                /* keep generic message */
+              }
+              setError(msg);
+            }
+            return false;
+          }
+
+          if (!rec.data) return false;
+
+          let payload: {
+            section?: string;
+            data?: unknown;
+            sources?: SourceRef[];
+            trace_id?: string;
+            stale?: boolean;
+          };
+          try {
+            payload = JSON.parse(rec.data);
+          } catch {
+            return false; // skip malformed record, keep the rest of the stream
+          }
+
+          if (payload.trace_id) {
+            setTraceId((prev) => prev ?? payload.trace_id ?? null);
+          }
+
+          const sectionName = payload.section as SectionName | undefined;
+          if (sectionName && sectionName in EMPTY_SECTIONS) {
+            receivedAnySection = true;
+            setSections((prev) => ({
+              ...prev,
+              [sectionName]: {
+                data: payload.data,
+                sources: payload.sources ?? [],
+                stale: payload.stale,
+              },
+            }));
+          }
+          return false;
+        };
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+          const { records, rest } = splitSSEBuffer(buffer);
+          buffer = rest;
 
-          for (const line of lines) {
-            if (line.startsWith("event: done")) {
+          for (const rec of records) {
+            if (handleRecord(rec)) {
               setIsDone(true);
               setIsStreaming(false);
               return;
             }
-            if (line.startsWith("data: ")) {
-              try {
-                const payload = JSON.parse(line.slice(6)) as {
-                  section: string;
-                  data: unknown;
-                  sources: SourceRef[];
-                  trace_id: string;
-                  stale?: boolean;
-                };
-
-                if (payload.trace_id && !traceId) {
-                  setTraceId(payload.trace_id);
-                }
-
-                const sectionName = payload.section as SectionName;
-                if (sectionName in EMPTY_SECTIONS) {
-                  setSections((prev) => ({
-                    ...prev,
-                    [sectionName]: {
-                      data: payload.data,
-                      sources: payload.sources,
-                      stale: payload.stale,
-                    },
-                  }));
-                }
-              } catch {
-                // Skip malformed JSON lines
-              }
-            }
           }
+        }
+
+        // Flush a trailing record that ended without a final blank line.
+        buffer += decoder.decode();
+        const tail = parseSSERecord(buffer);
+        if (tail && handleRecord(tail)) {
+          setIsDone(true);
+          setIsStreaming(false);
+          return;
         }
 
         setIsStreaming(false);
@@ -262,7 +301,6 @@ export function useOpportunityAnalysis(opportunityId: string | undefined): UseOp
       controller.abort();
       abortRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opportunityId, retryCount]);
 
   return { sections, isStreaming, isDone, error, traceId, retry };
