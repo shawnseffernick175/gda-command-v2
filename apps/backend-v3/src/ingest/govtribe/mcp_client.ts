@@ -16,6 +16,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
+import { isGovTribeEnabled } from './enabled.js';
 
 const MCP_ENDPOINT = process.env['GOVTRIBE_MCP_URL'] || 'https://govtribe.com/mcp';
 const API_KEY = process.env['GOVTRIBE_API_KEY'] ?? '';
@@ -51,7 +52,7 @@ const TOOL_CREDIT_PER_10: Record<string, number> = {
   'Documentation': 0,
 };
 
-export type BudgetDecision = 'called' | 'skipped_low_budget' | 'skipped_halted' | 'skipped_cycle_cap' | 'cached';
+export type BudgetDecision = 'called' | 'disabled' | 'skipped_low_budget' | 'skipped_halted' | 'skipped_cycle_cap' | 'cached';
 
 export interface CreditBudgetStatus {
   month: string;
@@ -81,9 +82,21 @@ function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
+function disabledBudgetStatus(): CreditBudgetStatus {
+  return {
+    month: currentMonth(),
+    credits_used: 0,
+    credits_budget: MONTHLY_CREDIT_BUDGET,
+    pct: 0,
+    last_call_at: null,
+  };
+}
+
 /* ── Credit budget helpers ─────────────────────────────────────────── */
 
 export async function getCreditBudgetStatus(): Promise<CreditBudgetStatus> {
+  if (!isGovTribeEnabled()) return disabledBudgetStatus();
+
   const month = currentMonth();
   const { rows } = await pool.query(
     `INSERT INTO govtribe_credit_monthly (month, credits_used, credits_budget)
@@ -168,6 +181,10 @@ export function computeDailyBudget(
 }
 
 export async function getDailyBudgetStatus(budgetStatus: CreditBudgetStatus): Promise<DailyBudgetStatus> {
+  if (!isGovTribeEnabled()) {
+    return computeDailyBudget(budgetStatus.credits_budget, budgetStatus.credits_used, 0);
+  }
+
   const { rows } = await pool.query(
     `SELECT COALESCE(SUM(cost_credits), 0) AS spent_today
      FROM govtribe_credit_ledger
@@ -242,6 +259,10 @@ let mcpClient: Client | null = null;
 let mcpTransport: StreamableHTTPClientTransport | null = null;
 
 async function getOrCreateClient(): Promise<Client> {
+  if (!isGovTribeEnabled()) {
+    throw new Error('GovTribe integration is disabled');
+  }
+
   if (mcpClient) return mcpClient;
 
   const transport = new StreamableHTTPClientTransport(new URL(MCP_ENDPOINT), {
@@ -291,6 +312,8 @@ export interface McpToolInfo {
  * This is the "dry-run" mode — only calls tools/list.
  */
 export async function listTools(): Promise<McpToolInfo[]> {
+  if (!isGovTribeEnabled()) return [];
+
   if (!API_KEY) {
     logger.warn({ source: 'govtribe' }, 'govtribe_mcp_no_api_key');
     return [];
@@ -349,6 +372,16 @@ export async function mcpCallTool<T = unknown>(
   critical = false,
   caller?: string,
 ): Promise<McpToolCallResult<T>> {
+  if (!isGovTribeEnabled()) {
+    return {
+      data: null,
+      decision: 'disabled',
+      from_cache: false,
+      credits_used: 0,
+      budget_status: disabledBudgetStatus(),
+    };
+  }
+
   const budgetStatus = await getCreditBudgetStatus();
   // Pre-estimate cost using per_page arg (or 10 default) for budget checks;
   // actual cost is recalculated after response using real row count.
@@ -520,6 +553,10 @@ export async function checkGovTribeMcpReachable(): Promise<{
   toolCount?: number;
   error?: string;
 }> {
+  if (!isGovTribeEnabled()) {
+    return { reachable: false, error: 'GovTribe integration is disabled' };
+  }
+
   if (!API_KEY) {
     return { reachable: false, error: 'GOVTRIBE_API_KEY not set' };
   }
@@ -536,6 +573,8 @@ export async function checkGovTribeMcpReachable(): Promise<{
  * Clean up expired cache entries (older than 30 days).
  */
 export async function purgeExpiredCache(): Promise<number> {
+  if (!isGovTribeEnabled()) return 0;
+
   const { rowCount } = await pool.query(
     `DELETE FROM govtribe_cache WHERE expires_at < NOW()`,
   );

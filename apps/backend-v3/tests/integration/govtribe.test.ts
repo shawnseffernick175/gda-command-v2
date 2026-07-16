@@ -14,8 +14,10 @@ import type { Pool } from 'pg';
 
 let app: FastifyInstance;
 let pool: ReturnType<typeof getPool>;
+const originalGovTribeEnabled = process.env['GOVTRIBE_ENABLED'];
 
 beforeAll(async () => {
+  process.env['GOVTRIBE_ENABLED'] = 'true';
   app = await getApp();
   pool = getPool();
   registerGovTribeSource();
@@ -23,6 +25,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeApp();
+  if (originalGovTribeEnabled === undefined) {
+    delete process.env['GOVTRIBE_ENABLED'];
+  } else {
+    process.env['GOVTRIBE_ENABLED'] = originalGovTribeEnabled;
+  }
 });
 
 describe('GovTribe schema', () => {

@@ -20,6 +20,7 @@ import {
   mcpCallTool,
 } from '../ingest/govtribe/mcp_client.js';
 import { runIngest } from '../ingest/framework/registry.js';
+import { isGovTribeEnabled } from '../ingest/govtribe/enabled.js';
 import type { JwtPayload } from '../middleware/auth.js';
 
 function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
@@ -34,6 +35,17 @@ function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
 }
 
 export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
+  app.addHook('onRequest', async (req, reply) => {
+    if (!isGovTribeEnabled()) {
+      return reply.send(
+        successEnvelope(
+          { enabled: false, status: 'disabled' },
+          req.requestId,
+        ),
+      );
+    }
+  });
+
   /**
    * GET /v3/govtribe/health
    * Returns MCP reachability (inferred from last ingest run), last poll,

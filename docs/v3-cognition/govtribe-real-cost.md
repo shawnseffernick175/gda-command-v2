@@ -86,7 +86,7 @@ Each GovTribe result ingested is also written to the RAG knowledge base:
 | `GOVTRIBE_API_KEY` | — | Bearer token for GovTribe MCP |
 | `GOVTRIBE_CYCLE_CREDIT_CAP` | 150 | Per-cycle cap (stops mid-poll) |
 | `GOVTRIBE_MONTHLY_CREDIT_CAP` | 1200 | Monthly cap for new months |
-| `ENABLE_GOVTRIBE_INGEST` | true | Master kill switch |
+| `GOVTRIBE_ENABLED` | false | Master enable switch |
 
 ## Comparison with V2 (Zapier-based)
 

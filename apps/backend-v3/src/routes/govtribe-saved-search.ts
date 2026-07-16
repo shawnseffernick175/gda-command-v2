@@ -23,6 +23,7 @@ import { mapGovTribeOpportunity } from '../ingest/govtribe/mapper.js';
 import { upsertExternalOpportunity } from '../ingest/framework/source_writer.js';
 import { ingestGovTribeToRag } from '../ingest/govtribe/rag_sink.js';
 import type { GovTribeOpportunityRaw } from '../ingest/govtribe/types.js';
+import { isGovTribeEnabled } from '../ingest/govtribe/enabled.js';
 import type { JwtPayload } from '../middleware/auth.js';
 
 /** Cycle window in hours — searches cannot re-run within this window. */
@@ -47,6 +48,17 @@ function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
 }
 
 export async function govtribeSavedSearchRoutes(app: FastifyInstance): Promise<void> {
+  app.addHook('onRequest', async (req, reply) => {
+    if (!isGovTribeEnabled()) {
+      return reply.send(
+        successEnvelope(
+          { enabled: false, status: 'disabled' },
+          req.requestId,
+        ),
+      );
+    }
+  });
+
   /**
    * POST /v3/govtribe/saved-search/dry-run
    * Returns credit estimate without spending. Logs a dry_run=true ledger row.

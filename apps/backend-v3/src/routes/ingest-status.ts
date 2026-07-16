@@ -13,6 +13,7 @@ import { logger } from '../lib/logger.js';
 import { getRegisteredSourcesWithLabels, runIngest, getRegisteredSources } from '../ingest/framework/registry.js';
 import { getIngestInsertStatus } from '../ingest/framework/run_logger.js';
 import { getCreditBudgetStatus } from '../ingest/govtribe/mcp_client.js';
+import { isGovTribeEnabled } from '../ingest/govtribe/enabled.js';
 import type { JwtPayload } from '../middleware/auth.js';
 
 /** Cron schedules — mirrors apps/backend-v3/src/cron/index.ts JOBS array */
@@ -25,10 +26,14 @@ const SCHEDULE_MAP: Record<string, { cron: string; intervalHours: number }> = {
   'dod_rss': { cron: '30 22 * * *', intervalHours: 24 },
   'nih': { cron: '0 7 * * 1', intervalHours: 168 },
   'arxiv': { cron: '0 6 * * 1', intervalHours: 168 },
-  'govtribe': { cron: '0 10 * * 1,4', intervalHours: 84 },
-  'govtribe.contacts': { cron: '0 9 * * 1', intervalHours: 168 },
-  'govtribe.vehicles': { cron: '0 6 1 * *', intervalHours: 720 },
-  'govtribe.budget': { cron: '55 3 * * *', intervalHours: 24 },
+  ...(isGovTribeEnabled()
+    ? {
+        'govtribe': { cron: '0 10 * * 1,4', intervalHours: 84 },
+        'govtribe.contacts': { cron: '0 9 * * 1', intervalHours: 168 },
+        'govtribe.vehicles': { cron: '0 6 1 * *', intervalHours: 720 },
+        'govtribe.budget': { cron: '55 3 * * *', intervalHours: 24 },
+      }
+    : {}),
   'govwin': { cron: '0 */6 * * *', intervalHours: 6 },
   'grants.gov': { cron: '0 11 * * *', intervalHours: 24 },
 };
@@ -222,10 +227,12 @@ export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
 
     // GovTribe credits
     let govtribeCredits = { credits_used: 0, credits_budget: 1200, pct: 0, last_call_at: null as string | null };
-    try {
-      govtribeCredits = await getCreditBudgetStatus();
-    } catch {
-      // Tables may not exist
+    if (isGovTribeEnabled()) {
+      try {
+        govtribeCredits = await getCreditBudgetStatus();
+      } catch {
+        // Tables may not exist
+      }
     }
 
     const sources = computed.map((c) => {

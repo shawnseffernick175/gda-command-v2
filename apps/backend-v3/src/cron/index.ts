@@ -48,9 +48,10 @@ import { runIntakeAssessment } from '../services/assessment/index.js';
 import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { runValueDateEnrichment } from '../services/enrichment/value-date.js';
 import { pool } from '../lib/db.js';
+import { isGovTribeEnabled } from '../ingest/govtribe/enabled.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
-const govtribeEnabled = process.env.ENABLE_GOVTRIBE_INGEST !== 'false';
+const govtribeEnabled = isGovTribeEnabled();
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
 const grantsGovEnabled = process.env.ENABLE_GRANTS_GOV_INGEST !== 'false';
 const fastracArmyEnabled = process.env.ENABLE_FASTRAC_ARMY_INGEST !== 'false';
@@ -108,7 +109,9 @@ export function startCronScheduler(): void {
   registerDoDRSSSource();
   registerNIHSource();
   registerArxivSource();
-  registerGovTribeSource();
+  if (govtribeEnabled) {
+    registerGovTribeSource();
+  }
   if (govwinEnabled) {
     registerGovWinSource();
   }
@@ -129,6 +132,9 @@ export function startCronScheduler(): void {
   }
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
+  }
+  if (!govtribeEnabled) {
+    logger.info({ flag: 'GOVTRIBE_ENABLED' }, '[cron] GovTribe integration disabled');
   }
   if (!fastracArmyEnabled) {
     logger.info({ flag: 'ENABLE_FASTRAC_ARMY_INGEST' }, '[cron] fastrac-army.daily skipped — gated behind env flag (default on)');

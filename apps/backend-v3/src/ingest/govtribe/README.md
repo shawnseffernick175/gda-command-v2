@@ -6,6 +6,9 @@ GovTribe integration uses **MCP (Model Context Protocol) over Streamable HTTP**
 against `https://govtribe.com/mcp`. The deprecated REST API (`api.govtribe.com`)
 was removed in F-323.
 
+The integration is disabled by default. Set `GOVTRIBE_ENABLED=true` to restore
+source registration, schedules, routes, and MCP calls.
+
 ### Files
 
 | File | Purpose |
@@ -38,7 +41,7 @@ Every MCP tool call is credit-budget-aware:
 - **Ledger:** `govtribe_credit_ledger` (one row per tool call)
 - **Monthly aggregate:** `govtribe_credit_monthly`
 
-Budget decisions: `called` | `skipped_low_budget` | `skipped_halted` | `skipped_cycle_cap` | `cached`
+Budget decisions: `called` | `disabled` | `skipped_low_budget` | `skipped_halted` | `skipped_cycle_cap` | `cached`
 
 ### Dry-Run Mode
 
@@ -53,7 +56,7 @@ Lists all discovered MCP tools without burning credits. Calls `tools/list` only.
 To regenerate `tools.generated.json`:
 
 ```bash
-GOVTRIBE_API_KEY=<jwt> pnpm tsx scripts/govtribe-discover.ts
+GOVTRIBE_ENABLED=true GOVTRIBE_API_KEY=<jwt> pnpm tsx scripts/govtribe-discover.ts
 ```
 
 This connects to the MCP endpoint, runs `tools/list`, and writes the catalog.
