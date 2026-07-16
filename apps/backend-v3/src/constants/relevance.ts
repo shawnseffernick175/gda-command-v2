@@ -5,6 +5,7 @@
  */
 
 import { ENVISION_NAICS } from './envision-naics.js';
+import { resolveSetAsideEligibility } from '../services/opportunities/eligibility.js';
 
 /** Set-aside codes where Envision is eligible to compete. */
 export const ENVISION_SET_ASIDES = new Set([
@@ -35,10 +36,16 @@ const naicsSet = new Set<string>(ENVISION_NAICS);
  * Logic:
  * 1. If naics is null/empty => relevant=false, status='unknown_naics' (route to review).
  * 2. If naics is not in ENVISION_NAICS => relevant=false, status='off_profile'.
- * 3. If days-to-deadline is >= 0 AND < 30, or past due => auto_pass=true, status='auto_pass'.
- * 4. Otherwise => relevant=true, status='relevant'.
+ * 3. If the set-aside is one Envision cannot prime (team-only or ineligible)
+ *    => auto_pass=true, status='auto_pass'. Envision holds no SBA program certs,
+ *    so a WOSB/EDWOSB/8(a)/HUBZone/SDVOSB/VOSB set-aside (team) or an SB set-aside
+ *    where Envision is LARGE under the NAICS (ineligible) is not active pipeline work.
+ * 4. If days-to-deadline is >= 0 AND < 30, or past due => auto_pass=true, status='auto_pass'.
+ * 5. Otherwise => relevant=true, status='relevant'.
  *
- * Set-aside fit is a soft signal noted in the reason but NAICS is the primary gate.
+ * The set-aside eligibility gate uses the same doctrine resolver as the display
+ * label (resolveSetAsideEligibility), so the system no longer surfaces an opp it
+ * already knows Envision cannot prime.
  */
 export function evaluateRelevance(opp: {
   naics: string | null | undefined;
@@ -69,6 +76,20 @@ export function evaluateRelevance(opp: {
       reason: `off_profile: NAICS ${naics} not in Envision registration${setAsideNote}`,
       auto_pass: false,
       status: 'off_profile',
+    };
+  }
+
+  // Set-aside eligibility gate (only for in-NAICS opps). Auto-pass anything
+  // Envision cannot prime: team-only set-asides (no SBA cert) or SB set-asides
+  // where Envision is LARGE under the NAICS. Uses the same doctrine resolver
+  // that produces the display label so KNOW-and-still-surface can't happen.
+  const eligibility = resolveSetAsideEligibility(setAside, naics);
+  if (eligibility.status === 'team' || eligibility.status === 'ineligible') {
+    return {
+      relevant: true,
+      reason: `auto_pass: set-aside not prime-able — ${eligibility.rationale}`,
+      auto_pass: true,
+      status: 'auto_pass',
     };
   }
 
