@@ -67,7 +67,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
       const whereClause = conditions.join(' AND ');
 
       const countRes = await pool.query<{ total: number }>(
-        `SELECT COUNT(*)::int AS total FROM govtribe_contacts c WHERE ${whereClause}`,
+        `SELECT COUNT(*)::int AS total FROM contacts c WHERE ${whereClause}`,
         params,
       );
       const total = countRes.rows[0]?.total ?? 0;
@@ -75,13 +75,13 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
 
       const dataParams = [...params, limitN, offset];
       const sql = `
-        SELECT c.id, c.govtribe_id, c.name, c.title, c.agency, c.email, c.phone, c.contact_type,
+        SELECT c.id, c.name, c.title, c.agency, c.email, c.phone, c.contact_type,
                c.source_url, c.last_seen_at, c.contact_category, c.company, c.linkedin_url,
                c.notes, c.relationship_score, c.ai_profile, c.ai_ran_at, c.is_manual,
                c.added_by, c.source_label,
                c.relationship_temp, c.last_contacted_at, c.contact_notes,
                c.linked_opportunity_ids, c.linked_capture_ids
-        FROM govtribe_contacts c
+        FROM contacts c
         WHERE ${whereClause}
         ORDER BY ${orderBy}
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -102,7 +102,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
               OR array_length(linked_capture_ids, 1) > 0
           )::int AS linked_to_pursuits,
           count(DISTINCT agency) FILTER (WHERE agency IS NOT NULL)::int AS agency_count
-        FROM govtribe_contacts`;
+        FROM contacts`;
       const { rows: metaRows } = await pool.query(metaSql);
       const meta = metaRows[0] as {
         total_count: number;
@@ -183,13 +183,13 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
 
     params.push(limit + 1);
     const sql = `
-      SELECT c.id, c.govtribe_id, c.name, c.title, c.agency, c.email, c.phone, c.contact_type,
+      SELECT c.id, c.name, c.title, c.agency, c.email, c.phone, c.contact_type,
              c.source_url, c.last_seen_at, c.contact_category, c.company, c.linkedin_url,
              c.notes, c.relationship_score, c.ai_profile, c.ai_ran_at, c.is_manual,
              c.added_by, c.source_label,
              c.relationship_temp, c.last_contacted_at, c.contact_notes,
              c.linked_opportunity_ids, c.linked_capture_ids
-      FROM govtribe_contacts c
+      FROM contacts c
       WHERE ${conditions.join(' AND ')}
       ORDER BY ${orderBy}
       LIMIT $${params.length}`;
@@ -212,7 +212,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
             OR array_length(linked_capture_ids, 1) > 0
         )::int AS linked_to_pursuits,
         count(DISTINCT agency) FILTER (WHERE agency IS NOT NULL)::int AS agency_count
-      FROM govtribe_contacts`;
+      FROM contacts`;
     const { rows: metaRows } = await pool.query(metaSql);
     const meta = metaRows[0] as {
       total_count: number;
@@ -287,7 +287,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
       conditions.push(`contact_category = $${params.length}`);
     }
     const { rows } = await pool.query(
-      `SELECT count(*)::int AS count FROM govtribe_contacts WHERE ${conditions.join(' AND ')}`,
+      `SELECT count(*)::int AS count FROM contacts WHERE ${conditions.join(' AND ')}`,
       params,
     );
     return reply.send(successEnvelope({ count: (rows[0] as { count: number }).count }, req.requestId));
@@ -320,7 +320,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const sql = `
-      INSERT INTO govtribe_contacts (
+      INSERT INTO contacts (
         name, title, agency, company, email, phone, contact_category,
         linkedin_url, notes, source_label, is_manual, added_by, last_seen_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, 'admin', NOW())
@@ -387,7 +387,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     params.push(Number(id));
-    const sql = `UPDATE govtribe_contacts SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`;
+    const sql = `UPDATE contacts SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`;
     const { rows } = await pool.query(sql, params);
 
     if (rows.length === 0) {
@@ -402,7 +402,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
 
     const { rows } = await pool.query(
-      `UPDATE govtribe_contacts SET last_contacted_at = NOW() WHERE id = $1 RETURNING *`,
+      `UPDATE contacts SET last_contacted_at = NOW() WHERE id = $1 RETURNING *`,
       [Number(id)],
     );
     if (rows.length === 0) {
@@ -426,14 +426,14 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     let params: unknown[];
 
     if (body.opportunity_id) {
-      sql = `UPDATE govtribe_contacts
+      sql = `UPDATE contacts
              SET linked_opportunity_ids = array_append(
                array_remove(linked_opportunity_ids, $1), $1
              )
              WHERE id = $2 RETURNING *`;
       params = [body.opportunity_id, Number(id)];
     } else {
-      sql = `UPDATE govtribe_contacts
+      sql = `UPDATE contacts
              SET linked_capture_ids = array_append(
                array_remove(linked_capture_ids, $1), $1
              )
@@ -463,10 +463,10 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     let params: unknown[];
 
     if (body.opportunity_id) {
-      sql = `UPDATE govtribe_contacts SET linked_opportunity_ids = array_remove(linked_opportunity_ids, $1) WHERE id = $2 RETURNING *`;
+      sql = `UPDATE contacts SET linked_opportunity_ids = array_remove(linked_opportunity_ids, $1) WHERE id = $2 RETURNING *`;
       params = [body.opportunity_id, Number(id)];
     } else {
-      sql = `UPDATE govtribe_contacts SET linked_capture_ids = array_remove(linked_capture_ids, $1) WHERE id = $2 RETURNING *`;
+      sql = `UPDATE contacts SET linked_capture_ids = array_remove(linked_capture_ids, $1) WHERE id = $2 RETURNING *`;
       params = [body.capture_id, Number(id)];
     }
 
@@ -522,7 +522,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
 
     const { rows: contactRows } = await pool.query(
-      'SELECT * FROM govtribe_contacts WHERE id = $1',
+      'SELECT * FROM contacts WHERE id = $1',
       [Number(id)],
     );
     if (contactRows.length === 0) {
@@ -565,11 +565,11 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     // the model the router truly used (see llm-router.table.ts routing).
     const aiProfile = { ...result.output, model_used: result.model_used };
     await pool.query(
-      'UPDATE govtribe_contacts SET ai_profile = $1, ai_ran_at = NOW() WHERE id = $2',
+      'UPDATE contacts SET ai_profile = $1, ai_ran_at = NOW() WHERE id = $2',
       [JSON.stringify(aiProfile), Number(id)],
     );
 
-    const { rows: updatedRows } = await pool.query('SELECT * FROM govtribe_contacts WHERE id = $1', [Number(id)]);
+    const { rows: updatedRows } = await pool.query('SELECT * FROM contacts WHERE id = $1', [Number(id)]);
     return reply.send(successEnvelope(updatedRows[0], req.requestId));
   });
 
@@ -578,7 +578,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
 
     const { rows } = await pool.query(
-      'SELECT is_manual FROM govtribe_contacts WHERE id = $1',
+      'SELECT is_manual FROM contacts WHERE id = $1',
       [Number(id)],
     );
     if (rows.length === 0) {
@@ -586,15 +586,15 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     }
     if (!(rows[0] as { is_manual: boolean }).is_manual) {
       return reply.status(403).send(
-        errorEnvelope('VALIDATION_ERROR', 'Cannot delete GovTribe-sourced contacts', req.requestId),
+        errorEnvelope('VALIDATION_ERROR', 'Cannot delete auto-sourced contacts', req.requestId),
       );
     }
 
-    await pool.query('DELETE FROM govtribe_contacts WHERE id = $1', [Number(id)]);
+    await pool.query('DELETE FROM contacts WHERE id = $1', [Number(id)]);
 
     recordAuditLog(pool, {
       action: 'contact_delete',
-      table_name: 'govtribe_contacts',
+      table_name: 'contacts',
       record_id: Number(id),
       old_values: { is_manual: true },
       new_values: null,

@@ -229,36 +229,3 @@ class GovwinResult(BaseModel):
 class GovwinSearchOutput(BaseModel):
     results: list[GovwinResult]
     warning: str | None = None
-
-
-# ---------------------------------------------------------------------------
-# govtribe_search
-# ---------------------------------------------------------------------------
-class GovtribeSearchInput(BaseModel):
-    query: str
-    agency: str | None = None
-    naics: list[str] | None = None
-    posted_within: str | None = Field(
-        default=None,
-        description="Recency filter, e.g. '7d' or '30d'",
-    )
-    max_results: int = Field(default=25, ge=1, le=100)
-
-
-class GovtribeOpportunity(BaseModel):
-    title: str
-    agency: str | None = None
-    posted_at: str | None = None
-    response_due_at: str | None = None
-    notice_id: str
-    govtribe_url: str
-    estimated_value: float | None = None
-    set_aside: str | None = None
-
-
-class GovtribeSearchOutput(BaseModel):
-    results: list[GovtribeOpportunity]
-    decision: str | None = None
-    credits_used: int = 0
-    from_cache: bool = False
-    warning: str | None = None

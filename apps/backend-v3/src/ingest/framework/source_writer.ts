@@ -278,7 +278,6 @@ export async function upsertOpportunityWithSources(
           id: oppId,
           data_source: validated.data_source,
           sam_notice_id: validated.sam_notice_id,
-          govtribe_id: null,
           external_id: null,
           title: validated.title,
           agency: validated.agency,
@@ -457,7 +456,6 @@ export async function upsertExternalOpportunity(
           id: oppId,
           data_source: validated.data_source,
           sam_notice_id: null,
-          govtribe_id: validated.data_source === 'govtribe' ? validated.external_id : null,
           external_id: validated.external_id,
           title: validated.title,
           agency: validated.agency,
@@ -498,7 +496,7 @@ export async function upsertExternalOpportunity(
 }
 
 /**
- * Upsert contacts tied to an opportunity into govtribe_contacts.
+ * Upsert contacts tied to an opportunity into contacts.
  * Runs outside the opportunity transaction — a bad contact row
  * never aborts the opportunity write. Errors are logged and skipped.
  */
@@ -514,7 +512,7 @@ async function upsertContactsForOpportunity(
       // Dedup: prefer email match, fall back to (name, agency)
       if (contact.email) {
         const { rows } = await pool.query<{ id: number }>(
-          `SELECT id FROM govtribe_contacts
+          `SELECT id FROM contacts
            WHERE source_label = $1 AND email IS NOT NULL AND lower(email) = lower($2)
            LIMIT 1`,
           [dataSource, contact.email],
@@ -522,7 +520,7 @@ async function upsertContactsForOpportunity(
         existingId = rows[0]?.id ?? null;
       } else if (contact.name) {
         const { rows } = await pool.query<{ id: number }>(
-          `SELECT id FROM govtribe_contacts
+          `SELECT id FROM contacts
            WHERE source_label = $1 AND lower(name) = lower($2)
              AND agency IS NOT DISTINCT FROM $3
            LIMIT 1`,
@@ -533,7 +531,7 @@ async function upsertContactsForOpportunity(
 
       if (existingId) {
         await pool.query(
-          `UPDATE govtribe_contacts SET
+          `UPDATE contacts SET
              name = COALESCE($1, name),
              title = COALESCE($2, title),
              phone = COALESCE($3, phone),
@@ -543,7 +541,7 @@ async function upsertContactsForOpportunity(
              last_seen_at = NOW(),
              linked_opportunity_ids = (
                SELECT ARRAY(SELECT DISTINCT unnest(linked_opportunity_ids || $7::int))
-               FROM govtribe_contacts WHERE id = $8
+               FROM contacts WHERE id = $8
              )
            WHERE id = $8`,
           [
@@ -559,12 +557,12 @@ async function upsertContactsForOpportunity(
         );
       } else {
         await pool.query(
-          `INSERT INTO govtribe_contacts (
-             govtribe_id, source_label, contact_category, contact_type,
+          `INSERT INTO contacts (
+             source_label, contact_category, contact_type,
              name, title, email, phone, agency, source_url, raw_json,
              linked_opportunity_ids, last_seen_at
            ) VALUES (
-             NULL, $1, 'government', $2,
+             $1, 'government', $2,
              $3, $4, $5, $6, $7, $8, $9,
              ARRAY[$10::int], NOW()
            )`,

@@ -1,4 +1,4 @@
-"""Unit tests for all 12 tools (mock external APIs)."""
+"""Unit tests for all 11 tools (mock external APIs)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from src.tools.decision_memory import decision_memory_lookup
 from src.tools.doctrine_check import doctrine_check
 from src.tools.federal_register_search import federal_register_search
 from src.tools.file_read import file_read
-from src.tools.govtribe_search import govtribe_search
 from src.tools.govwin_search import govwin_search
 from src.tools.pwin_score import pwin_score
 from src.tools.rag_search import rag_search
@@ -26,7 +25,6 @@ from src.tools.schemas import (
     DoctrineCheckInput,
     FederalRegisterSearchInput,
     FileReadInput,
-    GovtribeSearchInput,
     GovwinSearchInput,
     PwinScoreInput,
     RagSearchInput,
@@ -39,15 +37,14 @@ from src.tools.web_search import web_search
 
 
 class TestToolRegistry:
-    def test_all_12_tools_registered(self):
-        assert len(TOOL_REGISTRY) == 12
+    def test_all_11_tools_registered(self):
+        assert len(TOOL_REGISTRY) == 11
 
     def test_list_tools(self):
         names = list_tools()
-        assert len(names) == 12
+        assert len(names) == 11
         assert "sam_search" in names
         assert "govwin_search" in names
-        assert "govtribe_search" in names
 
     def test_get_tool(self):
         t = get_tool("sam_search")
@@ -59,7 +56,7 @@ class TestToolRegistry:
 
     def test_get_tool_schemas(self):
         schemas = get_tool_schemas()
-        assert len(schemas) == 12
+        assert len(schemas) == 11
         for s in schemas:
             assert "name" in s
             assert "input_schema" in s
@@ -303,135 +300,6 @@ class TestGovwinSearch:
         assert result.results == []
         assert result.warning is not None
         assert "not configured" in result.warning
-
-
-@pytest.mark.anyio
-class TestGovtribeSearch:
-    @respx.mock
-    async def test_govtribe_search_returns_opportunities(self):
-        respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "success": True,
-                    "data": {
-                        "results": [
-                            {
-                                "_id": "gt-001",
-                                "attributes": {
-                                    "title": "Cyber Defense Services",
-                                    "agency": {"name": "Department of Defense"},
-                                    "postedDate": "2026-05-28",
-                                    "responseDate": "2026-06-28",
-                                    "slug": "cyber-defense-services",
-                                    "estimatedValue": {"high": 5000000},
-                                    "setAside": "Total Small Business",
-                                },
-                            }
-                        ],
-                        "decision": "called",
-                        "credits_used": 3,
-                        "from_cache": False,
-                    },
-                },
-            )
-        )
-        result = await govtribe_search(
-            GovtribeSearchInput(query="cyber", agency="DoD", posted_within="7d", max_results=5)
-        )
-        assert len(result.results) == 1
-        opp = result.results[0]
-        assert opp.notice_id == "gt-001"
-        assert opp.title == "Cyber Defense Services"
-        assert opp.agency == "Department of Defense"
-        assert "govtribe.com" in opp.govtribe_url
-        assert opp.estimated_value == 5000000
-        assert opp.set_aside == "Total Small Business"
-        assert result.decision == "called"
-        assert result.credits_used == 3
-        assert result.from_cache is False
-
-    @respx.mock
-    async def test_govtribe_search_cached(self):
-        respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "success": True,
-                    "data": {
-                        "results": [
-                            {
-                                "_id": "gt-001",
-                                "attributes": {
-                                    "title": "Cyber Defense Services",
-                                    "slug": "cyber-defense-services",
-                                },
-                            }
-                        ],
-                        "decision": "cached",
-                        "credits_used": 0,
-                        "from_cache": True,
-                    },
-                },
-            )
-        )
-        result = await govtribe_search(GovtribeSearchInput(query="cyber", max_results=5))
-        assert len(result.results) == 1
-        assert result.decision == "cached"
-        assert result.credits_used == 0
-        assert result.from_cache is True
-
-    @respx.mock
-    async def test_govtribe_search_skipped_cycle_cap(self):
-        respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "success": True,
-                    "data": {
-                        "results": None,
-                        "decision": "skipped_cycle_cap",
-                        "credits_used": 0,
-                        "from_cache": False,
-                    },
-                },
-            )
-        )
-        result = await govtribe_search(GovtribeSearchInput(query="cyber"))
-        assert result.results == []
-        assert result.decision == "skipped_cycle_cap"
-        assert result.warning is not None
-        assert "skipped" in result.warning
-
-    @respx.mock
-    async def test_govtribe_search_empty_results(self):
-        respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "success": True,
-                    "data": {
-                        "results": [],
-                        "decision": "called",
-                        "credits_used": 3,
-                        "from_cache": False,
-                    },
-                },
-            )
-        )
-        result = await govtribe_search(GovtribeSearchInput(query="nonexistent-query-xyz"))
-        assert result.results == []
-        assert result.decision == "called"
-
-    @respx.mock
-    async def test_govtribe_search_http_error(self):
-        respx.post("http://localhost:4000/v3/govtribe/search").mock(
-            return_value=httpx.Response(500, json={"error": "internal"})
-        )
-        result = await govtribe_search(GovtribeSearchInput(query="cyber"))
-        assert result.results == []
-        assert result.warning is not None
-        assert "500" in result.warning
 
 
 # ---------------------------------------------------------------------------

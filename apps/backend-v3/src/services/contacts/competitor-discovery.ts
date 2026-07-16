@@ -2,7 +2,7 @@
  * Competitor Contact Discovery service.
  *
  * Discovers real people at top competitor companies via web search
- * (Perplexity sonar-pro) and upserts them into govtribe_contacts
+ * (Perplexity sonar-pro) and upserts them into contacts
  * with contact_category='competitor'.
  */
 
@@ -152,7 +152,7 @@ async function upsertCompetitorContact(
 
   if (contact.email) {
     const { rows } = await pool.query<{ id: number }>(
-      `SELECT id FROM govtribe_contacts
+      `SELECT id FROM contacts
        WHERE contact_category = 'competitor'
          AND lower(company) = lower($1)
          AND email IS NOT NULL AND lower(email) = lower($2)
@@ -164,7 +164,7 @@ async function upsertCompetitorContact(
 
   if (!existingId) {
     const { rows } = await pool.query<{ id: number }>(
-      `SELECT id FROM govtribe_contacts
+      `SELECT id FROM contacts
        WHERE contact_category = 'competitor'
          AND lower(name) = lower($1)
          AND lower(company) = lower($2)
@@ -178,7 +178,7 @@ async function upsertCompetitorContact(
 
   if (existingId) {
     await pool.query(
-      `UPDATE govtribe_contacts SET
+      `UPDATE contacts SET
          title = COALESCE($1, title),
          email = COALESCE($2, email),
          phone = COALESCE($3, phone),
@@ -199,12 +199,12 @@ async function upsertCompetitorContact(
     );
   } else {
     await pool.query(
-      `INSERT INTO govtribe_contacts (
-         govtribe_id, contact_category, source_label, added_by, is_manual,
+      `INSERT INTO contacts (
+         contact_category, source_label, added_by, is_manual,
          contact_type, name, title, company, email, phone, linkedin_url,
          source_url, raw_json, agency, last_seen_at
        ) VALUES (
-         NULL, 'competitor', 'internet', 'system', false,
+         'competitor', 'internet', 'system', false,
          'competitor_poc', $1, $2, $3, $4, $5, $6,
          $7, $8, NULL, NOW()
        )`,

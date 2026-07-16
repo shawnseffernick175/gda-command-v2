@@ -2,7 +2,7 @@
  * Integration test: teaming-partner contact discovery
  *
  * Seeds awards for a fake small business, runs discoverPartnerContacts
- * in LLM_ROUTER_MODE=mock, and asserts rows in govtribe_contacts.
+ * in LLM_ROUTER_MODE=mock, and asserts rows in contacts.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -48,7 +48,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (pool) {
     await pool.query(
-      `DELETE FROM govtribe_contacts WHERE contact_category = 'teaming_partner' AND company = 'SUMMIT TACTICAL LLC'`,
+      `DELETE FROM contacts WHERE contact_category = 'teaming_partner' AND company = 'SUMMIT TACTICAL LLC'`,
     );
     await pool.query(
       `DELETE FROM awards WHERE piid IN ('SUMMIT-PIID-001', 'SUMMIT-PIID-002')`,
@@ -71,10 +71,10 @@ describe('discoverPartnerContacts', () => {
     expect(result.companies_processed).toBe(1);
     expect(result.contacts_written).toBeGreaterThanOrEqual(1);
 
-    // Assert row exists in govtribe_contacts
+    // Assert row exists in contacts
     const { rows } = await pool.query(
       `SELECT name, company, contact_category, source_url, source_label, contact_type, is_manual, added_by
-       FROM govtribe_contacts
+       FROM contacts
        WHERE contact_category = 'teaming_partner' AND company = 'SUMMIT TACTICAL LLC'`,
     );
 
@@ -109,7 +109,7 @@ describe('discoverPartnerContacts', () => {
 
     // Count rows for this company
     const { rows } = await pool.query<{ count: number }>(
-      `SELECT count(*)::int AS count FROM govtribe_contacts
+      `SELECT count(*)::int AS count FROM contacts
        WHERE contact_category = 'teaming_partner' AND company = 'SUMMIT TACTICAL LLC'`,
     );
 

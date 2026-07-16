@@ -28,7 +28,6 @@ export type DoctrineStatus = 'qualified' | 'excluded' | 'unknown';
 
 export type PrimarySource =
   | 'sam'
-  | 'govtribe'
   | 'govwin'
   | 'nsf'
   | 'sbir'

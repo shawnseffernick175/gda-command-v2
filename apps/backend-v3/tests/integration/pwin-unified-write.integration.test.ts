@@ -78,7 +78,7 @@ describe('batchScoreOpportunities unified pwin write', () => {
 
     // Get the legacy row
     const { rows: legacyRows } = await pool.query(
-      `SELECT id, data_source, sam_notice_id, govtribe_id, external_id,
+      `SELECT id, data_source, sam_notice_id, external_id,
               title, agency, sub_agency, naics, psc, set_aside,
               value_min, value_max, posted_at::text AS posted_at,
               response_due_at::text AS response_due_at, status
@@ -149,7 +149,7 @@ describe('batchScoreOpportunities unified pwin write', () => {
     );
 
     const { rows: legacyRows } = await pool.query(
-      `SELECT id, data_source, sam_notice_id, govtribe_id, external_id,
+      `SELECT id, data_source, sam_notice_id, external_id,
               title, agency, sub_agency, naics, psc, set_aside,
               value_min, value_max, posted_at::text AS posted_at,
               response_due_at::text AS response_due_at, status

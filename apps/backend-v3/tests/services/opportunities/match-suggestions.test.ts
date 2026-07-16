@@ -84,7 +84,7 @@ function suggestionRow(overrides: Record<string, unknown> = {}): Record<string, 
   return {
     link_id: 7,
     internal_id: 'iid-1',
-    source: 'govtribe',
+    source: 'grants_gov',
     source_native_id: 'gt-123',
     confidence: 'MEDIUM',
     match_method: 'fuzzy_title_agency',
@@ -272,7 +272,7 @@ describe('decideMatchSuggestion', () => {
         rows: [{
           link_id: overrides.link_id ?? 7,
           internal_id: overrides.internal_id ?? 'iid-1',
-          source: overrides.source ?? 'govtribe',
+          source: overrides.source ?? 'grants_gov',
           source_native_id: overrides.source_native_id ?? 'gt-123',
           confidence: overrides.confidence ?? 'CONFIRMED',
           confirmed_by: overrides.confirmed_by ?? 'user-42',

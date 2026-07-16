@@ -32,9 +32,9 @@ export const COLOR_TEAM_CONFIGS: ColorTeamConfig[] = [
     role: "Adversarial Competitor Simulator",
     description:
       "For each named competitor, project what they will bid, price, themes, attack " +
-      "angles, and discriminator counters. Use GovWin, GovTribe, and USAspending data " +
+      "angles, and discriminator counters. Use GovWin and USAspending data " +
       "to ground competitor intelligence.",
-    tools: ["govwin_search", "govtribe_search", "usaspending_search", "rag_search"],
+    tools: ["govwin_search", "usaspending_search", "rag_search"],
     outputSchema: "severity, section_ref, finding, recommended_fix, citations[]",
   },
   {

@@ -2,7 +2,7 @@
  * R1 source citation types and helpers.
  *
  * Source kind enum per F-207 / product_rules.md:
- *   sam_gov | fpds | usaspending | govwin | govtribe |
+ *   sam_gov | fpds | usaspending | govwin |
  *   news | doctrine | partner_site | internal | manual | n8n_workflow
  */
 
@@ -11,7 +11,6 @@ export const SOURCE_KINDS = [
   'fpds',
   'usaspending',
   'govwin',
-  'govtribe',
   'news',
   'doctrine',
   'partner_site',

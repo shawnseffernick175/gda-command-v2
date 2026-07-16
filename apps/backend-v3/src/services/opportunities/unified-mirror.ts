@@ -16,7 +16,6 @@ export interface LegacyOpportunityRow {
   id: number;
   data_source: string;
   sam_notice_id: string | null;
-  govtribe_id: string | null;
   external_id: string | null;
   title: string | null;
   agency: string | null;
@@ -38,10 +37,9 @@ export interface MirrorResult {
 
 // ─── Source/native-id resolution ─────────────────────────────────────────────
 
-const DATA_SOURCE_TO_LINK: Record<string, { source: string; field: 'sam_notice_id' | 'govtribe_id' | 'external_id' }> = {
+const DATA_SOURCE_TO_LINK: Record<string, { source: string; field: 'sam_notice_id' | 'external_id' }> = {
   'sam.gov': { source: 'sam', field: 'sam_notice_id' },
   'govwin': { source: 'govwin', field: 'sam_notice_id' },
-  'govtribe': { source: 'govtribe', field: 'govtribe_id' },
   'arxiv': { source: 'arxiv', field: 'external_id' },
   'grants_gov': { source: 'grants_gov', field: 'external_id' },
   'nsf': { source: 'nsf', field: 'external_id' },
@@ -55,7 +53,7 @@ const DATA_SOURCE_TO_LINK: Record<string, { source: string; field: 'sam_notice_i
  * Exported so batch-score can resolve the unified row for pwin writes.
  */
 export function resolveUnifiedLink(
-  legacy: Pick<LegacyOpportunityRow, 'data_source' | 'sam_notice_id' | 'govtribe_id' | 'external_id'>,
+  legacy: Pick<LegacyOpportunityRow, 'data_source' | 'sam_notice_id' | 'external_id'>,
 ): { source: string; source_native_id: string } | null {
   return resolveLink(legacy as LegacyOpportunityRow);
 }

@@ -6,8 +6,8 @@
  *   - Override beats every source
  *   - Null-handling per field
  *   - pwin/doctrine_status always from unified row
- *   - estimated_value_cents custom precedence (GovWin > SAM > GovTribe)
- *   - response_due_at custom precedence (SAM > GovWin > GovTribe)
+ *   - estimated_value_cents custom precedence (GovWin > SAM)
+ *   - response_due_at custom precedence (SAM > GovWin)
  *   - posted_at earliest rule
  *   - Cache hit on second call (spy counter)
  *   - Cache invalidation
@@ -109,7 +109,7 @@ function override(fieldName: string, value: unknown): QueryRow {
  * Configure mock to return given source data based on source type.
  */
 function setupSourceData(
-  sourceType: 'sam' | 'govwin' | 'govtribe' | 'fast_track',
+  sourceType: 'sam' | 'govwin' | 'fast_track',
   data: Partial<QueryRow>,
 ): void {
   const base: QueryRow = {
@@ -128,15 +128,12 @@ function setupSourceData(
 
   switch (sourceType) {
     case 'sam':
-      setQueryResult("data_source = 'sam_gov'", [base]);
+      setQueryResult("data_source IN ('sam.gov', 'sam_gov')", [base]);
       break;
     case 'govwin':
       // GovWin lookups use sam_notice_id = 'govwin-...'
       // We need a way to differentiate from SAM. Use a second fragment check.
       setQueryResult("sam_notice_id = $1\n", [base]);
-      break;
-    case 'govtribe':
-      setQueryResult('govtribe_id', [base]);
       break;
     case 'fast_track':
       setQueryResult('fast_track_assessments', [base]);
@@ -177,19 +174,17 @@ describe('getMergedOpportunity', () => {
   });
 
   describe('precedence rules', () => {
-    it('GovWin title wins over SAM and GovTribe (default precedence)', async () => {
+    it('GovWin title wins over SAM (default precedence)', async () => {
       setQueryResult('unified_opportunities', [unifiedRow()]);
       setQueryResult('unified_opportunity_links', [
         link('sam', 'SAM-001'),
         link('govwin', 'GW-001'),
-        link('govtribe', 'GT-001'),
       ]);
       setQueryResult('unified_opportunity_field_overrides', []);
 
       // Override mockPool to handle per-source queries precisely
       let samCalled = false;
       let govwinCalled = false;
-      let govtribeCalled = false;
 
       mockPool.query.mockImplementation(async (sql: string, _params?: unknown[]) => {
         queryCallCount++;
@@ -198,14 +193,14 @@ describe('getMergedOpportunity', () => {
         }
         if (sql.includes('unified_opportunity_links')) {
           return {
-            rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001'), link('govtribe', 'GT-001')],
-            rowCount: 3,
+            rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001')],
+            rowCount: 2,
           };
         }
         if (sql.includes('unified_opportunity_field_overrides')) {
           return { rows: [], rowCount: 0 };
         }
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           samCalled = true;
           return {
             rows: [{ title: 'SAM Title', agency: 'SAM Agency', office: null, naics: '541512', psc: 'D302', set_aside: 'SDB', estimated_value_cents: 500000, posted_at: '2026-03-01', response_due_at: '2026-06-01', award_at: null }],
@@ -219,13 +214,6 @@ describe('getMergedOpportunity', () => {
             rowCount: 1,
           };
         }
-        if (sql.includes('govtribe_id')) {
-          govtribeCalled = true;
-          return {
-            rows: [{ title: 'GovTribe Title', agency: 'GovTribe Agency', office: 'GovTribe Office', naics: '541513', psc: 'D303', set_aside: 'WOSB', estimated_value_cents: 250000, posted_at: '2026-02-15', response_due_at: '2026-05-01', award_at: null }],
-            rowCount: 1,
-          };
-        }
         return { rows: [], rowCount: 0 };
       });
 
@@ -233,7 +221,6 @@ describe('getMergedOpportunity', () => {
 
       expect(samCalled).toBe(true);
       expect(govwinCalled).toBe(true);
-      expect(govtribeCalled).toBe(true);
 
       // GovWin wins for title, agency, office (highest precedence)
       expect(result!.title).toBe('GovWin Title');
@@ -250,20 +237,14 @@ describe('getMergedOpportunity', () => {
           return { rows: [unifiedRow()], rowCount: 1 };
         }
         if (sql.includes('unified_opportunity_links')) {
-          return { rows: [link('sam', 'SAM-001'), link('govtribe', 'GT-001')], rowCount: 2 };
+          return { rows: [link('sam', 'SAM-001')], rowCount: 1 };
         }
         if (sql.includes('unified_opportunity_field_overrides')) {
           return { rows: [], rowCount: 0 };
         }
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return {
             rows: [{ title: 'SAM Title', agency: 'SAM Agency', office: null, naics: '541512', psc: 'D302', set_aside: 'SDB', estimated_value_cents: 500000, posted_at: '2026-03-01', response_due_at: '2026-06-01', award_at: null }],
-            rowCount: 1,
-          };
-        }
-        if (sql.includes('govtribe_id')) {
-          return {
-            rows: [{ title: 'GovTribe Title', agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: null, award_at: null }],
             rowCount: 1,
           };
         }
@@ -274,52 +255,24 @@ describe('getMergedOpportunity', () => {
       expect(result!.title).toBe('SAM Title');
       expect(result!.field_sources['title']).toBe('sam');
     });
-
-    it('GovTribe wins when it is the only source with data', async () => {
-      mockPool.query.mockImplementation(async (sql: string) => {
-        queryCallCount++;
-        if (sql.includes('unified_opportunities WHERE')) {
-          return { rows: [unifiedRow()], rowCount: 1 };
-        }
-        if (sql.includes('unified_opportunity_links')) {
-          return { rows: [link('govtribe', 'GT-001')], rowCount: 1 };
-        }
-        if (sql.includes('unified_opportunity_field_overrides')) {
-          return { rows: [], rowCount: 0 };
-        }
-        if (sql.includes('govtribe_id')) {
-          return {
-            rows: [{ title: 'GovTribe Only', agency: 'GT Agency', office: null, naics: '541513', psc: null, set_aside: null, estimated_value_cents: 300000, posted_at: '2026-02-01', response_due_at: '2026-05-01', award_at: null }],
-            rowCount: 1,
-          };
-        }
-        return { rows: [], rowCount: 0 };
-      });
-
-      const result = await getMergedOpportunity(mockPool as unknown as pg.Pool, 'test-uuid-001');
-      expect(result!.title).toBe('GovTribe Only');
-      expect(result!.field_sources['title']).toBe('govtribe');
-    });
   });
 
-  describe('estimated_value_cents — GovWin > SAM > GovTribe (Fast Track skipped)', () => {
-    it('GovWin value wins over SAM and GovTribe', async () => {
+  describe('estimated_value_cents — GovWin > SAM (Fast Track skipped)', () => {
+    it('GovWin value wins over SAM', async () => {
       mockPool.query.mockImplementation(async (sql: string) => {
         queryCallCount++;
         if (sql.includes('unified_opportunities WHERE')) return { rows: [unifiedRow()], rowCount: 1 };
         if (sql.includes('unified_opportunity_links')) {
-          return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001'), link('govtribe', 'GT-001')], rowCount: 3 };
+          return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001')], rowCount: 2 };
         }
         if (sql.includes('unified_opportunity_field_overrides')) return { rows: [], rowCount: 0 };
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: 500000, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
         }
         if (sql.includes("sam_notice_id = $1") && !sql.includes("data_source")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: 1000000, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
         }
-        if (sql.includes('govtribe_id')) {
-          return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: 250000, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
-        }
+
         return { rows: [], rowCount: 0 };
       });
 
@@ -336,7 +289,7 @@ describe('getMergedOpportunity', () => {
           return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001')], rowCount: 2 };
         }
         if (sql.includes('unified_opportunity_field_overrides')) return { rows: [], rowCount: 0 };
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: 500000, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
         }
         if (sql.includes("sam_notice_id = $1") && !sql.includes("data_source")) {
@@ -369,24 +322,22 @@ describe('getMergedOpportunity', () => {
     });
   });
 
-  describe('response_due_at — SAM > GovWin > GovTribe', () => {
-    it('SAM due date wins over GovWin and GovTribe', async () => {
+  describe('response_due_at — SAM > GovWin', () => {
+    it('SAM due date wins over GovWin', async () => {
       mockPool.query.mockImplementation(async (sql: string) => {
         queryCallCount++;
         if (sql.includes('unified_opportunities WHERE')) return { rows: [unifiedRow()], rowCount: 1 };
         if (sql.includes('unified_opportunity_links')) {
-          return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001'), link('govtribe', 'GT-001')], rowCount: 3 };
+          return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001')], rowCount: 2 };
         }
         if (sql.includes('unified_opportunity_field_overrides')) return { rows: [], rowCount: 0 };
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: '2026-06-01', award_at: null }], rowCount: 1 };
         }
         if (sql.includes("sam_notice_id = $1") && !sql.includes("data_source")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: '2026-07-01', award_at: null }], rowCount: 1 };
         }
-        if (sql.includes('govtribe_id')) {
-          return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: '2026-05-01', award_at: null }], rowCount: 1 };
-        }
+
         return { rows: [], rowCount: 0 };
       });
 
@@ -403,7 +354,7 @@ describe('getMergedOpportunity', () => {
           return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001')], rowCount: 2 };
         }
         if (sql.includes('unified_opportunity_field_overrides')) return { rows: [], rowCount: 0 };
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
         }
         if (sql.includes("sam_notice_id = $1") && !sql.includes("data_source")) {
@@ -424,29 +375,27 @@ describe('getMergedOpportunity', () => {
         queryCallCount++;
         if (sql.includes('unified_opportunities WHERE')) return { rows: [unifiedRow()], rowCount: 1 };
         if (sql.includes('unified_opportunity_links')) {
-          return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001'), link('govtribe', 'GT-001')], rowCount: 3 };
+          return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001')], rowCount: 2 };
         }
         if (sql.includes('unified_opportunity_field_overrides')) return { rows: [], rowCount: 0 };
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: '2026-03-15', response_due_at: null, award_at: null }], rowCount: 1 };
         }
         if (sql.includes("sam_notice_id = $1") && !sql.includes("data_source")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: '2026-04-01', response_due_at: null, award_at: null }], rowCount: 1 };
         }
-        if (sql.includes('govtribe_id')) {
-          return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: '2026-02-10', response_due_at: null, award_at: null }], rowCount: 1 };
-        }
+
         return { rows: [], rowCount: 0 };
       });
 
       const result = await getMergedOpportunity(mockPool as unknown as pg.Pool, 'test-uuid-001');
-      expect(result!.posted_at).toBe('2026-02-10');
-      expect(result!.field_sources['posted_at']).toBe('govtribe');
+      expect(result!.posted_at).toBe('2026-03-15');
+      expect(result!.field_sources['posted_at']).toBe('sam');
     });
   });
 
   describe('override beats every source', () => {
-    it('override agency wins over GovWin, SAM, and GovTribe', async () => {
+    it('override agency wins over GovWin and SAM', async () => {
       mockPool.query.mockImplementation(async (sql: string) => {
         queryCallCount++;
         if (sql.includes('unified_opportunities WHERE')) return { rows: [unifiedRow()], rowCount: 1 };
@@ -456,7 +405,7 @@ describe('getMergedOpportunity', () => {
         if (sql.includes('unified_opportunity_field_overrides')) {
           return { rows: [override('agency', 'Override Agency')], rowCount: 1 };
         }
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return { rows: [{ title: 'SAM Title', agency: 'SAM Agency', office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
         }
         if (sql.includes("sam_notice_id = $1") && !sql.includes("data_source")) {
@@ -504,7 +453,7 @@ describe('getMergedOpportunity', () => {
         if (sql.includes('unified_opportunity_field_overrides')) {
           return { rows: [override('response_due_at', '2026-12-31')], rowCount: 1 };
         }
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: '2026-06-01', award_at: null }], rowCount: 1 };
         }
         return { rows: [], rowCount: 0 };
@@ -525,7 +474,7 @@ describe('getMergedOpportunity', () => {
           return { rows: [link('sam', 'SAM-001')], rowCount: 1 };
         }
         if (sql.includes('unified_opportunity_field_overrides')) return { rows: [], rowCount: 0 };
-        if (sql.includes("data_source = 'sam_gov'")) {
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
           return { rows: [{ title: null, agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
         }
         return { rows: [], rowCount: 0 };
@@ -549,25 +498,25 @@ describe('getMergedOpportunity', () => {
         queryCallCount++;
         if (sql.includes('unified_opportunities WHERE')) return { rows: [unifiedRow()], rowCount: 1 };
         if (sql.includes('unified_opportunity_links')) {
-          return { rows: [link('sam', 'SAM-001'), link('govtribe', 'GT-001')], rowCount: 2 };
+          return { rows: [link('sam', 'SAM-001'), link('govwin', 'GW-001')], rowCount: 2 };
         }
         if (sql.includes('unified_opportunity_field_overrides')) return { rows: [], rowCount: 0 };
-        if (sql.includes("data_source = 'sam_gov'")) {
-          return { rows: [{ title: null, agency: 'SAM Agency', office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
+        if (sql.includes("data_source IN ('sam.gov', 'sam_gov')")) {
+          return { rows: [{ title: 'SAM Title', agency: null, office: null, naics: null, psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
         }
-        if (sql.includes('govtribe_id')) {
-          return { rows: [{ title: 'GT Title', agency: null, office: null, naics: '541513', psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
+        if (sql.includes("sam_notice_id = $1") && !sql.includes("data_source")) {
+          return { rows: [{ title: null, agency: 'GovWin Agency', office: null, naics: '541511', psc: null, set_aside: null, estimated_value_cents: null, posted_at: null, response_due_at: null, award_at: null }], rowCount: 1 };
         }
         return { rows: [], rowCount: 0 };
       });
 
       const result = await getMergedOpportunity(mockPool as unknown as pg.Pool, 'test-uuid-001');
-      // SAM has higher precedence than GovTribe, but title is null in SAM
-      expect(result!.title).toBe('GT Title');
-      expect(result!.field_sources['title']).toBe('govtribe');
-      // Agency from SAM (higher precedence)
-      expect(result!.agency).toBe('SAM Agency');
-      expect(result!.field_sources['agency']).toBe('sam');
+      // GovWin has higher precedence than SAM, but title is null in GovWin
+      expect(result!.title).toBe('SAM Title');
+      expect(result!.field_sources['title']).toBe('sam');
+      // Agency from GovWin (higher precedence)
+      expect(result!.agency).toBe('GovWin Agency');
+      expect(result!.field_sources['agency']).toBe('govwin');
     });
 
     it('REJECTED links are excluded', async () => {

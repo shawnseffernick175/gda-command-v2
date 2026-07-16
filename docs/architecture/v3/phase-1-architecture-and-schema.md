@@ -99,7 +99,7 @@ CREATE TABLE sources (
   kind          TEXT          NOT NULL
                               CHECK (kind IN (
                                 'sam_gov', 'fpds', 'usaspending', 'govwin',
-                                'govtribe', 'news', 'doctrine', 'partner_site',
+                                'news', 'doctrine', 'partner_site',
                                 'internal', 'manual', 'n8n_workflow',
                                 'dibbs', 'neco'
                               )),
@@ -122,7 +122,7 @@ CREATE UNIQUE INDEX sources_legacy_id_uniq ON sources(legacy_id) WHERE legacy_id
 | Column | Purpose |
 |---|---|
 | `id` | Surrogate PK referenced by all fact tables via `source_id` FK |
-| `kind` | Typed source origin per R1 spec (`product_rules.md`): `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `manual`, `n8n_workflow`, `dibbs`, `neco` |
+| `kind` | Typed source origin per R1 spec (`product_rules.md`): `sam_gov`, `fpds`, `usaspending`, `govwin`, `news`, `doctrine`, `partner_site`, `internal`, `manual`, `n8n_workflow`, `dibbs`, `neco` |
 | `url` | Clickable link back to the original record. NULL only for `internal`/`manual` kinds where no URL exists |
 | `title` | Human-readable label rendered in the UI next to the source badge |
 | `retrieved_at` | When the data was fetched from the source — staleness detection |
@@ -229,13 +229,13 @@ CREATE TABLE opportunities (
   incumbent           TEXT,
   incumbent_confidence TEXT CHECK (incumbent_confidence IN ('high', 'medium', 'low')),
   incumbent_source    TEXT,
-  value_source        TEXT,                    -- provenance: sam, govwin_estimate, govtribe_estimate, manual
+  value_source        TEXT,                    -- provenance: sam, govwin_estimate, manual
   value_confidence    TEXT CHECK (value_confidence IN ('confirmed', 'estimated', 'forecasted')),
   date_source         TEXT,                    -- provenance for response_due_at
   date_confidence     TEXT CHECK (date_confidence IN ('confirmed', 'estimated', 'forecasted')),
   description         TEXT,
   tags                TEXT[]        NOT NULL DEFAULT '{}',
-  data_source         TEXT          NOT NULL DEFAULT 'manual',  -- ingest origin: 'sam', 'govtribe', 'govwin', 'dibbs', 'neco', 'manual'
+  data_source         TEXT          NOT NULL DEFAULT 'manual',  -- ingest origin: 'sam', 'govwin', 'dibbs', 'neco', 'manual'
   agency_subtype      TEXT,                    -- sub-classification: 'DLA', 'Navy', etc.
   department_name     TEXT,                    -- clean cabinet department (e.g. 'Department of Defense')
   agency_name         TEXT,                    -- sub-department / bureau (e.g. 'Department of the Navy')
@@ -246,8 +246,7 @@ CREATE TABLE opportunities (
   part_number         TEXT,                    -- DIBBS-specific part/NSN tracking
   quantity            NUMERIC,                 -- requested quantity (DIBBS/NECO)
   external_id         TEXT,                    -- non-SAM unique ID for dedup (DIBBS sol#, NECO RFQ#)
-  source_uri          TEXT,                    -- deep-link to source page (GovTribe, GovWin, etc.)
-  govtribe_id         TEXT,                    -- GovTribe entity ID for dedup + detail proxy
+  source_uri          TEXT,                    -- deep-link to source page (GovWin, etc.)
   relevance_status    TEXT,                    -- ingest-time relevance gate: relevant/off_profile/unknown_naics/auto_pass
   relevance_reason    TEXT,                    -- human-readable explanation of relevance_status
   assessment_status   TEXT          NOT NULL DEFAULT 'intake'
@@ -281,7 +280,6 @@ CREATE INDEX idx_opportunities_department_name ON opportunities (department_name
 CREATE INDEX idx_opportunities_agency_name ON opportunities (agency_name);
 CREATE INDEX idx_opps_part_number    ON opportunities (part_number) WHERE part_number IS NOT NULL;
 CREATE UNIQUE INDEX idx_opps_ext_id  ON opportunities (data_source, external_id) WHERE external_id IS NOT NULL;
-CREATE INDEX idx_opps_govtribe_id   ON opportunities (govtribe_id) WHERE govtribe_id IS NOT NULL;
 CREATE INDEX idx_opps_source_uri    ON opportunities (source_uri) WHERE source_uri IS NOT NULL;
 CREATE INDEX idx_opps_source         ON opportunities (source_id);
 CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted_at IS NOT NULL;
@@ -987,7 +985,7 @@ These endpoints replace the direct `INSERT`s n8n currently performs against shad
 
 | V3 endpoint | Auth | Replaces | Purpose |
 |---|---|---|---|
-| `POST /api/v3/ingest/opportunities` | `x-gda-key` | Direct INSERT to `gda_opportunity_tracker` + `sam_opportunities` | Upsert opportunities from SAM.gov, GovTribe, GovWin. Dedup on `sam_notice_id`. Auto-creates `sources` row. |
+| `POST /api/v3/ingest/opportunities` | `x-gda-key` | Direct INSERT to `gda_opportunity_tracker` + `sam_opportunities` | Upsert opportunities from SAM.gov, GovWin. Dedup on `sam_notice_id`. Auto-creates `sources` row. |
 | `POST /api/v3/ingest/fpds-awards` | `x-gda-key` | Direct INSERT to `fpds_awards` | Ingest FPDS award data. Creates source row with `kind: 'fpds'`. |
 | `POST /api/v3/ingest/intel` | `x-gda-key` | Direct INSERT to `gda_intelligence_log` + `intel_items` | Ingest intel items (news, competitor movements, market signals). |
 | `POST /api/v3/ingest/action-items` | `x-gda-key` | Direct INSERT to `gda_action_items` | Create action items from email parsing or workflow triggers. |

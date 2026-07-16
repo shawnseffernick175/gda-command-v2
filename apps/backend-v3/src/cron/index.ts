@@ -25,7 +25,6 @@ import { registerNSFSource } from '../ingest/nsf/index.js';
 import { registerDoDRSSSource } from '../ingest/dod_rss/index.js';
 import { registerNIHSource } from '../ingest/nih/index.js';
 import { registerArxivSource } from '../ingest/arxiv/index.js';
-import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
 import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
 import { registerFasTracTier1Source } from '../ingest/fastrac/index.js';
@@ -48,10 +47,8 @@ import { runIntakeAssessment } from '../services/assessment/index.js';
 import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { runValueDateEnrichment } from '../services/enrichment/value-date.js';
 import { pool } from '../lib/db.js';
-import { isGovTribeEnabled } from '../ingest/govtribe/enabled.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
-const govtribeEnabled = isGovTribeEnabled();
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
 const grantsGovEnabled = process.env.ENABLE_GRANTS_GOV_INGEST !== 'false';
 const fastracArmyEnabled = process.env.ENABLE_FASTRAC_ARMY_INGEST !== 'false';
@@ -76,14 +73,6 @@ const JOBS: CronJob[] = [
   { sourceKey: 'dod_rss', schedule: '30 22 * * *', label: 'DoD contract announcements RSS ingest (daily 18:30 ET, after 5pm ET feed publish)' },
   { sourceKey: 'nih', schedule: '0 7 * * 1', label: 'NIH RePORTER research awards ingest (weekly Mon 03:00 ET)' },
   { sourceKey: 'arxiv', schedule: '0 6 * * 1', label: 'arXiv defense/tech papers ingest (weekly Mon 02:00 ET)' },
-  ...(govtribeEnabled
-    ? [
-        { sourceKey: 'govtribe', schedule: '0 10 * * 1,4', label: 'GovTribe opps poll (Mon+Thu 6am ET / 10:00 UTC)' },
-        { sourceKey: 'govtribe.contacts', schedule: '0 9 * * 1', label: 'GovTribe contacts poll (weekly Mon 09:00 UTC)' },
-        { sourceKey: 'govtribe.vehicles', schedule: '0 6 1 * *', label: 'GovTribe vehicles poll (monthly)' },
-        { sourceKey: 'govtribe.budget', schedule: '55 3 * * *', label: 'GovTribe budget rollup (nightly 23:55 ET)' },
-      ]
-    : []),
   ...(govwinEnabled
     ? [
         { sourceKey: 'govwin', schedule: '0 */6 * * *', label: 'GovWin IQ opps poll (every 6 hours)' },
@@ -109,9 +98,6 @@ export function startCronScheduler(): void {
   registerDoDRSSSource();
   registerNIHSource();
   registerArxivSource();
-  if (govtribeEnabled) {
-    registerGovTribeSource();
-  }
   if (govwinEnabled) {
     registerGovWinSource();
   }
@@ -132,9 +118,6 @@ export function startCronScheduler(): void {
   }
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
-  }
-  if (!govtribeEnabled) {
-    logger.info({ flag: 'GOVTRIBE_ENABLED' }, '[cron] GovTribe integration disabled');
   }
   if (!fastracArmyEnabled) {
     logger.info({ flag: 'ENABLE_FASTRAC_ARMY_INGEST' }, '[cron] fastrac-army.daily skipped — gated behind env flag (default on)');
@@ -374,9 +357,7 @@ export function startCronScheduler(): void {
       logger.info(
         {
           govwin_value: result.enriched_value_govwin,
-          govtribe_value: result.enriched_value_govtribe,
           govwin_date: result.enriched_date_govwin,
-          govtribe_date: result.enriched_date_govtribe,
           still_null_value: result.still_null_value,
           still_null_date: result.still_null_date,
         },
@@ -413,10 +394,6 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'usaspending.gov' ? 'usaspending.daily'
       : job.sourceKey === 'federalregister.gov' ? 'federal_register.6h'
       : job.sourceKey === 'sbir' ? 'sbir.daily'
-      : job.sourceKey === 'govtribe' ? 'govtribe.opps.mon_thu'
-      : job.sourceKey === 'govtribe.contacts' ? 'govtribe.contacts.weekly'
-      : job.sourceKey === 'govtribe.vehicles' ? 'govtribe.vehicles.monthly'
-      : job.sourceKey === 'govtribe.budget' ? 'govtribe.budget.nightly'
       : job.sourceKey === 'govwin' ? 'govwin.6h'
       : job.sourceKey === 'dod_rss' ? 'dod_rss.daily'
       : job.sourceKey === 'nih' ? 'nih.weekly'

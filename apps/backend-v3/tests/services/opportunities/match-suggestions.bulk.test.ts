@@ -75,7 +75,7 @@ function decidedSteps(linkId: number, internalId: string = `iid-${linkId}`): Ste
       rows: [{
         link_id: linkId,
         internal_id: internalId,
-        source: 'govtribe',
+        source: 'grants_gov',
         source_native_id: `gt-${linkId}`,
         confidence: 'CONFIRMED',
         confirmed_by: 'operator',

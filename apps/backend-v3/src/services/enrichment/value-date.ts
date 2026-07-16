@@ -1,9 +1,9 @@
 /**
- * Opportunity Value & Due Date Enrichment — SAM → GovWin → GovTribe fallback.
+ * Opportunity Value & Due Date Enrichment — SAM → GovWin fallback.
  *
  * When SAM.gov is missing value or response_due_date on an opportunity, this
- * service queries GovWin (OAuth2 API) then GovTribe (MCP) to fill in
- * estimated values and forecasted dates.
+ * service queries GovWin (OAuth2 API) to fill in estimated values and
+ * forecasted dates.
  *
  * Matching: solicitation number (primary), title + agency fuzzy (fallback).
  */
@@ -15,15 +15,11 @@ import {
   searchByTitleAgency as govwinSearchByTitle,
   type GovWinApiOpportunity,
 } from '../govwin/api_client.js';
-import { mcpCallTool } from '../../ingest/govtribe/mcp_client.js';
-import { isGovTribeEnabled } from '../../ingest/govtribe/enabled.js';
-import type { GovTribeDetailRecord } from '../../ingest/govtribe/types.js';
 
 const BATCH_SIZE = 50;
 const GOVWIN_BATCH_DELAY_MS = 1_200;
-const GOVTRIBE_BATCH_DELAY_MS = 2_000;
 
-type ValueSource = 'sam' | 'govwin_estimate' | 'govtribe_estimate' | 'manual';
+type ValueSource = 'sam' | 'govwin_estimate' | 'manual';
 type Confidence = 'confirmed' | 'estimated' | 'forecasted';
 
 interface EnrichableRow {
@@ -43,13 +39,10 @@ export interface EnrichmentReport {
   ended_at: string;
   total_eligible: number;
   enriched_value_govwin: number;
-  enriched_value_govtribe: number;
   enriched_date_govwin: number;
-  enriched_date_govtribe: number;
   still_null_value: number;
   still_null_date: number;
   govwin_errors: number;
-  govtribe_errors: number;
 }
 
 interface EnrichmentHit {
@@ -90,7 +83,7 @@ async function writeSourceRef(
 }
 
 /**
- * Try GovWin first, then GovTribe. Returns enrichment data or null.
+ * Query GovWin for value/date enrichment. Returns enrichment data or null.
  */
 async function enrichFromGovWin(
   row: EnrichableRow,
@@ -123,81 +116,6 @@ async function enrichFromGovWin(
   }
 }
 
-async function enrichFromGovTribe(
-  row: EnrichableRow,
-  report: EnrichmentReport,
-): Promise<EnrichmentHit | null> {
-  try {
-    if (!row.solicitation_number && !row.title) return null;
-
-    const searchQuery = row.solicitation_number ?? row.title;
-    const cacheId = `enrichment_${row.id}`;
-
-    const result = await mcpCallTool<{ results?: GovTribeDetailRecord[] }>(
-      'Search_Federal_Contract_Opportunities',
-      {
-        query: searchQuery,
-        per_page: 5,
-        fields_to_return: ['due_date', 'solicitation_number', 'name'],
-      },
-      cacheId,
-    );
-
-    if (!result.data) return null;
-
-    const records = result.data.results ?? [];
-    if (records.length === 0) return null;
-
-    // Find best match by solicitation number, or take first result
-    let match = row.solicitation_number
-      ? records.find((r) => r.solicitation_number === row.solicitation_number)
-      : undefined;
-    if (!match) match = records[0];
-    if (!match) return null;
-
-    const dueDate = match.due_date ?? null;
-
-    // GovTribe opp detail doesn't carry estimated_value directly on the search
-    // result. We get due_date from the opp. For value, check forecasts.
-    let value: number | null = null;
-
-    if (row.solicitation_number) {
-      const forecastResult = await mcpCallTool<{ results?: Array<{ estimated_award_value?: number | { low?: number; high?: number }; estimated_solicitation_release_date?: string }> }>(
-        'Search_Federal_Forecasts',
-        {
-          query: row.solicitation_number,
-          per_page: 5,
-          fields_to_return: ['estimated_award_value', 'estimated_solicitation_release_date'],
-        },
-        `enrichment_forecast_${row.id}`,
-      );
-
-      if (forecastResult.data?.results?.length) {
-        const forecast = forecastResult.data.results[0];
-        if (forecast?.estimated_award_value != null) {
-          const raw = forecast.estimated_award_value;
-          if (typeof raw === 'number') {
-            value = raw;
-          } else if (typeof raw === 'object') {
-            value = raw.high ?? raw.low ?? null;
-          }
-        }
-      }
-    }
-
-    if (!value && !dueDate) return null;
-    const sourceUrl = match.govtribe_url ?? match.source_url ?? `https://govtribe.com/opportunity/${match.govtribe_id}`;
-    return { value, dueDate, sourceUrl, sourceTitle: `GovTribe ${match.govtribe_id}` };
-  } catch (err) {
-    report.govtribe_errors++;
-    logger.warn(
-      { oppId: row.id, error: err instanceof Error ? err.message : String(err) },
-      'enrichment_govtribe_error',
-    );
-    return null;
-  }
-}
-
 async function applyEnrichment(
   row: EnrichableRow,
   report: EnrichmentReport,
@@ -210,7 +128,6 @@ async function applyEnrichment(
   let valueEnriched = false;
   let dateEnriched = false;
 
-  // --- GovWin first ---
   const govwinResult = await enrichFromGovWin(row, report);
   if (govwinResult) {
     if (needsValue && govwinResult.value != null) {
@@ -237,45 +154,13 @@ async function applyEnrichment(
     }
   }
 
-  // --- GovTribe fallback ---
-  const stillNeedsValue = needsValue && !valueEnriched;
-  const stillNeedsDate = needsDate && !dateEnriched;
-
-  if (isGovTribeEnabled() && (stillNeedsValue || stillNeedsDate)) {
-    const govtribeResult = await enrichFromGovTribe(row, report);
-    if (govtribeResult) {
-      if (stillNeedsValue && govtribeResult.value != null) {
-        await pool.query(
-          `UPDATE opportunities
-           SET value_max = $1, value_source = 'govtribe_estimate', value_confidence = 'estimated'
-           WHERE id = $2`,
-          [govtribeResult.value, row.id],
-        );
-        await writeSourceRef(row.id, 'govtribe', govtribeResult.sourceUrl, govtribeResult.sourceTitle, 'opportunity_value_max_sources');
-        report.enriched_value_govtribe++;
-        valueEnriched = true;
-      }
-      if (stillNeedsDate && govtribeResult.dueDate != null) {
-        await pool.query(
-          `UPDATE opportunities
-           SET response_due_at = $1, date_source = 'govtribe_forecast', date_confidence = 'forecasted'
-           WHERE id = $2`,
-          [govtribeResult.dueDate, row.id],
-        );
-        await writeSourceRef(row.id, 'govtribe', govtribeResult.sourceUrl, govtribeResult.sourceTitle, 'opportunity_response_due_at_sources');
-        report.enriched_date_govtribe++;
-        dateEnriched = true;
-      }
-    }
-  }
-
   if (needsValue && !valueEnriched) report.still_null_value++;
   if (needsDate && !dateEnriched) report.still_null_date++;
 }
 
 /**
  * Main enrichment job: select all opportunities missing value or due date,
- * query GovWin → GovTribe in batches.
+ * query GovWin in batches.
  */
 export async function runValueDateEnrichment(): Promise<EnrichmentReport> {
   const startedAt = new Date().toISOString();
@@ -284,13 +169,10 @@ export async function runValueDateEnrichment(): Promise<EnrichmentReport> {
     ended_at: '',
     total_eligible: 0,
     enriched_value_govwin: 0,
-    enriched_value_govtribe: 0,
     enriched_date_govwin: 0,
-    enriched_date_govtribe: 0,
     still_null_value: 0,
     still_null_date: 0,
     govwin_errors: 0,
-    govtribe_errors: 0,
   };
 
   const countRes = await pool.query<{ cnt: number }>(
@@ -337,11 +219,7 @@ export async function runValueDateEnrichment(): Promise<EnrichmentReport> {
 
     // Respect rate limits between batches
     if (batchRes.rows.length === BATCH_SIZE) {
-      await delay(
-        isGovTribeEnabled()
-          ? Math.max(GOVWIN_BATCH_DELAY_MS, GOVTRIBE_BATCH_DELAY_MS)
-          : GOVWIN_BATCH_DELAY_MS,
-      );
+      await delay(GOVWIN_BATCH_DELAY_MS);
     }
   }
 
@@ -351,13 +229,10 @@ export async function runValueDateEnrichment(): Promise<EnrichmentReport> {
     {
       total_eligible: report.total_eligible,
       enriched_value_govwin: report.enriched_value_govwin,
-      enriched_value_govtribe: report.enriched_value_govtribe,
       enriched_date_govwin: report.enriched_date_govwin,
-      enriched_date_govtribe: report.enriched_date_govtribe,
       still_null_value: report.still_null_value,
       still_null_date: report.still_null_date,
       govwin_errors: report.govwin_errors,
-      govtribe_errors: report.govtribe_errors,
     },
     'value_date_enrichment_complete',
   );

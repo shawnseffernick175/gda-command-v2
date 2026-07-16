@@ -899,7 +899,6 @@ export type SourceKind =
   | 'fpds'
   | 'usaspending'
   | 'govwin'
-  | 'govtribe'
   | 'sbir_sttr'
   | 'darpa_baa'
   | 'afwerx'

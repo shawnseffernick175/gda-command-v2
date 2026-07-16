@@ -39,7 +39,7 @@ export interface FetchOpts {
 }
 
 export interface SourceAdapter {
-  /** Unique key identifying this source (e.g. 'sam', 'govwin', 'govtribe'). */
+  /** Unique key identifying this source (e.g. 'sam', 'govwin'). */
   readonly source: PrimarySource;
   /** The default lifecycle stage records from this source start in. */
   readonly defaultStage: LifecycleStage;

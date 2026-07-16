@@ -127,7 +127,7 @@ function formatDaysLeft(opp: OpportunitySummary): { text: string; className: str
 }
 
 function isEstimatedValue(opp: OpportunitySummary): boolean {
-  return opp.value_source === "govwin_estimate" || opp.value_source === "govtribe_estimate";
+  return opp.value_source === "govwin_estimate";
 }
 
 function formatValueWithSource(opp: OpportunitySummary): { text: string; className: string } {
@@ -539,7 +539,7 @@ function OpportunityList() {
                       <th className="w-[3px] p-0 bg-gda-bg-base" />
                       <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                       <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="140px" />
-                      <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" infoTooltip={<HeaderInfoTooltip text="Value pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin and GovTribe estimates (shown with ~ and in muted color). Empty means no source had data." />} />
+                      <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" infoTooltip={<HeaderInfoTooltip text="Value pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin estimates (shown with ~ and in muted color). Empty means no source had data." />} />
                       <SortableHeader label="Pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Probability of Win (0-100%). AI-scored from opportunity fit, competition, and Envision positioning. Green = forecast (65%+), amber = signal (45-64%), red = discovery (<45%)." />} />
                       <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="150px" />
                       <SortableHeader
@@ -555,7 +555,7 @@ function OpportunityList() {
                           onToggle: (v) => toggleArrayFilter(setSetAsideFilter, v),
                         }}
                       />
-                      <SortableHeader label="Due" field="due" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Due date pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin and GovTribe forecasts (shown with ~ and in muted color). Empty means no source had data." />} />
+                      <SortableHeader label="Due" field="due" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Due date pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin forecasts (shown with ~ and in muted color). Empty means no source had data." />} />
                       <th className="px-3 py-2 text-left font-medium w-[60px] bg-gda-bg-base">Actions</th>
                     </tr>
                   </thead>

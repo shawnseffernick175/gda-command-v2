@@ -25,8 +25,6 @@ import { authRoutes } from './routes/auth.js';
 import { systemHealthRoutes } from './routes/health.js';
 import { adminIngestRoutes } from './routes/admin/ingest.js';
 import { ragRoutes } from './routes/rag.js';
-import { govtribeRoutes } from './routes/govtribe.js';
-import { govtribeSavedSearchRoutes } from './routes/govtribe-saved-search.js';
 import { govwinRoutes } from './routes/govwin.js';
 import { sentinelRoutes } from './routes/sentinel.js';
 import { colorTeamRoutes } from './routes/color-teams.js';
@@ -190,8 +188,6 @@ export async function buildApp() {
   await app.register(doctrineRoutes);
   await app.register(adminIngestRoutes);
   await app.register(ragRoutes);
-  await app.register(govtribeRoutes);
-  await app.register(govtribeSavedSearchRoutes);
   if (process.env['GOVWIN_CONNECTOR_V1'] === 'true') {
     await app.register(govwinRoutes);
   }

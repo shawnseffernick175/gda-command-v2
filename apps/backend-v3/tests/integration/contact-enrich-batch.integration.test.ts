@@ -28,9 +28,9 @@ beforeAll(async () => {
 
   pool = new Pool({ connectionString: dbUrl, max: 5 });
 
-  // Seed two contacts directly into govtribe_contacts (no awards/sources FK needed)
+  // Seed two contacts directly into contacts (no awards/sources FK needed)
   await pool.query(
-    `INSERT INTO govtribe_contacts
+    `INSERT INTO contacts
        (name, title, agency, company, contact_category, email, linkedin_url, notes, ai_profile, source_label, contact_type, is_manual, added_by)
      VALUES
        ('Alice Enrich-Test', 'Director of IT', NULL, 'ENRICH-TEST CORP', 'competitor', 'alice@enrich-test.example', 'https://linkedin.com/in/alice-enrich', 'Test competitor contact', NULL, 'integration-test', 'competitor_poc', false, 'system'),
@@ -41,7 +41,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (pool) {
     await pool.query(
-      `DELETE FROM govtribe_contacts WHERE source_label = 'integration-test' AND name IN ('Alice Enrich-Test', 'Bob Enrich-Test')`,
+      `DELETE FROM contacts WHERE source_label = 'integration-test' AND name IN ('Alice Enrich-Test', 'Bob Enrich-Test')`,
     );
     await pool.end();
   }
@@ -62,7 +62,7 @@ describe('enrichContactsBatch', () => {
     // Verify both rows now have non-null ai_profile and ai_ran_at
     const { rows } = await pool.query<{ name: string; ai_profile: { model_used?: string } | null; ai_ran_at: Date | null }>(
       `SELECT name, ai_profile, ai_ran_at
-       FROM govtribe_contacts
+       FROM contacts
        WHERE source_label = 'integration-test' AND name IN ('Alice Enrich-Test', 'Bob Enrich-Test')
        ORDER BY name`,
     );
@@ -96,7 +96,7 @@ describe('enrichContactsBatch', () => {
     // the batch did not touch them again.
     const { rows } = await pool.query<{ ai_ran_at: Date }>(
       `SELECT ai_ran_at
-       FROM govtribe_contacts
+       FROM contacts
        WHERE source_label = 'integration-test' AND name IN ('Alice Enrich-Test', 'Bob Enrich-Test')
        ORDER BY name`,
     );
@@ -115,7 +115,7 @@ describe('enrichContactsBatch', () => {
     // our seeded contacts are not in the unenriched set.
     const { rows: unenriched } = await pool.query<{ count: number }>(
       `SELECT count(*)::int AS count
-       FROM govtribe_contacts
+       FROM contacts
        WHERE source_label = 'integration-test'
          AND name IN ('Alice Enrich-Test', 'Bob Enrich-Test')
          AND ai_profile IS NULL`,

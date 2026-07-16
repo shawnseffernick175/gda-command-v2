@@ -2,7 +2,7 @@
  * Derive a human-readable source label from a URL's host.
  *
  * Avoids hardcoding "SAM.gov" on chips whose underlying link may point at a
- * different government data source (GovTribe, USAspending, FPDS, etc.). When
+ * different government data source (USAspending, FPDS, etc.). When
  * the host is unrecognized we fall back to the bare hostname so the chip still
  * tells the truth about where the link goes (honors R1: every data point names
  * its real source).
@@ -10,7 +10,6 @@
 
 const HOST_LABELS: Array<{ match: RegExp; label: string }> = [
   { match: /(^|\.)sam\.gov$/i, label: "SAM.gov" },
-  { match: /(^|\.)govtribe\.com$/i, label: "GovTribe" },
   { match: /(^|\.)usaspending\.gov$/i, label: "USAspending" },
   { match: /(^|\.)fpds\.gov$/i, label: "FPDS" },
   { match: /(^|\.)govwin\.com$/i, label: "GovWin" },

@@ -146,13 +146,13 @@ describe('validateAndRecompute', () => {
       ...makeRow(),
       external_id: 'ext-123',
       agency_subtype: 'sub-agency',
-      data_source: 'govtribe',
+      data_source: 'grants_gov',
       sam_notice_id: undefined,
     };
     const result = validateAndRecompute(externalRow);
     expect(result.external_id).toBe('ext-123');
     expect(result.agency_subtype).toBe('sub-agency');
-    expect(result.data_source).toBe('govtribe');
+    expect(result.data_source).toBe('grants_gov');
   });
 
   it('does not mutate the input row', () => {

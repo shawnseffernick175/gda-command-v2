@@ -2,7 +2,7 @@
  * Batch Contact Enrichment service.
  *
  * Runs the existing `contact_enrich` LLM task over many contacts at once,
- * writing the structured AI profile into govtribe_contacts.ai_profile + ai_ran_at.
+ * writing the structured AI profile into contacts.ai_profile + ai_ran_at.
  * Wraps existing machinery -- does NOT invent a new LLM task.
  */
 
@@ -43,7 +43,7 @@ export async function enrichContactsBatch(
 
   const { rows: contacts } = await pool.query<ContactRow>(
     `SELECT id, name, title, agency, company, contact_category, email, linkedin_url, notes
-     FROM govtribe_contacts
+     FROM contacts
      WHERE contact_category = ANY($1)
        AND ($2::boolean IS FALSE OR ai_profile IS NULL)
      ORDER BY id ASC
@@ -78,7 +78,7 @@ export async function enrichContactsBatch(
         // self-reported in its JSON (it tends to write a generic "gpt-4").
         const aiProfile = { ...result.output, model_used: result.model_used };
         await pool.query(
-          'UPDATE govtribe_contacts SET ai_profile = $1, ai_ran_at = NOW() WHERE id = $2',
+          'UPDATE contacts SET ai_profile = $1, ai_ran_at = NOW() WHERE id = $2',
           [JSON.stringify(aiProfile), c.id],
         );
         contactsEnriched++;

@@ -799,7 +799,6 @@ function ContactsContent() {
               className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
             >
               <option value="">Source</option>
-              <option value="GovTribe">GovTribe</option>
               <option value="GovWin">GovWin</option>
               <option value="sam.gov">SAM.gov</option>
               <option value="Manual">Manual</option>
@@ -845,7 +844,7 @@ function ContactsContent() {
         <Card className="border-border bg-gda-panel">
           <CardContent className="py-10 text-center">
             <p className="text-sm text-muted-foreground">
-              No contacts found — add one manually or wait for the next GovTribe ingest (Mon/Thu 6am ET)
+              No contacts found — add one manually or wait for the next contact discovery run
             </p>
           </CardContent>
         </Card>

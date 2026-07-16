@@ -248,7 +248,7 @@ describe('ANALYSIS_AFFECTING_FIELDS', () => {
 describe('SOURCE_KINDS enum', () => {
   it('includes all required kinds per F-207', () => {
     const required = [
-      'sam_gov', 'fpds', 'usaspending', 'govwin', 'govtribe',
+      'sam_gov', 'fpds', 'usaspending', 'govwin',
       'news', 'doctrine', 'partner_site', 'internal', 'manual', 'n8n_workflow',
     ];
     for (const kind of required) {

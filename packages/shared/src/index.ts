@@ -1377,7 +1377,7 @@ export interface SAMScanRun {
 }
 
 // ---------------------------------------------------------------------------
-// GovWin / GovTribe Integration
+// GovWin Integration
 // ---------------------------------------------------------------------------
 
 export type GovWinStatus = "new" | "tracking" | "qualified" | "dismissed" | "archived";

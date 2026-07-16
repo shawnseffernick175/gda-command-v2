@@ -14,7 +14,6 @@ describe('sourceKindOf', () => {
   it('maps internal source names to canonical SourceKind', () => {
     expect(sourceKindOf('sam')).toBe('sam_gov');
     expect(sourceKindOf('govwin')).toBe('govwin');
-    expect(sourceKindOf('govtribe')).toBe('govtribe');
     expect(sourceKindOf('fast_track')).toBe('internal');
     expect(sourceKindOf('something-else')).toBe('internal');
   });
@@ -24,7 +23,6 @@ describe('sourceLabelOf', () => {
   it('returns human labels', () => {
     expect(sourceLabelOf('sam')).toBe('SAM.gov');
     expect(sourceLabelOf('govwin')).toBe('GovWin IQ');
-    expect(sourceLabelOf('govtribe')).toBe('GovTribe');
     expect(sourceLabelOf('fast_track')).toBe('GDA Fast Track');
     expect(sourceLabelOf('mystery')).toBe('mystery');
   });
@@ -33,12 +31,6 @@ describe('sourceLabelOf', () => {
 describe('buildSourceUrl', () => {
   it('builds SAM.gov opportunity URLs', () => {
     expect(buildSourceUrl('sam', 'N-123')).toBe('https://sam.gov/opp/N-123/view');
-  });
-
-  it('builds GovTribe URLs', () => {
-    expect(buildSourceUrl('govtribe', 'GT-9')).toBe(
-      'https://govtribe.com/opportunity/federal-contract-opportunity/GT-9',
-    );
   });
 
   it('builds GovWin URLs', () => {
@@ -60,7 +52,6 @@ describe('buildSourceUrl', () => {
 describe('buildFieldSourceRefs', () => {
   const links = [
     { source: 'sam', source_native_id: 'N-1' },
-    { source: 'govtribe', source_native_id: 'GT-2' },
     { source: 'fast_track', source_native_id: 'FT-3' },
   ];
 

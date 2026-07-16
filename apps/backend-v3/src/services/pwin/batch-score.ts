@@ -147,7 +147,7 @@ export async function batchScoreOpportunities(
       query = `SELECT id, naics, agency, set_aside, value_min, value_max,
                       response_due_at, posted_at, incumbent, incumbent_confidence,
                       solicitation_number, title, description, psc,
-                      data_source, sam_notice_id, govtribe_id, external_id
+                      data_source, sam_notice_id, external_id
                FROM opportunities
                WHERE deleted_at IS NULL AND id > $1 AND id = ANY($2)
                ORDER BY id LIMIT $3`;
@@ -156,7 +156,7 @@ export async function batchScoreOpportunities(
       query = `SELECT id, naics, agency, set_aside, value_min, value_max,
                       response_due_at, posted_at, incumbent, incumbent_confidence,
                       solicitation_number, title, description, psc,
-                      data_source, sam_notice_id, govtribe_id, external_id
+                      data_source, sam_notice_id, external_id
                FROM opportunities
                WHERE deleted_at IS NULL AND id > $1
                ORDER BY id LIMIT $2`;
@@ -205,7 +205,6 @@ export async function batchScoreOpportunities(
           const link = resolveUnifiedLink({
             data_source: r.data_source as string,
             sam_notice_id: r.sam_notice_id as string | null,
-            govtribe_id: r.govtribe_id as string | null,
             external_id: r.external_id as string | null,
           });
           if (link) {
