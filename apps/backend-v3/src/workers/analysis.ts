@@ -61,7 +61,6 @@ interface PeriodicRefreshCandidate {
   value_max: string | null;
   response_due_at: Date | null;
   incumbent: string | null;
-  updated_at: Date | null;
   analysis_version: string | null;
   stored_revision_hash: string | null;
 }
@@ -871,7 +870,7 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
 
     const res = await pool.query<PeriodicRefreshCandidate>(
       `SELECT id, title, description, agency, naics, set_aside, value_min, value_max,
-              response_due_at, incumbent, updated_at, analysis_version,
+              response_due_at, incumbent, analysis_version,
               analysis->>'revision_hash' AS stored_revision_hash
        FROM opportunities
        WHERE deleted_at IS NULL

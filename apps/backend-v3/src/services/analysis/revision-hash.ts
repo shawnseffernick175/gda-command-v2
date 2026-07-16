@@ -26,7 +26,6 @@ export interface RevisionHashInput {
   value_max: unknown;
   response_due_at: unknown;
   incumbent: unknown;
-  updated_at: unknown;
 }
 
 export function computeRevisionHash(row: RevisionHashInput): string {
@@ -40,7 +39,6 @@ export function computeRevisionHash(row: RevisionHashInput): string {
     value_max: row.value_max ?? null,
     response_due_at: row.response_due_at ?? null,
     incumbent: row.incumbent ?? null,
-    updated_at: row.updated_at ?? null,
   });
   return crypto.createHash('sha256').update(payload).digest('hex').slice(0, 16);
 }
