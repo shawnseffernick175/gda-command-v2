@@ -157,11 +157,11 @@ export function useAnalysisStream(
       setStatus((prev) => prev === "error" ? prev : "done");
     } catch (err) {
       if (controller.signal.aborted) return;
-      // A hard 401 (refresh failed) already redirected to /login — surface a
-      // calm session message rather than a raw error, and never blank the view.
+      // A hard auth failure (refresh also failed) must NOT blank the view.
+      // Render an inline "unavailable" state instead of redirecting away.
       if (err instanceof ApiError && err.status === 401) {
         setStatus("error");
-        setError("Session expired — redirecting to sign in");
+        setError("Analysis unavailable — please reload or re-login");
         return;
       }
       setStatus("error");
