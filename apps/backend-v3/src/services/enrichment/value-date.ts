@@ -16,6 +16,7 @@ import {
   type GovWinApiOpportunity,
 } from '../govwin/api_client.js';
 import { mcpCallTool } from '../../ingest/govtribe/mcp_client.js';
+import { isGovTribeEnabled } from '../../ingest/govtribe/enabled.js';
 import type { GovTribeDetailRecord } from '../../ingest/govtribe/types.js';
 
 const BATCH_SIZE = 50;
@@ -240,7 +241,7 @@ async function applyEnrichment(
   const stillNeedsValue = needsValue && !valueEnriched;
   const stillNeedsDate = needsDate && !dateEnriched;
 
-  if (stillNeedsValue || stillNeedsDate) {
+  if (isGovTribeEnabled() && (stillNeedsValue || stillNeedsDate)) {
     const govtribeResult = await enrichFromGovTribe(row, report);
     if (govtribeResult) {
       if (stillNeedsValue && govtribeResult.value != null) {
@@ -336,7 +337,11 @@ export async function runValueDateEnrichment(): Promise<EnrichmentReport> {
 
     // Respect rate limits between batches
     if (batchRes.rows.length === BATCH_SIZE) {
-      await delay(Math.max(GOVWIN_BATCH_DELAY_MS, GOVTRIBE_BATCH_DELAY_MS));
+      await delay(
+        isGovTribeEnabled()
+          ? Math.max(GOVWIN_BATCH_DELAY_MS, GOVTRIBE_BATCH_DELAY_MS)
+          : GOVWIN_BATCH_DELAY_MS,
+      );
     }
   }
 

@@ -3,8 +3,7 @@
  * framework entries for contacts/vehicles/budget.
  *
  * Uses MCP over Streamable HTTP (https://govtribe.com/mcp).
- * Gated behind ENABLE_GOVTRIBE_INGEST env flag (default: true when
- * GOVTRIBE_API_KEY is set).
+ * Gated behind GOVTRIBE_ENABLED (default false).
  */
 
 import { registerAdapter } from '../adapter/registry.js';
@@ -16,8 +15,11 @@ import {
   runGovTribeVehiclesIngest,
   runGovTribeBudgetRollup,
 } from './job.js';
+import { isGovTribeEnabled } from './enabled.js';
 
 export function registerGovTribeSource(): void {
+  if (!isGovTribeEnabled()) return;
+
   registerAdapter(
     new GovTribeSolicitationAdapter(),
     'GovTribe Opportunities',

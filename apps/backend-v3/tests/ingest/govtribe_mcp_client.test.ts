@@ -14,19 +14,23 @@ const mockListTools = vi.fn();
 const mockCallTool = vi.fn();
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
-  Client: vi.fn().mockImplementation(() => ({
-    connect: mockConnect,
-    close: mockClose,
-    listTools: mockListTools,
-    callTool: mockCallTool,
-  })),
+  Client: vi.fn(function MockClient() {
+    return {
+      connect: mockConnect,
+      close: mockClose,
+      listTools: mockListTools,
+      callTool: mockCallTool,
+    };
+  }),
 }));
 
 vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
-  StreamableHTTPClientTransport: vi.fn().mockImplementation(() => ({
-    onclose: null,
-    onerror: null,
-  })),
+  StreamableHTTPClientTransport: vi.fn(function MockTransport() {
+    return {
+      onclose: null,
+      onerror: null,
+    };
+  }),
 }));
 
 const mockPoolQuery = vi.fn();
@@ -46,9 +50,13 @@ vi.mock('../../src/lib/logger.js', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env['GOVTRIBE_ENABLED'] = 'true';
 
   // Default: budget at 0% with room to call
   mockPoolQuery.mockImplementation((sql: string) => {
+    if (typeof sql === 'string' && sql.includes('SUM(cost_credits)')) {
+      return { rows: [{ spent_today: 0 }] };
+    }
     if (typeof sql === 'string' && sql.includes('govtribe_credit_monthly')) {
       if (sql.includes('INSERT')) {
         return { rows: [{ month: '2026-06', credits_used: 0, credits_budget: 1200, pct: 0, last_call_at: null }] };
@@ -86,6 +94,7 @@ import {
   listTools,
   mcpCallTool,
   checkGovTribeMcpReachable,
+  getCreditBudgetStatus,
   purgeExpiredCache,
   resetCycleCredits,
 } from '../../src/ingest/govtribe/mcp_client.js';
@@ -112,6 +121,16 @@ describe('GovTribe MCP Client', () => {
       expect(mockCallTool).not.toHaveBeenCalled();
     });
 
+    it('returns disabled budget status without a database query', async () => {
+      process.env['GOVTRIBE_ENABLED'] = 'false';
+
+      const result = await getCreditBudgetStatus();
+
+      expect(result.credits_used).toBe(0);
+      expect(result.pct).toBe(0);
+      expect(mockPoolQuery).not.toHaveBeenCalled();
+    });
+
     it('dry-run lists ≥5 tools without burning credits', async () => {
       mockListTools.mockResolvedValue({
         tools: Array.from({ length: 10 }, (_, i) => ({
@@ -132,6 +151,22 @@ describe('GovTribe MCP Client', () => {
   });
 
   describe('mcpCallTool', () => {
+    it('does not access the database or MCP when disabled', async () => {
+      process.env['GOVTRIBE_ENABLED'] = 'false';
+
+      const result = await mcpCallTool(
+        'Search_Federal_Contract_Opportunities',
+        { query: 'test' },
+        'test-disabled',
+      );
+
+      expect(result.decision).toBe('disabled');
+      expect(result.credits_used).toBe(0);
+      expect(mockPoolQuery).not.toHaveBeenCalled();
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(mockCallTool).not.toHaveBeenCalled();
+    });
+
     it('should call tool and return parsed data on success', async () => {
       resetCycleCredits();
       mockCallTool.mockResolvedValue({
@@ -167,13 +202,16 @@ describe('GovTribe MCP Client', () => {
       expect(ledgerInserts[0][1]).toContain('called');
     });
 
-    it('should skip with skipped_halted when budget ≥ 95%', async () => {
+    it('should skip with skipped_halted when the monthly budget is exhausted', async () => {
       resetCycleCredits();
       mockPoolQuery.mockImplementation((sql: string) => {
         if (typeof sql === 'string' && sql.includes('govtribe_credit_monthly') && sql.includes('INSERT')) {
-          return { rows: [{ month: '2026-06', credits_used: 1140, credits_budget: 1200, pct: 95, last_call_at: null }] };
+          return { rows: [{ month: '2026-06', credits_used: 1200, credits_budget: 1200, pct: 100, last_call_at: null }] };
         }
         if (typeof sql === 'string' && sql.includes('govtribe_credit_ledger')) {
+          if (sql.includes('SUM(cost_credits)')) {
+            return { rows: [{ spent_today: 0 }] };
+          }
           return { rows: [], rowCount: 1 };
         }
         if (typeof sql === 'string' && sql.includes('govtribe_cache') && sql.includes('SELECT')) {
@@ -193,13 +231,16 @@ describe('GovTribe MCP Client', () => {
       expect(mockCallTool).not.toHaveBeenCalled();
     });
 
-    it('should skip with skipped_low_budget when budget ≥ 80%', async () => {
+    it('should skip with skipped_halted when the daily allowance is exhausted', async () => {
       resetCycleCredits();
       mockPoolQuery.mockImplementation((sql: string) => {
         if (typeof sql === 'string' && sql.includes('govtribe_credit_monthly') && sql.includes('INSERT')) {
           return { rows: [{ month: '2026-06', credits_used: 960, credits_budget: 1200, pct: 80, last_call_at: null }] };
         }
         if (typeof sql === 'string' && sql.includes('govtribe_credit_ledger')) {
+          if (sql.includes('SUM(cost_credits)')) {
+            return { rows: [{ spent_today: 100 }] };
+          }
           return { rows: [], rowCount: 1 };
         }
         if (typeof sql === 'string' && sql.includes('govtribe_cache') && sql.includes('SELECT')) {
@@ -214,7 +255,7 @@ describe('GovTribe MCP Client', () => {
         'test-003',
       );
 
-      expect(result.decision).toBe('skipped_low_budget');
+      expect(result.decision).toBe('skipped_halted');
       expect(result.credits_used).toBe(0);
     });
 
