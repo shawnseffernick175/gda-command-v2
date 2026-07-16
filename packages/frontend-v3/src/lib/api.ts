@@ -86,13 +86,19 @@ async function tryRefresh(): Promise<boolean> {
 
 /**
  * Attempt to restore the session from the httpOnly refresh cookie.
- * Called once on app boot (before any other API call).
+ * Called once on app boot (before any other authed data/SSE request) and
+ * awaited so `accessToken` is populated BEFORE the opportunities/analysis
+ * hooks fire — otherwise the first analysis SSE goes out with no Authorization
+ * header and 401s, blanking the Opportunities view (#1123).
  * Returns the new access token on success, null if no valid session.
  */
-export async function bootRefresh(): Promise<string | null> {
+export async function restoreSession(): Promise<string | null> {
   const ok = await tryRefresh();
   return ok ? accessToken : null;
 }
+
+/** @deprecated use restoreSession — kept as an alias for existing callers. */
+export const bootRefresh = restoreSession;
 
 async function apiFetch<T>(
   path: string,
@@ -230,10 +236,16 @@ function parseSSEResponse<T>(raw: string, status: number): T {
  *
  * The opportunity Decision Brief streams (`/v3/opportunities/:id/analysis`)
  * must go through here so a stale/expired access token is silently refreshed
- * and the request retried once — instead of surfacing a hard 401 that blanks
- * the Opportunities view. On a genuine auth failure (refresh also fails) this
- * clears the token, redirects to /login, and throws ApiError("UNAUTHORIZED"),
- * matching apiFetch's behaviour so the whole page never renders blank.
+ * and the request retried — instead of surfacing a hard 401 that blanks the
+ * Opportunities view (#1123):
+ *  1. If there is no in-memory `accessToken` yet (fresh page load / expired
+ *     token), refresh FIRST so the stream request never goes out unauthed.
+ *  2. If the request still 401s, refresh + retry once (second layer).
+ *
+ * On a genuine auth failure (refresh also fails) this throws
+ * ApiError("UNAUTHORIZED") but does NOT redirect: the analysis hooks render an
+ * inline "unavailable" state so the list + detail always render. A truly dead
+ * session is caught by apiFetch (list/detail), which handles the /login redirect.
  *
  * Kept here so this file remains the only networking layer in the frontend.
  */
@@ -252,15 +264,22 @@ export async function sseFetch(
 
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
 
+  // Layer 1: no token yet — refresh before the first request so the SSE is
+  // authenticated on a fresh load instead of 401ing with a null token.
+  if (!accessToken) {
+    await tryRefresh();
+  }
+
   let res = await fetch(url, { ...init, headers: buildHeaders() });
 
+  // Layer 2: token was stale/expired — refresh and retry once.
   if (res.status === 401) {
     const refreshed = await tryRefresh();
     if (refreshed) {
       res = await fetch(url, { ...init, headers: buildHeaders() });
     } else {
-      accessToken = null;
-      redirectToLogin();
+      // Do NOT redirect here — that blanks the whole Opportunities view. Throw
+      // so the analysis hook can render an inline "unavailable" state instead.
       throw new ApiError("UNAUTHORIZED", "Session expired", 401);
     }
   }

@@ -2,9 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { sseFetch, setToken, ApiError } from "@/lib/api";
 
 /**
- * #1118 — the opportunity Decision Brief SSE stream must silently refresh a
- * stale access token and retry once (mirroring apiFetch), and on a genuine
- * auth failure redirect to /login instead of blanking the Opportunities view.
+ * #1123 — the opportunity Decision Brief SSE stream must:
+ *  - refresh BEFORE the first request when there is no in-memory token
+ *    (fresh load / expired token) so it never goes out unauthed,
+ *  - refresh + retry once on a 401 (stale token), and
+ *  - on a genuine auth failure throw UNAUTHORIZED WITHOUT redirecting, so the
+ *    analysis hook renders an inline "unavailable" state and the list + detail
+ *    still render (the full /login redirect is owned by apiFetch).
  */
 
 function sseResponse(status = 200): Response {
@@ -85,7 +89,31 @@ describe("sseFetch", () => {
     expect(retryHeaders.Authorization).toBe("Bearer fresh-token");
   });
 
-  it("redirects to /login and throws when refresh also fails", async () => {
+  it("refreshes FIRST when there is no in-memory token (fresh load)", async () => {
+    setToken(null);
+    fetchSpy = vi.fn(async (url: string) => {
+      if (url.includes("/v3/auth/refresh")) return refreshOk();
+      return sseResponse(200);
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const res = await sseFetch("/v3/opportunities/1/analysis");
+
+    expect(res.ok).toBe(true);
+    // The refresh must precede the analysis request.
+    const order = fetchSpy.mock.calls.map((c) => String(c[0]));
+    const refreshIdx = order.findIndex((u) => u.includes("/v3/auth/refresh"));
+    const analysisIdx = order.findIndex((u) => u.includes("/analysis"));
+    expect(refreshIdx).toBeGreaterThanOrEqual(0);
+    expect(refreshIdx).toBeLessThan(analysisIdx);
+    // The analysis request carries the freshly refreshed token, not null.
+    const analysisHeaders = fetchSpy.mock.calls
+      .filter((c) => String(c[0]).includes("/analysis"))
+      .at(-1)![1].headers as Record<string, string>;
+    expect(analysisHeaders.Authorization).toBe("Bearer fresh-token");
+  });
+
+  it("throws UNAUTHORIZED WITHOUT redirecting when refresh also fails", async () => {
     fetchSpy = vi.fn(async (url: string) => {
       if (url.includes("/v3/auth/refresh")) return new Response("no", { status: 401 });
       return sseResponse(401);
@@ -96,6 +124,7 @@ describe("sseFetch", () => {
       name: "ApiError",
       status: 401,
     } satisfies Partial<ApiError>);
-    expect(window.location.href).toBe("/login");
+    // Must NOT redirect — that would blank the whole Opportunities view (#1123).
+    expect(window.location.href).toBe("");
   });
 });

@@ -243,10 +243,11 @@ export function useOpportunityAnalysis(opportunityId: string | undefined): UseOp
         setIsDone(true);
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
-        // A hard 401 (refresh failed) already redirected to /login — surface a
-        // calm session message rather than a raw error, and never blank the view.
+        // A hard auth failure (refresh also failed) must NOT blank the view.
+        // Render an inline "unavailable" state; the list + detail still render,
+        // and a truly dead session is redirected by the list/detail apiFetch.
         if (err instanceof ApiError && err.status === 401) {
-          setError("Session expired — redirecting to sign in");
+          setError("Analysis unavailable — please reload or re-login");
           setIsStreaming(false);
           return;
         }
