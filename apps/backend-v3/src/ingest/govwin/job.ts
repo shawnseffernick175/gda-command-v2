@@ -19,8 +19,8 @@ import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import {
   discoverRecentOpportunitiesWithDetailApi,
   logQuotaStatus,
-  getDailyCallCount,
-  getDailyLimit,
+  getCallsThisHour,
+  getHourlyLimit,
   type GovWinApiOpportunity,
 } from '../../services/govwin/api_client.js';
 import { classifyGovWinStage } from './adapter.js';
@@ -44,6 +44,8 @@ async function upsertGovWinCache(opp: GovWinApiOpportunity): Promise<void> {
     postedAt: opp.postedAt,
     description: opp.description?.slice(0, 5000) ?? null,
     sourceUri: opp.sourceUri,
+    // Persist updateDate so subsequent runs can skip unchanged opportunities.
+    updateDate: opp.updateDate ?? null,
   };
 
   await pool.query(
@@ -239,12 +241,16 @@ export async function runGovWinIngest(): Promise<IngestResult> {
 
   let opps: GovWinApiOpportunity[];
   let detailFetches = 0;
-  let detailCapSkipped = 0;
+  let subEndpointCalls = 0;
+  let skippedUnchanged = 0;
+  let skippedIrrelevant = 0;
   try {
     const discovery = await discoverRecentOpportunitiesWithDetailApi();
     opps = discovery.opportunities;
     detailFetches = discovery.detailFetches;
-    detailCapSkipped = discovery.detailCapSkipped;
+    subEndpointCalls = discovery.subEndpointCalls;
+    skippedUnchanged = discovery.skippedUnchanged;
+    skippedIrrelevant = discovery.skippedIrrelevant;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ error: message }, 'govwin_api_discovery_failed');
@@ -260,7 +266,7 @@ export async function runGovWinIngest(): Promise<IngestResult> {
   }
 
   logger.info(
-    { count: opps.length, detailFetches, detailCapSkipped },
+    { count: opps.length, detailFetches, subEndpointCalls, skippedUnchanged, skippedIrrelevant },
     'govwin_ingest_discovered',
   );
 
@@ -304,9 +310,11 @@ export async function runGovWinIngest(): Promise<IngestResult> {
       updated,
       skipped,
       detailFetches,
-      detailCapSkipped,
-      dailyUsed: getDailyCallCount(),
-      dailyLimit: getDailyLimit(),
+      subEndpointCalls,
+      skippedUnchanged,
+      skippedIrrelevant,
+      callsThisHour: getCallsThisHour(),
+      hourlyLimit: getHourlyLimit(),
     },
     'govwin_ingest_complete',
   );

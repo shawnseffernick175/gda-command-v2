@@ -9,12 +9,10 @@ vi.mock('../../src/services/govwin/cas_client.js', () => ({
   discoverRecentOpportunitiesApiCas: vi.fn(),
   fetchOpportunityByIdApiCas: vi.fn(),
   fetchOpportunityDetailHtmlCas: vi.fn(),
-  searchBySolicitationNumberCas: vi.fn(),
-  searchByTitleAgencyCas: vi.fn(),
 }));
 
 vi.mock('../../src/lib/db.js', () => ({
-  pool: { query: vi.fn() },
+  pool: { query: vi.fn().mockResolvedValue({ rows: [] }) },
 }));
 
 vi.mock('../../src/lib/logger.js', () => ({
@@ -28,116 +26,126 @@ function jsonResponse(body: unknown): Response {
   });
 }
 
-describe('discoverRecentOpportunitiesWithDetailApi (#1134)', () => {
+/** Deltek V3-shaped opportunity summary in an Envision-relevant NAICS. */
+function deltekSummary(id: string, overrides: Record<string, unknown> = {}) {
+  const base = `https://services.govwin.com/neo-ws/opportunities/${id}`;
+  return {
+    id,
+    iqOppId: `IQ-${id}`,
+    title: `Opportunity ${id}`,
+    status: 'Pre-RFP',
+    oppValue: '$5,000,000',
+    primaryNAICS: { id: '541512', title: 'Computer Systems Design', sizeStandard: '$34M' },
+    solicitationNumber: `SOL-${id}`,
+    // Far in the future so the deadline gate does not auto-pass.
+    solicitationDate: { value: '2099-01-01T00:00:00Z' },
+    updateDate: '2026-07-10T00:00:00Z',
+    createdDate: '2026-06-01T00:00:00Z',
+    govEntity: { id: 'A', title: 'Department of the Army' },
+    links: {
+      companies: { href: `${base}/companies` },
+      contracts: { href: `${base}/contracts` },
+      contacts: { href: `${base}/contacts` },
+    },
+    ...overrides,
+  };
+}
+
+describe('discoverRecentOpportunitiesWithDetailApi — Deltek V3 sub-endpoint enrichment', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env['GOVWIN_AUTH_MODE'] = 'oauth2';
-    process.env['GOVWIN_DAILY_LIMIT'] = '200';
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env['GOVWIN_AUTH_MODE'];
-    delete process.env['GOVWIN_DAILY_LIMIT'];
+    delete process.env['GOVWIN_HOURLY_LIMIT'];
   });
 
-  it('calls the detail endpoint for every discovered opportunity and merges enrichment', async () => {
-    const listBody = {
-      opportunities: [
-        { id: 'GW-1', title: 'Opp One', agency: 'DOD' },
-        { id: 'GW-2', title: 'Opp Two', agency: 'DHS' },
+  it('pulls incumbent from /companies and competitors from the other companies', async () => {
+    const list = { opportunities: [deltekSummary('GW-1')] };
+    const companies = {
+      companies: [
+        { companyName: 'Acme Federal LLC', role: 'Incumbent' },
+        { companyName: 'Booz Allen', role: 'Competitor' },
+        { companyName: 'Leidos', relationship: 'tracking' },
       ],
     };
-    const detailById: Record<string, unknown> = {
-      'GW-1': {
-        id: 'GW-1',
-        title: 'Opp One',
-        status: 'pre-rfp',
-        incumbent: 'Acme Federal LLC',
-        competitors: ['Booz Allen', 'Leidos'],
-        value_min: 1_000_000,
-        value_max: 5_000_000,
-      },
-      'GW-2': {
-        id: 'GW-2',
-        title: 'Opp Two',
-        status: 'active',
-        incumbent: 'Globex Corp',
-        competitors: ['SAIC'],
-        value_min: 250_000,
-        value_max: 750_000,
-      },
-    };
 
-    const detailUrls: string[] = [];
+    const calledPaths: string[] = [];
     const mockFetch = vi.fn((url: string) => {
-      const detailMatch = /\/opportunities\/(GW-\d+)$/.exec(url);
-      if (detailMatch) {
-        detailUrls.push(url);
-        return Promise.resolve(jsonResponse(detailById[detailMatch[1]!]));
-      }
-      return Promise.resolve(jsonResponse(listBody));
+      calledPaths.push(url);
+      if (/\/opportunities\/GW-1\/companies/.test(url)) return Promise.resolve(jsonResponse(companies));
+      if (/\/opportunities\/GW-1\/contracts/.test(url)) return Promise.resolve(jsonResponse({ contracts: [] }));
+      if (/\/opportunities\/GW-1$/.test(url)) return Promise.resolve(jsonResponse(deltekSummary('GW-1')));
+      return Promise.resolve(jsonResponse(list));
     });
     vi.stubGlobal('fetch', mockFetch);
 
     const { discoverRecentOpportunitiesWithDetailApi } = await import(
       '../../src/services/govwin/api_client.js'
     );
-
     const result = await discoverRecentOpportunitiesWithDetailApi();
 
-    // Detail endpoint hit once per discovered opportunity.
-    expect(detailUrls).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('/opportunities/GW-1'),
-        expect.stringContaining('/opportunities/GW-2'),
-      ]),
-    );
-    expect(result.detailFetches).toBe(2);
-    expect(result.detailCapSkipped).toBe(0);
+    // The companies sub-endpoint was called (incumbent is NOT on the opp object).
+    expect(calledPaths.some((p) => /\/opportunities\/GW-1\/companies/.test(p))).toBe(true);
 
     const gw1 = result.opportunities.find((o) => o.govwinId === 'GW-1')!;
     expect(gw1.incumbent).toBe('Acme Federal LLC');
     expect(gw1.competitors).toEqual(['Booz Allen', 'Leidos']);
-    expect(gw1.valueMin).toBe(1_000_000);
+    // oppValue string parsed to numeric dollars, raw preserved.
+    expect(gw1.valueMin).toBe(5_000_000);
     expect(gw1.valueMax).toBe(5_000_000);
-    expect(gw1.status).toBe('pre-rfp');
-
-    const gw2 = result.opportunities.find((o) => o.govwinId === 'GW-2')!;
-    expect(gw2.incumbent).toBe('Globex Corp');
-    expect(gw2.status).toBe('active');
+    expect(gw1.valueRaw).toBe('$5,000,000');
+    expect(gw1.agency).toBe('Department of the Army');
+    expect(gw1.naics).toBe('541512');
+    expect(result.detailFetches).toBe(1);
   });
 
-  it('stops calling the detail endpoint once the daily cap is reached', async () => {
-    process.env['GOVWIN_DAILY_LIMIT'] = '1';
-
-    const listBody = {
-      opportunities: [
-        { id: 'GW-1', title: 'Opp One' },
-        { id: 'GW-2', title: 'Opp Two' },
-      ],
-    };
-
-    const detailUrls: string[] = [];
+  it('falls back to /contracts for the incumbent when /companies is empty', async () => {
+    const list = { opportunities: [deltekSummary('GW-2')] };
     const mockFetch = vi.fn((url: string) => {
-      if (/\/opportunities\/GW-\d+$/.test(url)) {
-        detailUrls.push(url);
-        return Promise.resolve(jsonResponse({ id: 'GW-1', title: 'Opp One', incumbent: 'Acme' }));
+      if (/\/opportunities\/GW-2\/companies/.test(url)) return Promise.resolve(jsonResponse({ companies: [] }));
+      if (/\/opportunities\/GW-2\/contracts/.test(url)) {
+        return Promise.resolve(jsonResponse({ contracts: [{ primeContractor: 'Globex Corp' }] }));
       }
-      return Promise.resolve(jsonResponse(listBody));
+      if (/\/opportunities\/GW-2$/.test(url)) return Promise.resolve(jsonResponse(deltekSummary('GW-2')));
+      return Promise.resolve(jsonResponse(list));
     });
     vi.stubGlobal('fetch', mockFetch);
 
     const { discoverRecentOpportunitiesWithDetailApi } = await import(
       '../../src/services/govwin/api_client.js'
     );
-
     const result = await discoverRecentOpportunitiesWithDetailApi();
 
-    // Cap is 1 and the list call consumes it, so no detail fetch succeeds and
-    // the run does not throw — records are returned summary-only.
+    const gw2 = result.opportunities.find((o) => o.govwinId === 'GW-2')!;
+    expect(gw2.incumbent).toBe('Globex Corp');
+  });
+
+  it('skips sub-endpoint calls for off-profile opportunities (DLA-parts noise)', async () => {
+    const offProfile = deltekSummary('GW-3', {
+      title: '53--GASKET,DOOR',
+      primaryNAICS: { id: '332999', title: 'Fabricated Metal' },
+    });
+    const list = { opportunities: [offProfile] };
+    const calledPaths: string[] = [];
+    const mockFetch = vi.fn((url: string) => {
+      calledPaths.push(url);
+      if (/\/opportunities\/GW-3$/.test(url)) return Promise.resolve(jsonResponse(offProfile));
+      return Promise.resolve(jsonResponse(list));
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { discoverRecentOpportunitiesWithDetailApi } = await import(
+      '../../src/services/govwin/api_client.js'
+    );
+    const result = await discoverRecentOpportunitiesWithDetailApi();
+
+    // No companies/contracts calls for an off-profile NAICS.
+    expect(calledPaths.some((p) => /\/companies|\/contracts/.test(p))).toBe(false);
+    expect(result.skippedIrrelevant).toBe(1);
     expect(result.detailFetches).toBe(0);
-    expect(result.detailCapSkipped).toBe(2);
-    expect(result.opportunities).toHaveLength(2);
   });
 });

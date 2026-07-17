@@ -2,14 +2,22 @@
  * GovWin IQ data client — the single import surface used by ingest,
  * adapters, enrichment and routes.
  *
+ * OAuth2 path targets Deltek's GovWin Web Services API V3 (`/neo-ws`). The
+ * field mapping follows the Deltek WSAPI V3 Quick Reference (March 2025): the
+ * opportunity object exposes `id`, `iqOppId`, `title`, `status`, `oppValue`
+ * (a String), `primaryNAICS`, `solicitationDate`, `updateDate`, `govEntity`,
+ * etc. Incumbent / competitors are NOT fields on the opportunity object — they
+ * are fetched from the `/opportunities/{id}/companies` and
+ * `/opportunities/{id}/contracts` sub-endpoints, linked via `links.*.href`.
+ *
+ * Rate limit: the WSAPI cap is 4,000 calls/HOUR org-wide (rolling 60-min
+ * window), NOT 200/day. This client enforces a configurable hourly ceiling
+ * (GOVWIN_HOURLY_LIMIT, default 3500) and backs off on 429 (honouring
+ * Retry-After) instead of aborting a run.
+ *
  * P0 (#1099): dispatches on GOVWIN_AUTH_MODE (default 'cas'). In CAS mode the
  * calls delegate to `cas_client.ts` (JSESSIONID session cookie against the NEO
- * portal). In 'oauth2' mode they use the official OAuth2 Web Services API at
- * services.govwin.com/neo-ws. The OAuth2 tier is not provisioned for this
- * account, so 'cas' is the default; flip GOVWIN_AUTH_MODE=oauth2 if it ever is.
- *
- * The OAuth2 path enforces a configurable daily download cap
- * (GOVWIN_DAILY_LIMIT) and backs off cleanly on 429.
+ * portal). In 'oauth2' mode they use the official V3 Web Services API.
  */
 
 import { getAccessToken, invalidateOAuth2Token } from './oauth2_auth.js';
@@ -18,19 +26,31 @@ import {
   discoverRecentOpportunitiesApiCas,
   fetchOpportunityByIdApiCas,
   fetchOpportunityDetailHtmlCas,
-  searchBySolicitationNumberCas,
-  searchByTitleAgencyCas,
 } from './cas_client.js';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
+import { evaluateRelevance } from '../../constants/relevance.js';
 
 const API_BASE = process.env['GOVWIN_API_BASE'] ?? 'https://services.govwin.com/neo-ws';
-const DAILY_LIMIT = parseInt(process.env['GOVWIN_DAILY_LIMIT'] ?? '200', 10);
-const BACKOFF_429_MS = 60_000; // 1 min backoff on 429
-/** Bounded concurrency for per-opportunity detail fetches (#1134). */
+/** WSAPI org-wide rolling hourly cap. Default 3,500 (safety margin under 4,000). */
+const HOURLY_LIMIT = parseInt(process.env['GOVWIN_HOURLY_LIMIT'] ?? '3500', 10);
+const HOUR_MS = 3_600_000;
+const DEFAULT_BACKOFF_MS = 60_000;
+/** Max attempts for a single request before surfacing the rate-limit error. */
+const MAX_RATE_LIMIT_RETRIES = 3;
+/** WSAPI search rejects max > 100. */
+const MAX_SEARCH_PAGE = 100;
+/** Bounded concurrency for per-opportunity enrichment fetches. */
 const DETAIL_CONCURRENCY = 4;
 
-/** Re-export the GovWinOpportunity shape unchanged so job.ts keeps working. */
+/** Links to the opportunity sub-endpoints (companies/contracts/contacts). */
+export interface GovWinOppLinks {
+  companies: string | null;
+  contracts: string | null;
+  contacts: string | null;
+}
+
+/** The GovWinOpportunity shape consumed by job.ts, adapters and enrichment. */
 export interface GovWinApiOpportunity {
   govwinId: string;
   title: string;
@@ -44,51 +64,80 @@ export interface GovWinApiOpportunity {
   competitors: string[];
   valueMin: number | null;
   valueMax: number | null;
+  /** Raw `oppValue` string as returned by GovWin (may be a range or text). */
+  valueRaw?: string | null;
   responseDueAt: string | null;
   postedAt: string | null;
   description: string | null;
   sourceUri: string;
+  /** ISO `updateDate` — used to skip re-enriching unchanged opportunities. */
+  updateDate?: string | null;
+  createdDate?: string | null;
+  links?: GovWinOppLinks;
 }
 
-/* ── Daily quota tracking ────────────────────────────────────────── */
+/* ── Hourly rolling rate limiter ─────────────────────────────────── */
 
-let dailyCallCount = 0;
-let dailyCountDate = '';
+/** Timestamps (ms) of API calls made in the current rolling hour. */
+let callTimestamps: number[] = [];
 
-function resetDailyCountIfNeeded(): void {
-  const today = new Date().toISOString().slice(0, 10);
-  if (today !== dailyCountDate) {
-    dailyCallCount = 0;
-    dailyCountDate = today;
-  }
+function pruneOldCalls(now = Date.now()): void {
+  const cutoff = now - HOUR_MS;
+  callTimestamps = callTimestamps.filter((t) => t > cutoff);
 }
 
-function isDailyLimitReached(): boolean {
-  resetDailyCountIfNeeded();
-  return dailyCallCount >= DAILY_LIMIT;
+export function getCallsThisHour(): number {
+  pruneOldCalls();
+  return callTimestamps.length;
 }
 
-function incrementDailyCount(): void {
-  resetDailyCountIfNeeded();
-  dailyCallCount++;
+export function getHourlyLimit(): number {
+  return HOURLY_LIMIT;
 }
 
-export function getDailyCallCount(): number {
-  resetDailyCountIfNeeded();
-  return dailyCallCount;
+function isHourlyLimitReached(): boolean {
+  return getCallsThisHour() >= HOURLY_LIMIT;
 }
 
-export function getDailyLimit(): number {
-  return DAILY_LIMIT;
+/** Milliseconds until the oldest in-window call ages out, freeing a slot. */
+function msUntilSlotFree(now = Date.now()): number {
+  pruneOldCalls(now);
+  if (callTimestamps.length < HOURLY_LIMIT) return 0;
+  const oldest = callTimestamps[0]!;
+  return Math.max(0, oldest + HOUR_MS - now);
 }
 
-/* ── HTTP helpers ────────────────────────────────────────────────── */
+/** Test-only: reset the in-memory rate-limiter window. */
+export function __resetRateLimiterForTest(): void {
+  callTimestamps = [];
+}
 
-async function apiGet<T>(path: string): Promise<T> {
-  if (isDailyLimitReached()) {
-    throw new Error(
-      `GovWin daily limit reached (${DAILY_LIMIT}). Skipping API call.`,
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Parse a Retry-After header (seconds or HTTP-date) into milliseconds. */
+function parseRetryAfterMs(header: string | null): number | null {
+  if (!header) return null;
+  const secs = Number(header);
+  if (Number.isFinite(secs)) return Math.max(0, secs * 1000);
+  const date = Date.parse(header);
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  return null;
+}
+
+/* ── HTTP helper ─────────────────────────────────────────────────── */
+
+async function apiGet<T>(path: string, attempt = 0): Promise<T> {
+  // Proactive hourly limiter: wait for a slot rather than aborting the run.
+  if (isHourlyLimitReached()) {
+    const waitMs = Math.min(msUntilSlotFree(), DEFAULT_BACKOFF_MS);
+    logger.warn(
+      { path, callsThisHour: getCallsThisHour(), hourlyLimit: HOURLY_LIMIT, waitMs },
+      'govwin_hourly_limit_reached',
     );
+    await delay(waitMs);
+    pruneOldCalls();
   }
 
   const token = await getAccessToken();
@@ -101,13 +150,20 @@ async function apiGet<T>(path: string): Promise<T> {
     },
   });
 
+  // Every request counts against the org-wide rolling limit.
+  callTimestamps.push(Date.now());
+
   if (res.status === 429) {
+    const retryAfterMs = parseRetryAfterMs(res.headers.get('retry-after'));
     logger.warn(
-      { path, dailyCount: dailyCallCount, dailyLimit: DAILY_LIMIT },
+      { path, attempt, retryAfterMs, callsThisHour: getCallsThisHour(), hourlyLimit: HOURLY_LIMIT },
       'govwin_api_rate_limited',
     );
-    await new Promise((r) => setTimeout(r, BACKOFF_429_MS));
-    throw new Error('GovWin API rate limited (429). Backing off.');
+    if (attempt >= MAX_RATE_LIMIT_RETRIES) {
+      throw new Error('GovWin API rate limited (429): retries exhausted.');
+    }
+    await delay(retryAfterMs ?? DEFAULT_BACKOFF_MS);
+    return apiGet<T>(path, attempt + 1);
   }
 
   if (res.status === 401) {
@@ -115,76 +171,263 @@ async function apiGet<T>(path: string): Promise<T> {
     throw new Error('GovWin API unauthorized (401). Token invalidated.');
   }
 
+  if (res.status === 422) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`GovWin API 422 (malformed request) for ${path}: ${text.slice(0, 200)}`);
+  }
+
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`GovWin API error: ${res.status} ${text.slice(0, 200)}`);
   }
 
-  incrementDailyCount();
   return (await res.json()) as T;
 }
 
-/* ── Typed API calls ─────────────────────────────────────────────── */
+/* ── Deltek V3 opportunity shapes ────────────────────────────────── */
+
+interface DeltekNaics {
+  id?: string;
+  title?: string;
+  sizeStandard?: string;
+}
+
+interface DeltekTitled {
+  title?: string;
+}
+
+interface DeltekDateValue {
+  value?: string;
+}
+
+interface DeltekLink {
+  href?: string;
+}
+
+interface GovWinRawOpp {
+  id?: string;
+  iqOppId?: string;
+  title?: string;
+  status?: string;
+  oppValue?: string | number;
+  primaryNAICS?: DeltekNaics;
+  additionalNaics?: DeltekNaics[];
+  competitionTypes?: DeltekTitled[];
+  contractTypes?: DeltekTitled[];
+  typeOfAward?: string;
+  solicitationDate?: DeltekDateValue;
+  solicitationNumber?: string;
+  sourceURL?: string;
+  updateDate?: string;
+  createdDate?: string;
+  description?: string;
+  govEntity?: { id?: string; title?: string };
+  priority?: string;
+  primaryRequirement?: string;
+  links?: {
+    companies?: DeltekLink;
+    contracts?: DeltekLink;
+    contacts?: DeltekLink;
+  };
+}
 
 interface GovWinSearchResult {
   opportunities?: GovWinRawOpp[];
   results?: GovWinRawOpp[];
   data?: GovWinRawOpp[];
-  total?: number;
-  page?: number;
-  per_page?: number;
+  meta?: { paging?: { totalCount?: number } };
 }
 
-interface GovWinRawOpp {
-  id?: string;
-  govwin_id?: string;
-  title?: string;
-  agency?: string;
-  agency_name?: string;
-  sub_agency?: string;
-  solicitation_number?: string;
-  status?: string;
-  state?: string;
-  naics?: string;
-  naics_code?: string;
-  set_aside?: string;
-  set_aside_type?: string;
-  incumbent?: string;
-  incumbent_name?: string;
-  competitors?: string[];
-  competitor_names?: string[];
-  value_min?: number;
-  value_max?: number;
-  estimated_value_low?: number;
-  estimated_value_high?: number;
-  response_due_date?: string;
-  due_date?: string;
-  posted_date?: string;
-  description?: string;
-  url?: string;
-  source_url?: string;
+/**
+ * Parse the `oppValue` String into numeric dollar amounts. GovWin returns it as
+ * text — a single value ("$5,000,000"), a range ("$1M - $5M"), a shorthand
+ * ("2.5M") or non-numeric text ("Undisclosed"). Returns dollars (matching the
+ * value_min/value_max columns) plus the raw string for provenance.
+ */
+export function parseOppValue(raw: string | number | null | undefined): {
+  valueMin: number | null;
+  valueMax: number | null;
+  valueRaw: string | null;
+} {
+  if (raw === null || raw === undefined) return { valueMin: null, valueMax: null, valueRaw: null };
+  const valueRaw = String(raw).trim();
+  if (!valueRaw) return { valueMin: null, valueMax: null, valueRaw: null };
+
+  const tokenRe = /(\d[\d,]*(?:\.\d+)?)\s*([kmb])?/gi;
+  const nums: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = tokenRe.exec(valueRaw)) !== null) {
+    const base = parseFloat(m[1]!.replace(/,/g, ''));
+    if (Number.isNaN(base)) continue;
+    const suffix = (m[2] ?? '').toLowerCase();
+    const mult = suffix === 'k' ? 1e3 : suffix === 'm' ? 1e6 : suffix === 'b' ? 1e9 : 1;
+    nums.push(Math.round(base * mult));
+  }
+
+  if (nums.length === 0) return { valueMin: null, valueMax: null, valueRaw };
+  if (nums.length === 1) return { valueMin: nums[0]!, valueMax: nums[0]!, valueRaw };
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  return { valueMin: min, valueMax: max, valueRaw };
+}
+
+function firstTitle(items: DeltekTitled[] | undefined): string | null {
+  if (!items?.length) return null;
+  for (const it of items) {
+    const t = it.title?.trim();
+    if (t) return t;
+  }
+  return null;
 }
 
 function mapRawToOpp(raw: GovWinRawOpp): GovWinApiOpportunity {
-  const govwinId = raw.id ?? raw.govwin_id ?? '';
+  const govwinId = (raw.id ?? raw.iqOppId ?? '').trim();
+  const { valueMin, valueMax, valueRaw } = parseOppValue(raw.oppValue);
+  const naics = raw.primaryNAICS?.id?.trim() || null;
+  const solDate = raw.solicitationDate?.value?.trim() || null;
+
   return {
     govwinId,
-    title: raw.title ?? 'Untitled GovWin Opportunity',
-    agency: raw.agency ?? raw.agency_name ?? null,
-    subAgency: raw.sub_agency ?? null,
-    solicitationNumber: raw.solicitation_number ?? null,
-    status: raw.status ?? raw.state ?? null,
-    naics: raw.naics ?? raw.naics_code ?? null,
-    setAside: raw.set_aside ?? raw.set_aside_type ?? null,
-    incumbent: raw.incumbent ?? raw.incumbent_name ?? null,
-    competitors: raw.competitors ?? raw.competitor_names ?? [],
-    valueMin: raw.value_min ?? raw.estimated_value_low ?? null,
-    valueMax: raw.value_max ?? raw.estimated_value_high ?? null,
-    responseDueAt: raw.response_due_date ?? raw.due_date ?? null,
-    postedAt: raw.posted_date ?? null,
-    description: raw.description ?? null,
-    sourceUri: raw.url ?? raw.source_url ?? `https://iq.govwin.com/neo/opportunity/view/${govwinId}`,
+    title: raw.title?.trim() || 'Untitled GovWin Opportunity',
+    agency: raw.govEntity?.title?.trim() || null,
+    subAgency: null,
+    solicitationNumber: raw.solicitationNumber?.trim() || null,
+    status: raw.status?.trim() || null,
+    naics,
+    setAside: firstTitle(raw.competitionTypes),
+    // Incumbent/competitors are not on the opportunity object; the sub-endpoint
+    // fetch fills these in.
+    incumbent: null,
+    competitors: [],
+    valueMin,
+    valueMax,
+    valueRaw,
+    responseDueAt: solDate,
+    postedAt: raw.createdDate?.trim() || solDate,
+    description: raw.description?.trim() || null,
+    sourceUri:
+      raw.sourceURL?.trim() ||
+      `https://iq.govwin.com/neo/opportunity/view/${govwinId}`,
+    updateDate: raw.updateDate?.trim() || null,
+    createdDate: raw.createdDate?.trim() || null,
+    links: {
+      companies: raw.links?.companies?.href?.trim() || null,
+      contracts: raw.links?.contracts?.href?.trim() || null,
+      contacts: raw.links?.contacts?.href?.trim() || null,
+    },
   };
+}
+
+/* ── Sub-endpoint shapes (companies / contracts) ─────────────────── */
+
+interface DeltekCompany {
+  companyName?: string;
+  name?: string;
+  title?: string;
+  role?: string;
+  relationship?: string;
+  relationshipType?: string;
+  isIncumbent?: boolean;
+}
+
+interface DeltekCompaniesResponse {
+  companies?: DeltekCompany[];
+  relatedCompanies?: DeltekCompany[];
+  data?: DeltekCompany[];
+  results?: DeltekCompany[];
+}
+
+interface DeltekContract {
+  primeContractor?: string;
+  contractor?: string;
+  vendorName?: string;
+  awardee?: string;
+  companyName?: string;
+  isIncumbent?: boolean;
+}
+
+interface DeltekContractsResponse {
+  contracts?: DeltekContract[];
+  data?: DeltekContract[];
+  results?: DeltekContract[];
+}
+
+export interface GovWinRelatedCompanies {
+  incumbent: string | null;
+  competitors: string[];
+}
+
+function companyName(c: DeltekCompany): string | null {
+  return (c.companyName ?? c.name ?? c.title ?? '').trim() || null;
+}
+
+function isIncumbentCompany(c: DeltekCompany): boolean {
+  if (c.isIncumbent === true) return true;
+  const role = `${c.role ?? ''} ${c.relationship ?? ''} ${c.relationshipType ?? ''}`.toLowerCase();
+  return role.includes('incumbent');
+}
+
+/** Convert a link href (absolute or relative) into a path under API_BASE. */
+function hrefToPath(href: string): string {
+  try {
+    const u = new URL(href);
+    const marker = '/neo-ws';
+    const idx = u.pathname.indexOf(marker);
+    const path = idx >= 0 ? u.pathname.slice(idx + marker.length) : u.pathname;
+    return `${path}${u.search}`;
+  } catch {
+    return href.startsWith('/') ? href : `/${href}`;
+  }
+}
+
+/**
+ * Fetch related companies for an opportunity and classify them into the
+ * incumbent (role/relationship = incumbent) and other competitors.
+ */
+export async function fetchOpportunityCompanies(
+  govwinId: string,
+  href?: string | null,
+): Promise<GovWinRelatedCompanies> {
+  const path = href
+    ? hrefToPath(href)
+    : `/opportunities/${encodeURIComponent(govwinId)}/companies`;
+  const data = await apiGet<DeltekCompaniesResponse>(path);
+  const list = data.companies ?? data.relatedCompanies ?? data.data ?? data.results ?? [];
+
+  let incumbent: string | null = null;
+  const competitors: string[] = [];
+  for (const c of list) {
+    const name = companyName(c);
+    if (!name) continue;
+    if (!incumbent && isIncumbentCompany(c)) {
+      incumbent = name;
+    } else {
+      competitors.push(name);
+    }
+  }
+  return { incumbent, competitors };
+}
+
+/**
+ * Fetch contract history for an opportunity. Used as a fallback source for the
+ * incumbent when the companies sub-endpoint is empty.
+ */
+export async function fetchOpportunityContracts(
+  govwinId: string,
+  href?: string | null,
+): Promise<{ incumbent: string | null }> {
+  const path = href
+    ? hrefToPath(href)
+    : `/opportunities/${encodeURIComponent(govwinId)}/contracts`;
+  const data = await apiGet<DeltekContractsResponse>(path);
+  const list = data.contracts ?? data.data ?? data.results ?? [];
+
+  for (const c of list) {
+    if (c.isIncumbent === false) continue;
+    const name = (c.primeContractor ?? c.contractor ?? c.vendorName ?? c.awardee ?? c.companyName ?? '').trim();
+    if (name) return { incumbent: name };
+  }
+  return { incumbent: null };
 }
 
 /**
@@ -196,8 +439,10 @@ export async function discoverRecentOpportunitiesApi(
   if (isCasMode()) {
     return discoverRecentOpportunitiesApiCas(maxResults);
   }
+  // WSAPI rejects max > 100; clamp defensively.
+  const max = Math.min(maxResults, MAX_SEARCH_PAGE);
   const data = await apiGet<GovWinSearchResult>(
-    `/opportunities?sort=updatedDate&order=desc&max=${maxResults}&oppSelectionDateFrom=-30D`,
+    `/opportunities?sort=updateDate&order=desc&max=${max}&oppSelectionDateFrom=-30D`,
   );
 
   const rawItems = data.opportunities ?? data.results ?? data.data ?? [];
@@ -205,7 +450,7 @@ export async function discoverRecentOpportunitiesApi(
 }
 
 /**
- * Fetch a single opportunity by GovWin ID.
+ * Fetch a single opportunity by GovWin ID (full opportunity object incl. links).
  */
 export async function fetchOpportunityByIdApi(
   govwinId: string,
@@ -216,7 +461,7 @@ export async function fetchOpportunityByIdApi(
     return fetchOpportunityDetailHtmlCas(govwinId);
   }
   try {
-    const raw = await apiGet<GovWinRawOpp>(`/opportunities/${govwinId}`);
+    const raw = await apiGet<GovWinRawOpp>(`/opportunities/${encodeURIComponent(govwinId)}`);
     return mapRawToOpp(raw);
   } catch (err) {
     logger.warn(
@@ -227,11 +472,7 @@ export async function fetchOpportunityByIdApi(
   }
 }
 
-/**
- * Alias for the per-opportunity detail endpoint (`/opportunities/${govwinId}`).
- * The list/summary endpoint omits incumbent, competitors, value and full
- * status — those only come from this detail call (#1134).
- */
+/** Alias for the per-opportunity detail endpoint. */
 export const fetchOpportunityDetail = fetchOpportunityByIdApi;
 
 /**
@@ -256,27 +497,116 @@ export function mergeDetailIntoSummary(
     competitors: detail.competitors.length > 0 ? detail.competitors : summary.competitors,
     valueMin: detail.valueMin ?? summary.valueMin,
     valueMax: detail.valueMax ?? summary.valueMax,
+    valueRaw: detail.valueRaw ?? summary.valueRaw,
     responseDueAt: detail.responseDueAt ?? summary.responseDueAt,
     postedAt: detail.postedAt ?? summary.postedAt,
     description: detail.description ?? summary.description,
+    updateDate: detail.updateDate ?? summary.updateDate,
+    createdDate: detail.createdDate ?? summary.createdDate,
+    links: detail.links ?? summary.links,
   };
 }
 
 export interface DiscoverWithDetailResult {
   opportunities: GovWinApiOpportunity[];
-  /** Number of detail-endpoint fetches actually performed this run. */
+  /** Number of opportunities enriched via sub-endpoint fetches this run. */
   detailFetches: number;
-  /** Opportunities left summary-only because the daily cap was reached. */
-  detailCapSkipped: number;
+  /** Total WSAPI calls issued for detail + sub-endpoints this run. */
+  subEndpointCalls: number;
+  /** Opportunities skipped because their updateDate was unchanged. */
+  skippedUnchanged: number;
+  /** Opportunities skipped because they are off-profile or auto-passed. */
+  skippedIrrelevant: number;
+}
+
+/** Load the last-seen updateDate per govwinId from the cache. */
+async function loadStoredUpdateDates(ids: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const filtered = ids.filter((id) => id);
+  if (filtered.length === 0) return map;
+  try {
+    const { rows } = await pool.query<{ govwin_id: string; update_date: string | null }>(
+      `SELECT govwin_id, raw_payload->>'updateDate' AS update_date
+         FROM govwin_cache
+        WHERE endpoint = 'opportunities' AND govwin_id = ANY($1::text[])`,
+      [filtered],
+    );
+    for (const r of rows) {
+      if (r.update_date) map.set(r.govwin_id, r.update_date);
+    }
+  } catch (err) {
+    logger.warn(
+      { error: err instanceof Error ? err.message : String(err) },
+      'govwin_update_date_lookup_failed',
+    );
+  }
+  return map;
 }
 
 /**
- * Discover recent opportunities and enrich each with its detail payload
- * (incumbent, competitors, value, full status) via the per-opportunity
- * detail endpoint, using bounded concurrency and respecting the daily cap.
+ * Enrich a single relevant opportunity with incumbent + competitors from the
+ * companies sub-endpoint, falling back to the contracts sub-endpoint for the
+ * incumbent. Returns the merged record and the number of WSAPI calls made.
+ */
+async function enrichOneOpportunity(
+  summary: GovWinApiOpportunity,
+  detail: GovWinApiOpportunity | null,
+): Promise<{ opp: GovWinApiOpportunity; calls: number }> {
+  const merged = mergeDetailIntoSummary(summary, detail);
+  let calls = 0;
+
+  let incumbent: string | null = null;
+  let competitors: string[] = [];
+
+  try {
+    const companies = await fetchOpportunityCompanies(merged.govwinId, merged.links?.companies);
+    calls += 1;
+    incumbent = companies.incumbent;
+    competitors = companies.competitors;
+  } catch (err) {
+    logger.warn(
+      { govwinId: merged.govwinId, error: err instanceof Error ? err.message : String(err) },
+      'govwin_companies_fetch_error',
+    );
+  }
+
+  if (!incumbent) {
+    try {
+      const contracts = await fetchOpportunityContracts(merged.govwinId, merged.links?.contracts);
+      calls += 1;
+      incumbent = contracts.incumbent;
+    } catch (err) {
+      logger.warn(
+        { govwinId: merged.govwinId, error: err instanceof Error ? err.message : String(err) },
+        'govwin_contracts_fetch_error',
+      );
+    }
+  }
+
+  return {
+    opp: {
+      ...merged,
+      incumbent: incumbent ?? merged.incumbent,
+      competitors: competitors.length > 0 ? competitors : merged.competitors,
+    },
+    calls,
+  };
+}
+
+/**
+ * Discover recent opportunities and enrich each relevant, changed one with its
+ * incumbent + competitors from the companies/contracts sub-endpoints.
  *
- * In CAS mode the discovery path already fetches per-opportunity detail, so
- * the summaries are returned unchanged (no extra calls).
+ * Cost control:
+ *  - opportunities whose `updateDate` is unchanged since our last pull are
+ *    skipped entirely (no detail, no sub-endpoint calls);
+ *  - opportunities that fail relevance or are auto-passed (non-primeable
+ *    set-asides, off-profile NAICS, imminent/past deadlines) get no
+ *    sub-endpoint calls;
+ *  - the rest cost ~2-3 WSAPI calls each (detail + companies [+ contracts]).
+ *
+ * In CAS mode the discovery path already fetches per-opportunity detail, so the
+ * summaries are returned unchanged (no extra calls).
  */
 export async function discoverRecentOpportunitiesWithDetailApi(
   maxResults = 50,
@@ -284,12 +614,22 @@ export async function discoverRecentOpportunitiesWithDetailApi(
   const summaries = await discoverRecentOpportunitiesApi(maxResults);
 
   if (isCasMode()) {
-    return { opportunities: summaries, detailFetches: 0, detailCapSkipped: 0 };
+    return {
+      opportunities: summaries,
+      detailFetches: 0,
+      subEndpointCalls: 0,
+      skippedUnchanged: 0,
+      skippedIrrelevant: 0,
+    };
   }
+
+  const storedDates = await loadStoredUpdateDates(summaries.map((s) => s.govwinId));
 
   const enriched: GovWinApiOpportunity[] = new Array(summaries.length);
   let detailFetches = 0;
-  let detailCapSkipped = 0;
+  let subEndpointCalls = 0;
+  let skippedUnchanged = 0;
+  let skippedIrrelevant = 0;
   let cursor = 0;
 
   async function worker(): Promise<void> {
@@ -299,17 +639,37 @@ export async function discoverRecentOpportunitiesWithDetailApi(
       if (idx >= summaries.length) return;
 
       const summary = summaries[idx]!;
-      // Respect the OAuth2 daily download cap: once hit, keep the summary
-      // record rather than erroring the whole run.
-      if (isDailyLimitReached()) {
+
+      // Skip opportunities we have already enriched and that have not changed.
+      const prev = storedDates.get(summary.govwinId);
+      if (prev && summary.updateDate && prev === summary.updateDate) {
         enriched[idx] = summary;
-        detailCapSkipped += 1;
+        skippedUnchanged += 1;
         continue;
       }
 
       const detail = await fetchOpportunityDetail(summary.govwinId);
-      if (detail) detailFetches += 1;
-      enriched[idx] = mergeDetailIntoSummary(summary, detail);
+      if (detail) subEndpointCalls += 1;
+      const merged = mergeDetailIntoSummary(summary, detail);
+
+      // Relevance gate: never spend sub-endpoint calls on off-profile or
+      // auto-passed opportunities (DLA commodity parts, non-primeable
+      // set-asides, imminent deadlines).
+      const relevance = evaluateRelevance({
+        naics: merged.naics,
+        set_aside: merged.setAside,
+        response_due_at: merged.responseDueAt,
+      });
+      if (!relevance.relevant || relevance.auto_pass) {
+        enriched[idx] = merged;
+        skippedIrrelevant += 1;
+        continue;
+      }
+
+      const { opp, calls } = await enrichOneOpportunity(summary, detail);
+      subEndpointCalls += calls;
+      detailFetches += 1;
+      enriched[idx] = opp;
     }
   }
 
@@ -320,80 +680,28 @@ export async function discoverRecentOpportunitiesWithDetailApi(
     {
       discovered: summaries.length,
       detailFetches,
-      detailCapSkipped,
-      dailyUsed: getDailyCallCount(),
-      dailyLimit: DAILY_LIMIT,
+      subEndpointCalls,
+      skippedUnchanged,
+      skippedIrrelevant,
+      callsThisHour: getCallsThisHour(),
+      hourlyLimit: HOURLY_LIMIT,
     },
     'govwin_detail_enrichment_complete',
   );
 
-  return { opportunities: enriched, detailFetches, detailCapSkipped };
+  return { opportunities: enriched, detailFetches, subEndpointCalls, skippedUnchanged, skippedIrrelevant };
 }
 
 /**
- * Search for an opportunity by solicitation number.
- * Returns the first match or null.
- */
-export async function searchBySolicitationNumber(
-  solNumber: string,
-): Promise<GovWinApiOpportunity | null> {
-  if (isCasMode()) {
-    return searchBySolicitationNumberCas(solNumber);
-  }
-  try {
-    const data = await apiGet<GovWinSearchResult>(
-      `/opportunities?solicitationNumber=${encodeURIComponent(solNumber)}&max=5`,
-    );
-    const rawItems = data.opportunities ?? data.results ?? data.data ?? [];
-    if (rawItems.length === 0) return null;
-    return mapRawToOpp(rawItems[0]!);
-  } catch (err) {
-    logger.warn(
-      { solNumber, error: err instanceof Error ? err.message : String(err) },
-      'govwin_api_search_sol_error',
-    );
-    return null;
-  }
-}
-
-/**
- * Search for an opportunity by title + agency fuzzy match.
- * Returns the first match or null.
- */
-export async function searchByTitleAgency(
-  title: string,
-  agency: string | null,
-): Promise<GovWinApiOpportunity | null> {
-  if (isCasMode()) {
-    return searchByTitleAgencyCas(title, agency);
-  }
-  try {
-    const q = agency ? `${title} ${agency}` : title;
-    const data = await apiGet<GovWinSearchResult>(
-      `/opportunities?q=${encodeURIComponent(q.slice(0, 200))}&max=5`,
-    );
-    const rawItems = data.opportunities ?? data.results ?? data.data ?? [];
-    if (rawItems.length === 0) return null;
-    return mapRawToOpp(rawItems[0]!);
-  } catch (err) {
-    logger.warn(
-      { title, agency, error: err instanceof Error ? err.message : String(err) },
-      'govwin_api_search_title_error',
-    );
-    return null;
-  }
-}
-
-/**
- * Log remaining daily quota for observability.
+ * Log remaining hourly quota for observability.
  */
 export function logQuotaStatus(): void {
-  resetDailyCountIfNeeded();
+  const used = getCallsThisHour();
   logger.info(
     {
-      dailyUsed: dailyCallCount,
-      dailyLimit: DAILY_LIMIT,
-      remaining: Math.max(0, DAILY_LIMIT - dailyCallCount),
+      callsThisHour: used,
+      hourlyLimit: HOURLY_LIMIT,
+      remaining: Math.max(0, HOURLY_LIMIT - used),
     },
     'govwin_api_quota_status',
   );
