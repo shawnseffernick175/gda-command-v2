@@ -45,7 +45,6 @@ import { runAutoPassDeadline } from './auto-pass-deadline.js';
 import { runLaunchpadPreWarmCron } from './launchpad-pre-warm.js';
 import { runIntakeAssessment } from '../services/assessment/index.js';
 import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
-import { runValueDateEnrichment } from '../services/enrichment/value-date.js';
 import { pool } from '../lib/db.js';
 import { isResearchFeedsEnabled } from '../ingest/framework/research-feeds.js';
 
@@ -361,26 +360,6 @@ export function startCronScheduler(): void {
   tasks.push(autoPassDeadlineTask);
   logger.info({ schedule: '0 7 * * *' }, '[cron] registered: auto-pass-deadline (0 7 * * *)');
 
-  // Value & Due Date enrichment — nightly at 07:30 UTC (after auto-pass-deadline)
-  const valueDateEnrichTask = cron.schedule('30 7 * * *', async () => {
-    try {
-      logger.info('[cron] value-date-enrichment starting');
-      const result = await runValueDateEnrichment();
-      logger.info(
-        {
-          govwin_value: result.enriched_value_govwin,
-          govwin_date: result.enriched_date_govwin,
-          still_null_value: result.still_null_value,
-          still_null_date: result.still_null_date,
-        },
-        '[cron] value-date-enrichment completed',
-      );
-    } catch (err) {
-      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_value_date_enrichment_error');
-    }
-  });
-  tasks.push(valueDateEnrichTask);
-  logger.info({ schedule: '30 7 * * *' }, '[cron] registered: value-date-enrichment (30 7 * * *)');
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {
       logger.warn({ sourceKey: job.sourceKey }, 'cron_source_not_found');

@@ -227,46 +227,6 @@ export async function fetchOpportunityByIdApiCas(
   }
 }
 
-export async function searchBySolicitationNumberCas(
-  solNumber: string,
-): Promise<GovWinApiOpportunity | null> {
-  try {
-    const qs = new URLSearchParams({ solicitationNumber: solNumber, max: '5' });
-    const data = await casGetJson<GovWinSearchResult | GovWinRawOpp[]>(
-      `${OPP_SEARCH_PATH}?${qs.toString()}`,
-    );
-    const items = extractItems(data);
-    return items.length > 0 ? mapRawToOpp(items[0]!) : null;
-  } catch (err) {
-    logger.warn(
-      { solNumber, error: err instanceof Error ? err.message : String(err) },
-      'govwin_cas_search_sol_error',
-    );
-    return null;
-  }
-}
-
-export async function searchByTitleAgencyCas(
-  title: string,
-  agency: string | null,
-): Promise<GovWinApiOpportunity | null> {
-  try {
-    const q = agency ? `${title} ${agency}` : title;
-    const qs = new URLSearchParams({ q: q.slice(0, 200), max: '5' });
-    const data = await casGetJson<GovWinSearchResult | GovWinRawOpp[]>(
-      `${OPP_SEARCH_PATH}?${qs.toString()}`,
-    );
-    const items = extractItems(data);
-    return items.length > 0 ? mapRawToOpp(items[0]!) : null;
-  } catch (err) {
-    logger.warn(
-      { title, agency, error: err instanceof Error ? err.message : String(err) },
-      'govwin_cas_search_title_error',
-    );
-    return null;
-  }
-}
-
 /**
  * HTML fallback: fetch an opportunity detail page and parse it with cheerio.
  * Used when the JSON detail endpoint is unavailable but the session can still

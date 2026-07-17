@@ -51,34 +51,22 @@ describe('GovWin CAS client URL construction', () => {
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ opportunities: [] }))
-      .mockResolvedValueOnce(jsonResponse({ id: 'GW-1', title: 'Detail' }))
-      .mockResolvedValueOnce(jsonResponse({ opportunities: [] }))
-      .mockResolvedValueOnce(jsonResponse({ opportunities: [] }));
+      .mockResolvedValueOnce(jsonResponse({ id: 'GW-1', title: 'Detail' }));
     vi.stubGlobal('fetch', mockFetch);
 
     const {
       discoverRecentOpportunitiesApiCas,
       fetchOpportunityByIdApiCas,
-      searchBySolicitationNumberCas,
-      searchByTitleAgencyCas,
     } = await import('../../src/services/govwin/cas_client.js');
 
     await discoverRecentOpportunitiesApiCas(50);
     await fetchOpportunityByIdApiCas('GW-1');
-    await searchBySolicitationNumberCas('W15QKN-26-R-0001');
-    await searchByTitleAgencyCas('Logistics Support', 'Department of the Army');
 
     const urls = mockFetch.mock.calls.map(([url]) => String(url));
     expect(urls[0]).toBe(
       'https://iq.govwin.com/neo/rest/opportunities?sort=updatedDate&order=desc&max=50&oppSelectionDateFrom=-30D',
     );
     expect(urls[1]).toBe('https://iq.govwin.com/neo/rest/opportunities/GW-1');
-    expect(urls[2]).toBe(
-      'https://iq.govwin.com/neo/rest/opportunities?solicitationNumber=W15QKN-26-R-0001&max=5',
-    );
-    expect(urls[3]).toBe(
-      'https://iq.govwin.com/neo/rest/opportunities?q=Logistics+Support+Department+of+the+Army&max=5',
-    );
   });
 
   it('rejects a non-absolute configured base before fetching', async () => {

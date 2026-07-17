@@ -61,17 +61,46 @@ async function fetchGovWinRecords(_opts: FetchOpts): Promise<RawRecord[]> {
   return opps as unknown as RawRecord[];
 }
 
-export const FORECAST_STATUSES = new Set(['pre-rfp', 'forecast', 'planning', 'draft rfp']);
+export const FORECAST_STATUSES = new Set([
+  'pre-rfp',
+  'pre rfp',
+  'forecast',
+  'planning',
+  'draft rfp',
+]);
+
+export const SOLICITATION_STATUSES = new Set([
+  'source sought',
+  'sources sought',
+  'pre-solicitation',
+  'pre solicitation',
+  'solicitation',
+  'post-rfp',
+  'post rfp',
+]);
+
+export const AWARDED_STATUSES = new Set(['awarded', 'award', 'post-award', 'post award']);
 
 /**
- * Classify a GovWin status into a lifecycle stage. Forecast/pre-RFP statuses
- * map to 'forecast'; everything else (active solicitations) to 'solicitation'.
+ * Classify a Deltek GovWin V3 `status` into our lifecycle stage.
+ *
+ *   Pre-RFP / Forecast / Planning / Draft RFP        → 'forecast'
+ *   Source Sought / Pre-Solicitation / Solicitation
+ *     / Post-RFP                                     → 'solicitation'
+ *   Awarded                                          → 'awarded'
+ *
+ * A real GovWin status is always mapped to a concrete lifecycle stage (never
+ * left as the generic 'discovery' pipeline placeholder). Unknown/other active
+ * statuses default to 'solicitation'.
  */
 export function classifyGovWinStage(
   status: string | null | undefined,
-): 'forecast' | 'solicitation' {
+): 'forecast' | 'solicitation' | 'awarded' {
   const s = (status ?? '').toLowerCase().trim();
-  return FORECAST_STATUSES.has(s) ? 'forecast' : 'solicitation';
+  if (AWARDED_STATUSES.has(s)) return 'awarded';
+  if (FORECAST_STATUSES.has(s)) return 'forecast';
+  if (SOLICITATION_STATUSES.has(s)) return 'solicitation';
+  return 'solicitation';
 }
 
 export class GovWinForecastAdapter implements ForecastAdapter {
