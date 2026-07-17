@@ -197,6 +197,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // exposed so the Financials tab can label the series and visually separate the
   // quarter total from its months.
   app.get('/v3/financials/trend', async (req, reply) => {
+    // Trend rule: quarter rows (period LIKE '%Q%') are recomputed aggregates and
+    // always kept; monthly rows must carry a real sales/ebit/gross-margin signal,
+    // so an orders-only period (the June phantom bug) is excluded from the series.
     // IS#2: DISTINCT ON dedup — income_statement > l1_actual per period.
     // IS#3: Normalize gross-margin units (l1_actual stores fraction, IS stores %).
     const { rows } = await pool.query(
@@ -210,10 +213,6 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
               actual_ros AS ros
        FROM financial_actuals
        WHERE source IN ('income_statement', 'l1_actual')
-         -- Never emit a monthly P&L row for a period with no ingested actuals.
-         -- Quarter rows (period LIKE '%Q%') are recomputed aggregates and always
-         -- kept; month rows must carry a real sales/ebit/gross-margin signal so a
-         -- phantom orders-only period (the June bug) does not appear in the trend.
          AND (
            period LIKE '%Q%'
            OR COALESCE(actual_sales, 0) <> 0
