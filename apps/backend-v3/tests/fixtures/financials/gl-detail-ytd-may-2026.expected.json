@@ -1,0 +1,27 @@
+{
+  "file": "gl-detail-ytd-may-2026.extracted.txt",
+  "source_filename": "YTD MAY-2026 GL Detail.xlsx",
+  "note": "Trimmed slice of the real YTD MAY GL Detail (all 5 PDs). Amount read from col len-3; Account Name = col 10; includes ragged comma-shifted rows.",
+  "periods": [
+    "FY26 Jan",
+    "FY26 Feb",
+    "FY26 Mar",
+    "FY26 Apr",
+    "FY26 May"
+  ],
+  "directLaborActualByPeriod": {
+    "FY26 Jan": 1945.77,
+    "FY26 Feb": 7746.14,
+    "FY26 Mar": 6778.47,
+    "FY26 Apr": 3679.49,
+    "FY26 May": 2489.89
+  },
+  "totalActualByPeriod": {
+    "FY26 Jan": 32351.37,
+    "FY26 Feb": 121428.74,
+    "FY26 Mar": 539667.06,
+    "FY26 Apr": 672602.96,
+    "FY26 May": 183069.43
+  },
+  "selectedRowCount": 50
+}

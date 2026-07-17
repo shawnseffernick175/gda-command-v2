@@ -8,6 +8,7 @@ import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
 import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
+import type { IngestionCoverageStatus } from "@/lib/types";
 
 const IC_SORT_COLS: ColumnSortConfig[] = [
   { field: "doc_id", type: "string" },
@@ -15,6 +16,20 @@ const IC_SORT_COLS: ColumnSortConfig[] = [
   { field: "status", type: "string" },
   { field: "total_rows", type: "number" },
 ];
+
+const STATUS_LABEL: Record<IngestionCoverageStatus, string> = {
+  ingested: "Ingested",
+  skipped_duplicate: "Skipped (duplicate)",
+  not_ingested: "Not Ingested",
+  extraction_failed: "Extract Failed",
+};
+
+const STATUS_BADGE: Record<IngestionCoverageStatus, string> = {
+  ingested: "bg-gda-green/15 text-gda-green",
+  skipped_duplicate: "border border-border bg-gda-panel text-muted-foreground",
+  not_ingested: "bg-red-400/15 text-red-400",
+  extraction_failed: "bg-amber-400/15 text-amber-400",
+};
 
 export function IngestionCoverageTab() {
   const { data, isLoading } = useIngestionCoverage();
@@ -24,15 +39,17 @@ export function IngestionCoverageTab() {
   const summary = data?.summary ?? {
     total: 0,
     ingested: 0,
-    no_handler: 0,
+    skipped_duplicate: 0,
+    not_ingested: 0,
     extraction_failed: 0,
+    no_handler: 0,
   };
 
   const itemsWithTotalRows = useMemo(
     () =>
       coverage.map((doc) => ({
         ...doc,
-        total_rows: doc.destinations.reduce((s, d) => s + d.row_count, 0),
+        total_rows: doc.row_count ?? doc.destinations.reduce((s, d) => s + d.row_count, 0),
       })),
     [coverage],
   );
@@ -70,15 +87,20 @@ export function IngestionCoverageTab() {
     values.push(summary.ingested);
     colors.push("var(--color-gda-green)");
   }
-  if (summary.no_handler > 0) {
-    categories.push("No Handler");
-    values.push(summary.no_handler);
-    colors.push("var(--color-fin-amber)");
+  if (summary.skipped_duplicate > 0) {
+    categories.push("Skipped");
+    values.push(summary.skipped_duplicate);
+    colors.push("var(--color-fin-stone)");
+  }
+  if (summary.not_ingested > 0) {
+    categories.push("Not Ingested");
+    values.push(summary.not_ingested);
+    colors.push("var(--color-gda-red)");
   }
   if (summary.extraction_failed > 0) {
     categories.push("Failed");
     values.push(summary.extraction_failed);
-    colors.push("var(--color-gda-red)");
+    colors.push("var(--color-fin-amber)");
   }
 
   const chartOption = {
@@ -106,10 +128,11 @@ export function IngestionCoverageTab() {
   return (
     <div className="space-y-4">
       {/* KPI tiles */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <Kpi label="Total Docs" value={String(summary.total)} />
         <Kpi label="Ingested" value={String(summary.ingested)} subtitle={`${pctIngested}% coverage`} />
-        <Kpi label="No Handler" value={String(summary.no_handler)} />
+        <Kpi label="Skipped (dup)" value={String(summary.skipped_duplicate)} />
+        <Kpi label="Not Ingested" value={String(summary.not_ingested)} />
         <Kpi label="Extraction Failed" value={String(summary.extraction_failed)} />
       </div>
 
@@ -129,7 +152,7 @@ export function IngestionCoverageTab() {
               <SortableHeader label="Doc ID" field="doc_id" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Filename" field="filename" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Destination Tables</th>
+              <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Destination / Reason</th>
               <SortableHeader label="Total Rows" field="total_rows" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
             </tr>
           </thead>
@@ -149,19 +172,10 @@ export function IngestionCoverageTab() {
                   <span
                     className={cn(
                       "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium",
-                      doc.status === "ingested" &&
-                        "bg-gda-green/15 text-gda-green",
-                      doc.status === "no_handler" &&
-                        "bg-amber-400/15 text-amber-400",
-                      doc.status === "extraction_failed" &&
-                        "bg-red-400/15 text-red-400",
+                      STATUS_BADGE[doc.status],
                     )}
                   >
-                    {doc.status === "ingested"
-                      ? "Ingested"
-                      : doc.status === "no_handler"
-                        ? "No Handler"
-                        : "Extract Failed"}
+                    {STATUS_LABEL[doc.status]}
                   </span>
                 </td>
                 <td className="px-3 py-2 text-left text-muted-foreground">
@@ -169,7 +183,7 @@ export function IngestionCoverageTab() {
                     ? doc.destinations
                         .map((d) => `${d.table} (${d.row_count})`)
                         .join(", ")
-                    : "—"}
+                    : doc.reason ?? "—"}
                 </td>
                 <td className="px-3 py-2 text-right text-foreground tabular-nums">
                   {doc.total_rows}

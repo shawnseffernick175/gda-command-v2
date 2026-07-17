@@ -140,8 +140,16 @@ export function rejectReason(raw: FinancialRow, row: FinancialRow): string | nul
   const ros = isFiniteNumber(row.ros) ? row.ros : null;
   const revenueBasis = sales !== null ? sales : totalRevenue;
 
-  // (1) Nothing to store: no revenue/sales AND no EBIT AND no gross margin.
-  if ((revenueBasis === null || revenueBasis === 0) && ebit === null && gm === null) {
+  // (1) Nothing to store: no revenue/sales, no EBIT, and no gross margin. A zero
+  // in these fields is as empty as null. `orders` is intentionally NOT treated as
+  // a P&L signal: an "orders-only" row (e.g. an annual/backlog orders figure that
+  // an extract attributed to a month with no ingested actuals) must never create a
+  // phantom monthly income-statement row. This keeps backlog/orders out of the
+  // monthly P&L orders series and is the root-cause guard for the phantom-June row.
+  const hasRevenue = revenueBasis !== null && revenueBasis !== 0;
+  const hasEbit = ebit !== null && ebit !== 0;
+  const hasGm = gm !== null && gm !== 0;
+  if (!hasRevenue && !hasEbit && !hasGm) {
     return 'no usable signal (no revenue/sales, no ebit, no gross_margin)';
   }
 

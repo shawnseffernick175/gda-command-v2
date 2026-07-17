@@ -19,6 +19,7 @@ import type { TrialBalanceExtractOutput } from '../../lib/llm-router.types.js';
 import type { SieExtractOutput } from '../../lib/llm-router.types.js';
 import type { CostDetailExtractOutput } from '../../lib/llm-router.types.js';
 import type { ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js';
+import type { FinancialStatementExtractOutput } from '../../lib/llm-router.types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -173,7 +174,7 @@ function parseNum(v: string): number {
 }
 
 /** Infer period and fiscal year from filename. */
-function inferPeriod(filename: string): { period: string; fiscal_year: number; quarter: number } | null {
+export function inferPeriod(filename: string): { period: string; fiscal_year: number; quarter: number } | null {
   const months: Record<string, { num: number; label: string }> = {
     jan: { num: 1, label: 'Jan' }, feb: { num: 2, label: 'Feb' }, mar: { num: 3, label: 'Mar' },
     apr: { num: 4, label: 'Apr' }, may: { num: 5, label: 'May' }, jun: { num: 6, label: 'Jun' },
@@ -963,98 +964,214 @@ export function parseYtdGlDetail(
   const colMap = buildColumnMap(lines[effectiveHeaderIdx]);
   const headerCols = splitRow(lines[effectiveHeaderIdx]);
 
-  // Find key column indices
+  // Key column indices, read from the START of the row. In these GL files the
+  // only free-text column that can contain embedded commas is "Name" (~col 14),
+  // which shifts everything AFTER it. FY, PD, Proj Classification, Project ID and
+  // Account Name all sit BEFORE that column, so reading them by index is safe.
   const fyIdx = colMap.get('fy') ?? 0;
   const pdIdx = colMap.get('pd') ?? 1;
   const projClassIdx = colMap.get('proj classification') ?? colMap.get('project classification') ?? 5;
   const projectIdIdx = colMap.get('project id') ?? 6;
 
-  // Find account/amount columns
-  let accountIdx = -1;
-  let amountIdx = -1;
-  for (const [key, idx] of colMap.entries()) {
-    if (key.includes('account') && !key.includes('name') && accountIdx === -1) accountIdx = idx;
-    if ((key.includes('amount') || key.includes('total') || key.includes('debit') || key.includes('credit')) && amountIdx === -1) amountIdx = idx;
+  // Bug 1b: use ACCOUNT NAME (human-readable cost element), not Account ID. The
+  // old detection `includes('account') && !includes('name')` matched Account ID.
+  // Prefer the exact "account name" header; fall back to any account column.
+  let accountIdx = colMap.get('account name') ?? -1;
+  if (accountIdx === -1) {
+    for (const [key, idx] of colMap.entries()) {
+      if (key.includes('account') && key.includes('name')) { accountIdx = idx; break; }
+    }
   }
-  // Fallback: look for numeric columns in the header
-  if (amountIdx === -1) {
-    // Try common positions for amount in GL detail
-    for (let c = headerCols.length - 1; c >= 10; c--) {
-      const h = headerCols[c].toLowerCase();
-      if (h.includes('amount') || h.includes('total') || h.includes('amt')) {
-        amountIdx = c;
-        break;
-      }
+  if (accountIdx === -1) {
+    for (const [key, idx] of colMap.entries()) {
+      if (key.includes('account')) { accountIdx = idx; break; }
     }
   }
 
-  // Determine ingest period number from the period label
-  const monthMap: Record<string, number> = {
-    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-  };
-  const periodMonthMatch = periodInfo.period.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
-  const targetPd = periodMonthMatch ? monthMap[periodMonthMatch[1].toLowerCase()] : null;
+  // Amount is read from the END of each row. It lives past the comma-containing
+  // "Name" column, so a fixed start-index would be wrong on ragged rows. We find
+  // Amount's offset from the end of the HEADER and apply the same offset to each
+  // data row's end — robust to any left-shift caused by embedded commas.
+  let amountIdx = -1;
+  for (const [key, idx] of colMap.entries()) {
+    if (key === 'amount') { amountIdx = idx; break; }
+  }
+  if (amountIdx === -1) {
+    for (const [key, idx] of colMap.entries()) {
+      if (key.includes('amount') || key.includes('amt')) { amountIdx = idx; break; }
+    }
+  }
+  // Distance of Amount from the end of the header row (0 = last column).
+  const amountFromEnd = amountIdx >= 0 ? headerCols.length - 1 - amountIdx : -1;
 
-  // Aggregate by proj_classification (pool) + account (cost_element)
-  const aggregates = new Map<string, { target: number; actual: number }>();
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Bug 1: GL Detail files are YTD-cumulative (every posted period PD1..PDn is
+  // present in one file). Emit rows for EVERY period found, each tagged with its
+  // own period/fiscal_year/quarter derived from the PD column — do NOT collapse
+  // to a single target period.
+  // Aggregate by period (PD) + proj_classification (pool) + account (cost element).
+  const aggregates = new Map<
+    string,
+    { period: string; fiscal_year: number; quarter: number; pool: string; costElement: string; actual: number }
+  >();
 
   for (let i = effectiveHeaderIdx + 1; i < lines.length; i++) {
     const cols = splitRow(lines[i]);
     if (cols.length < 5) continue;
 
-    // Filter by fiscal year if present
-    const fy = cols[fyIdx] || '';
-    if (fy && !/^\d{4}$/.test(fy.trim())) continue;
+    // Filter by fiscal year if present (skip subtotal / label rows).
+    const fyRaw = (cols[fyIdx] || '').trim();
+    if (fyRaw && !/^\d{4}$/.test(fyRaw)) continue;
 
-    // Filter by period if targetPd is set
-    const pd = cols[pdIdx] || '';
-    if (targetPd !== null && pd) {
-      const pdNum = parseInt(pd.trim(), 10);
-      if (!isNaN(pdNum) && pdNum !== targetPd) continue;
-    }
+    const pdRaw = (cols[pdIdx] || '').trim();
+    const pdNum = parseInt(pdRaw, 10);
+    if (isNaN(pdNum) || pdNum < 1 || pdNum > 12) continue;
 
     const projClass = (cols[projClassIdx] || '').trim();
     const projectId = (cols[projectIdIdx] || '').trim();
     const account = accountIdx >= 0 && accountIdx < cols.length ? (cols[accountIdx] || '').trim() : '';
-    const amount = amountIdx >= 0 && amountIdx < cols.length ? parseNum(cols[amountIdx]) : 0;
+
+    // Read Amount from the END of the row using the header-derived offset.
+    let amount = 0;
+    if (amountFromEnd >= 0) {
+      const ai = cols.length - 1 - amountFromEnd;
+      if (ai >= 0 && ai < cols.length) amount = parseNum(cols[ai]);
+    }
 
     if (!projClass && !account && !projectId) continue;
     if (amount === 0) continue;
 
-    // Use proj classification as pool, account (or project ID) as cost element
+    const fyNum = fyRaw ? parseInt(fyRaw, 10) : periodInfo.fiscal_year;
+    const period = `FY${String(fyNum).slice(2)} ${MONTHS[pdNum - 1]}`;
+    const quarter = Math.ceil(pdNum / 3);
+
     const pool = projClass || 'UNCLASSIFIED';
     const costElement = account || projectId || 'UNKNOWN';
-    const key = `${pool}|||${costElement}`;
+    const key = `${period}|||${pool}|||${costElement}`;
 
     const existing = aggregates.get(key);
     if (existing) {
       existing.actual += amount;
     } else {
-      aggregates.set(key, { target: 0, actual: amount });
+      aggregates.set(key, { period, fiscal_year: fyNum, quarter, pool, costElement, actual: amount });
     }
   }
 
   const rows: CostDetailExtractOutput['rows'] = [];
-  for (const [key, values] of aggregates.entries()) {
-    const [pool, costElement] = key.split('|||');
+  for (const v of aggregates.values()) {
     rows.push({
-      period: periodInfo.period,
-      fiscal_year: periodInfo.fiscal_year,
-      quarter: periodInfo.quarter,
-      cost_element: costElement,
-      pool,
-      target_amount: values.target,
-      actual_amount: values.actual,
+      period: v.period,
+      fiscal_year: v.fiscal_year,
+      quarter: v.quarter,
+      cost_element: v.costElement,
+      pool: v.pool,
+      target_amount: 0,
+      actual_amount: v.actual,
     });
   }
 
   if (rows.length === 0) return null;
 
+  const periodsSeen = new Set(rows.map((r) => r.period)).size;
   return {
     is_cost_detail: true,
     rows,
-    notes: `Deterministic parser: extracted ${rows.length} GL detail cost rows (aggregated by classification × account) from ${filename}`,
+    notes: `Deterministic parser: extracted ${rows.length} GL detail cost rows across ${periodsSeen} period(s) (aggregated by period × classification × account) from ${filename}`,
+    model_used: 'deterministic',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Parser: L2 / L1 ACTUAL & TARGET — sheet "DataSetLandTbl" (Bug 2)
+// Company monthly P&L: sums per-project "Period" columns into one company row.
+// ACTUAL -> financial_actuals (source l1_actual); TARGET -> financial_plan
+// (source l1_target), so the KPI/trend variance columns populate.
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse an "L2 - ACTUAL/TARGET" or "L1-ACTUAL/TARGET Proj Revenue Summary" file.
+ *
+ * These live on sheet DataSetLandTbl with 7 positional columns:
+ *   0 Project | 1 Period Cost | 2 Period Profit | 3 Period Revenue |
+ *   4 YTD Cost | 5 YTD Profit | 6 YTD Revenue
+ * The header cells are ExcelJS RichText, so parseXlsx renders them as
+ * "[object Object]" — column labels are unusable and we MUST read by position.
+ *
+ * ACTUAL vs TARGET is taken from the filename (the only reliable signal, since
+ * the header text is lost). We sum the per-project PERIOD (single-month) figures
+ * into one company row for the month inferred from the filename, skipping the
+ * "Grand Total" line so the total is not double-counted.
+ */
+export function parseProjectActualsTargets(
+  extractedText: string,
+  filename: string,
+): FinancialStatementExtractOutput | null {
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['project', 'period', 'revenue'],
+    ['DataSetLandTbl', 'Sheet1', 'Page1'],
+  );
+  if (!lines || lines.length < 2) return null;
+
+  const periodInfo = inferPeriod(filename);
+  if (!periodInfo) {
+    logger.warn({ filename }, 'L2/L1 deterministic: cannot infer period from filename');
+    return null;
+  }
+
+  // ACTUAL vs TARGET from the filename — header labels are lost to RichText.
+  const isTarget = /target/i.test(filename);
+  const kind: 'plan' | 'actual' = isTarget ? 'plan' : 'actual';
+  const source: 'l1_actual' | 'l1_target' = isTarget ? 'l1_target' : 'l1_actual';
+
+  // Header row is the first line mentioning "Project".
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    if (/project/i.test(lines[i])) { headerIdx = i; break; }
+  }
+
+  let sumRevenue = 0;
+  let sumProfit = 0;
+  let count = 0;
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = splitRow(lines[i]);
+    if (cols.length < 4) continue;
+    const label = (cols[0] || '').trim();
+    if (!label) continue;
+    // Skip subtotal / grand-total lines so the company sum is not double-counted.
+    if (/grand\s*total|^total\b|^subtotal\b/i.test(label)) continue;
+
+    const profit = parseNum(cols[2]); // Period Profit
+    const revenue = parseNum(cols[3]); // Period Revenue
+    if (revenue === 0 && profit === 0) continue;
+    sumRevenue += revenue;
+    sumProfit += profit;
+    count += 1;
+  }
+
+  if (count === 0) return null;
+
+  const round2 = (v: number): number => Math.round(v * 100) / 100;
+
+  return {
+    is_financial: true,
+    currency: 'USD',
+    rows: [
+      {
+        period: periodInfo.period,
+        fiscal_year: periodInfo.fiscal_year,
+        quarter: periodInfo.quarter,
+        kind,
+        source,
+        orders: null,
+        sales: round2(sumRevenue),
+        ebit: round2(sumProfit),
+        gross_margin: null,
+        ros: null,
+      },
+    ],
+    notes: `Deterministic parser: aggregated ${count} project rows into one ${kind}/${source} company row for ${periodInfo.period} from ${filename}`,
     model_used: 'deterministic',
   };
 }
