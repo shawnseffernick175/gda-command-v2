@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS gda_opportunity_tracker (
 
 INSERT INTO gda_opportunity_tracker (id, solicitation_number, title, agency, status, value_estimated, naics, source_url, analysis)
 VALUES
-  (1, 'SOL-2026-004', 'USCG Cyber Security Assessment', 'US Coast Guard', 'qualified', 2000000, '541512', 'https://govtribe.com/opp/004', '{"pwin": 65, "pwin_sources": [{"kind": "govtribe", "title": "GovTribe Analysis", "url": "https://govtribe.com/opp/004", "retrieved_at": "2026-03-15T00:00:00Z"}], "incumbent": "Booz Allen", "incumbent_sources": [{"kind": "fpds", "title": "FPDS Award", "url": "https://fpds.gov/004", "retrieved_at": "2026-03-15T00:00:00Z"}], "competitors": [{"name": "Booz Allen", "threat_level": "high"}], "competitors_sources": [{"kind": "govtribe", "title": "GovTribe Competitors", "url": "https://govtribe.com/opp/004/competitors", "retrieved_at": "2026-03-15T00:00:00Z"}]}');
+  (1, 'SOL-2026-004', 'USCG Cyber Security Assessment', 'US Coast Guard', 'qualified', 2000000, '541512', 'https://sam.gov/opp/004', '{"pwin": 65, "pwin_sources": [{"kind": "sam_gov", "title": "SAM.gov Notice", "url": "https://sam.gov/opp/004", "retrieved_at": "2026-03-15T00:00:00Z"}], "incumbent": "Booz Allen", "incumbent_sources": [{"kind": "fpds", "title": "FPDS Award", "url": "https://fpds.gov/004", "retrieved_at": "2026-03-15T00:00:00Z"}], "competitors": [{"name": "Booz Allen", "threat_level": "high"}], "competitors_sources": [{"kind": "usaspending", "title": "USAspending Awards", "url": "https://usaspending.gov/opp/004/competitors", "retrieved_at": "2026-03-15T00:00:00Z"}]}');
 
 -- opportunities (legacy backend table)
 CREATE TABLE IF NOT EXISTS opportunities (
@@ -144,7 +144,7 @@ INSERT INTO source_registry (id, kind, name, base_url, confidence)
 VALUES
   (1, 'sam_gov', 'SAM.gov', 'https://sam.gov', 'high'),
   (2, 'fpds', 'FPDS.gov', 'https://fpds.gov', 'high'),
-  (3, 'govtribe', 'GovTribe', 'https://govtribe.com', 'medium');
+  (3, 'usaspending', 'USAspending.gov', 'https://usaspending.gov', 'medium');
 
 -- gda_teaming_partners
 CREATE TABLE IF NOT EXISTS gda_teaming_partners (

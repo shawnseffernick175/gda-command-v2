@@ -215,7 +215,7 @@ describe('v3_026_unified_opportunities migration', () => {
 
       await pool.query(`
         INSERT INTO unified_opportunity_links (internal_id, source, source_native_id)
-        VALUES ($1, 'govtribe', 'GT-CASCADE')
+        VALUES ($1, 'grants_gov', 'GT-CASCADE')
       `, [oppId]);
       await pool.query(`
         INSERT INTO unified_opportunity_signals (internal_id, signal_type, signal_score)

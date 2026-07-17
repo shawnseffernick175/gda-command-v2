@@ -293,7 +293,7 @@ export async function opportunityAnalysisRoutes(app: FastifyInstance): Promise<v
         const ragResults = await ragSearch({
           query: queryText,
           top_k: 5,
-          doc_type_filter: 'govtribe_award',
+          doc_type_filter: 'awarded_contract',
           min_score: 0.4,
         });
         similarAwards = ragResults.map((r) => ({

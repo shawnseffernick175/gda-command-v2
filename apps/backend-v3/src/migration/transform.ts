@@ -51,7 +51,6 @@ function normalizeSourceKind(raw: string | null | undefined): SourceKind {
   if (lower.includes('fpds')) return 'fpds';
   if (lower.includes('usaspending')) return 'usaspending';
   if (lower.includes('govwin')) return 'govwin';
-  if (lower.includes('govtribe')) return 'govtribe';
   if (lower.includes('n8n') || lower.includes('workflow')) return 'n8n_workflow';
   if (lower.includes('manual')) return 'manual';
   if (lower.includes('news')) return 'news';
@@ -66,7 +65,6 @@ function inferSourceKindFromUrl(url: string | null | undefined): SourceKind {
   if (url.includes('fpds.gov')) return 'fpds';
   if (url.includes('usaspending.gov')) return 'usaspending';
   if (url.includes('govwin')) return 'govwin';
-  if (url.includes('govtribe')) return 'govtribe';
   return 'internal';
 }
 
@@ -74,7 +72,6 @@ function inferDataSource(legacy: LegacyOpportunity): string {
   if (legacy.data_source) {
     const ds = legacy.data_source.toLowerCase();
     if (ds.includes('sam')) return 'sam_gov';
-    if (ds.includes('govtribe')) return 'govtribe';
     if (ds.includes('govwin')) return 'govwin';
     if (ds.includes('n8n')) return 'n8n_workflow';
     if (ds.includes('manual')) return 'manual';

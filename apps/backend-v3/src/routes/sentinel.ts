@@ -4,7 +4,6 @@
  *
  * GET /v3/sentinel/sources           — Legacy per-source health (unchanged)
  * GET /v3/sentinel/handoffs          — Open handoffs (waiting on human)
- * GET /v3/sentinel/credit-pacing/govtribe — GovTribe credit pacing detail
  * GET /v3/sentinel/credit-pacing/govwin   — GovWin API call volume
  * GET /v3/sentinel/recent-wins       — Successful completions last 24h
  * GET /v3/sentinel/upcoming-breaks   — Credentials/secrets/certs about to expire
@@ -15,7 +14,6 @@ import { pool } from '../lib/db.js';
 import { successEnvelope } from '../lib/envelope.js';
 import { getRegisteredSourcesWithLabels } from '../ingest/framework/registry.js';
 import { getIngestStatus } from '../ingest/framework/run_logger.js';
-import { getCreditBudgetStatus, getDailyBudgetStatus } from '../ingest/govtribe/mcp_client.js';
 import { getAuthHealth } from '../services/govwin/auth.js';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
@@ -65,20 +63,6 @@ interface UpcomingBreakCard {
   created_at: string;
 }
 
-interface CreditPacingGovTribe {
-  month: string;
-  credits_used: number;
-  credits_budget: number;
-  pct: number;
-  burn_rate_7d: number;
-  projected_exhaustion_date: string | null;
-  days_remaining_in_month: number;
-  daily_allowance: number;
-  today_spent: number;
-  top_queries: Array<{ tool_name: string; credits: number; call_count: number }>;
-  daily_burn_history: Array<{ date: string; credits: number }>;
-}
-
 interface CreditPacingGovWin {
   month: string;
   calls_mtd: number;
@@ -93,40 +77,10 @@ interface CreditPacingGovWin {
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
 
-function deriveSentinelMessage(
-  sourceKey: string,
-  pct: number,
-  lagSeconds: number | null,
-): string {
-  if (sourceKey !== 'govtribe' && !sourceKey.startsWith('govtribe.')) {
-    if (lagSeconds === null) return 'No data yet';
-    if (lagSeconds > 3600 * 12) return `Stale — last success ${Math.round(lagSeconds / 3600)}h ago`;
-    return `Healthy — last poll ${Math.round(lagSeconds / 60)} min ago`;
-  }
-
-  const lagMsg = lagSeconds !== null
-    ? `Last opps poll ${Math.round(lagSeconds / 60)} min ago.`
-    : 'No polls yet.';
-
-  if (pct >= 95) {
-    return `GovTribe at ${pct}% of 1200/mo budget — STOPPED auto-polling. Only opp detail on user request. ${lagMsg}`;
-  }
-  if (pct >= 80) {
-    const now = new Date();
-    const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
-    return `GovTribe at ${pct}% of 1200/mo budget — ${daysLeft} days left in month. Restricting to on-demand calls only. ${lagMsg}`;
-  }
-  if (pct >= 50) {
-    return `GovTribe at ${pct}% of 1200/mo credit budget — pacing on track. ${lagMsg}`;
-  }
-
-  return `GovTribe at ${pct}% of 1200/mo credit budget. ${lagMsg}`;
-}
-
-function deriveSeverity(pct: number): 'ok' | 'warning' | 'critical' {
-  if (pct >= 95) return 'critical';
-  if (pct >= 80) return 'warning';
-  return 'ok';
+function deriveSentinelMessage(lagSeconds: number | null): string {
+  if (lagSeconds === null) return 'No data yet';
+  if (lagSeconds > 3600 * 12) return `Stale — last success ${Math.round(lagSeconds / 3600)}h ago`;
+  return `Healthy — last poll ${Math.round(lagSeconds / 60)} min ago`;
 }
 
 /* ── Route registration ────────────────────────────────────────────── */
@@ -139,13 +93,6 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
     const ingestStatus = await getIngestStatus();
 
     const ingestMap = new Map(ingestStatus.map((s) => [s.source_key, s]));
-
-    let govtribeBudget = { credits_used: 0, credits_budget: 1200, pct: 0, last_call_at: null as string | null };
-    try {
-      govtribeBudget = await getCreditBudgetStatus();
-    } catch {
-      // Tables may not exist yet
-    }
 
     const { rows: lastErrorRows } = await pool.query(
       `SELECT DISTINCT ON (source_key) source_key, error_text
@@ -174,14 +121,9 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
         status = (lagSeconds !== null && lagSeconds > 3600 * 12) ? 'stale' : 'healthy';
       }
 
-      const isGovTribe = sourceKey === 'govtribe' || sourceKey.startsWith('govtribe.');
-
-      const pct = isGovTribe ? govtribeBudget.pct : 0;
-      const message = isGovTribe
-        ? deriveSentinelMessage(sourceKey, pct, lagSeconds)
-        : recentError
-          ? `Error: ${recentError.slice(0, 100)}`
-          : deriveSentinelMessage(sourceKey, 0, lagSeconds);
+      const message = recentError
+        ? `Error: ${recentError.slice(0, 100)}`
+        : deriveSentinelMessage(lagSeconds);
 
       const entry: SentinelSourceEntry & { label: string } = {
         source_key: sourceKey,
@@ -192,20 +134,8 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
         message,
       };
 
-      if (isGovTribe) {
-        entry.credits = {
-          used: govtribeBudget.credits_used,
-          budget: govtribeBudget.credits_budget,
-          pct: govtribeBudget.pct,
-          last_call_at: govtribeBudget.last_call_at,
-        };
-      }
-
       return entry;
     });
-
-    const govtribeEntry = entries.find((e) => e.source_key === 'govtribe');
-    const severity = govtribeEntry ? deriveSeverity(govtribeBudget.pct) : 'ok';
 
     const CORE_SOURCES = ["sam.gov", "usaspending.gov", "govwin"];
     const coreEntries = entries.filter((e) => CORE_SOURCES.includes(e.source_key));
@@ -218,8 +148,6 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
         {
           overall,
           sources: entries,
-          govtribe_severity: severity,
-          govtribe_credits: govtribeBudget,
         },
         req.requestId,
       ),
@@ -240,91 +168,6 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
     );
 
     return reply.send(successEnvelope({ items: rows, count: rows.length }, req.requestId));
-  });
-
-  /* ── GET /v3/sentinel/credit-pacing/govtribe ──────────────────────── */
-  app.get('/v3/sentinel/credit-pacing/govtribe', async (req, reply) => {
-    let budgetStatus = { month: '', credits_used: 0, credits_budget: 1200, pct: 0, last_call_at: null as string | null };
-    try {
-      budgetStatus = await getCreditBudgetStatus();
-    } catch {
-      // Table not yet created
-    }
-
-    const dailyStatus = await getDailyBudgetStatus(budgetStatus);
-
-    // Burn rate: average daily credits over last 7 days
-    const { rows: burnRows } = await pool.query<{ daily_avg: string }>(
-      `SELECT COALESCE(
-         ROUND(SUM(cost_credits)::numeric / GREATEST(1, COUNT(DISTINCT created_at::date)), 1),
-         0
-       ) AS daily_avg
-       FROM govtribe_credit_ledger
-       WHERE decision = 'called'
-         AND created_at >= NOW() - INTERVAL '7 days'`,
-    );
-    const burnRate7d = parseFloat(burnRows[0]?.daily_avg ?? '0');
-
-    // Projected exhaustion date
-    let projectedExhaustionDate: string | null = null;
-    if (burnRate7d > 0) {
-      const remaining = budgetStatus.credits_budget - budgetStatus.credits_used;
-      const daysUntilExhaustion = Math.ceil(remaining / burnRate7d);
-      const exhaustionDate = new Date();
-      exhaustionDate.setDate(exhaustionDate.getDate() + daysUntilExhaustion);
-      projectedExhaustionDate = exhaustionDate.toISOString().slice(0, 10);
-    }
-
-    // Top consuming queries (by tool_name)
-    const { rows: topQueries } = await pool.query<{ tool_name: string; credits: string; call_count: string }>(
-      `SELECT endpoint AS tool_name,
-              SUM(cost_credits)::text AS credits,
-              COUNT(*)::text AS call_count
-       FROM govtribe_credit_ledger
-       WHERE decision = 'called'
-         AND created_at >= date_trunc('month', NOW())
-       GROUP BY endpoint
-       ORDER BY SUM(cost_credits) DESC
-       LIMIT 5`,
-    );
-
-    // 7-day daily burn history for sparkline
-    const { rows: dailyBurnRows } = await pool.query<{ day: string; credits: string }>(
-      `SELECT created_at::date::text AS day,
-              COALESCE(SUM(cost_credits), 0)::text AS credits
-       FROM govtribe_credit_ledger
-       WHERE decision = 'called'
-         AND created_at >= NOW() - INTERVAL '7 days'
-       GROUP BY created_at::date
-       ORDER BY created_at::date ASC`,
-    );
-
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const daysRemainingInMonth = daysInMonth - now.getDate();
-
-    const result: CreditPacingGovTribe = {
-      month: budgetStatus.month || new Date().toISOString().slice(0, 7),
-      credits_used: budgetStatus.credits_used,
-      credits_budget: budgetStatus.credits_budget,
-      pct: budgetStatus.pct,
-      burn_rate_7d: burnRate7d,
-      projected_exhaustion_date: projectedExhaustionDate,
-      days_remaining_in_month: daysRemainingInMonth,
-      daily_allowance: dailyStatus.dailyAllowance,
-      today_spent: dailyStatus.todaySpent,
-      top_queries: topQueries.map((q) => ({
-        tool_name: q.tool_name,
-        credits: parseInt(q.credits, 10),
-        call_count: parseInt(q.call_count, 10),
-      })),
-      daily_burn_history: dailyBurnRows.map((r) => ({
-        date: r.day,
-        credits: parseFloat(r.credits),
-      })),
-    };
-
-    return reply.send(successEnvelope(result, req.requestId));
   });
 
   /* ── GET /v3/sentinel/credit-pacing/govwin ────────────────────────── */
@@ -438,27 +281,7 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
        LIMIT 20`,
     );
 
-    // Auto-detect: GovTribe credit exhaustion risk
     const autoBreaks: UpcomingBreakCard[] = [];
-    try {
-      const budget = await getCreditBudgetStatus();
-      if (budget.pct >= 80) {
-        const now = new Date();
-        const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
-        autoBreaks.push({
-          id: 'auto-govtribe-credits',
-          title: `GovTribe credits at ${budget.pct}% — ${daysLeft} days remain in billing cycle`,
-          context: `Used ${budget.credits_used} of ${budget.credits_budget} monthly credits. At current pace, credits may run out before month end.`,
-          action_label: 'Top up credits',
-          action_url: 'https://govtribe.com/account/billing',
-          severity: budget.pct >= 95 ? 'critical' : 'warning',
-          due_by: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10),
-          created_at: now.toISOString(),
-        });
-      }
-    } catch {
-      // Ignore
-    }
 
     // Auto-detect: GovWin auth expiry
     try {

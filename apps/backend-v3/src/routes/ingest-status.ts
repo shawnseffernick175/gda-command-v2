@@ -12,8 +12,6 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import { getRegisteredSourcesWithLabels, runIngest, getRegisteredSources } from '../ingest/framework/registry.js';
 import { getIngestInsertStatus } from '../ingest/framework/run_logger.js';
-import { getCreditBudgetStatus } from '../ingest/govtribe/mcp_client.js';
-import { isGovTribeEnabled } from '../ingest/govtribe/enabled.js';
 import { isResearchFeedsEnabled } from '../ingest/framework/research-feeds.js';
 import type { JwtPayload } from '../middleware/auth.js';
 
@@ -29,14 +27,6 @@ const SCHEDULE_MAP: Record<string, { cron: string; intervalHours: number }> = {
         'dod_rss': { cron: '30 22 * * *', intervalHours: 24 },
         'nih': { cron: '0 7 * * 1', intervalHours: 168 },
         'arxiv': { cron: '0 6 * * 1', intervalHours: 168 },
-      }
-    : {}),
-  ...(isGovTribeEnabled()
-    ? {
-        'govtribe': { cron: '0 10 * * 1,4', intervalHours: 84 },
-        'govtribe.contacts': { cron: '0 9 * * 1', intervalHours: 168 },
-        'govtribe.vehicles': { cron: '0 6 1 * *', intervalHours: 720 },
-        'govtribe.budget': { cron: '55 3 * * *', intervalHours: 24 },
       }
     : {}),
   'govwin': { cron: '0 */6 * * *', intervalHours: 6 },
@@ -230,16 +220,6 @@ export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/ingest/status', async (req, reply) => {
     const computed = await computeSources();
 
-    // GovTribe credits
-    let govtribeCredits = { credits_used: 0, credits_budget: 1200, pct: 0, last_call_at: null as string | null };
-    if (isGovTribeEnabled()) {
-      try {
-        govtribeCredits = await getCreditBudgetStatus();
-      } catch {
-        // Tables may not exist
-      }
-    }
-
     const sources = computed.map((c) => {
       const entry: Record<string, unknown> = {
         source_key: c.sourceKey,
@@ -254,14 +234,6 @@ export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
         last_success_at: c.lastInsertAt,
         log_lines: c.logLines,
       };
-
-      if (c.sourceKey === 'govtribe' || c.sourceKey.startsWith('govtribe.')) {
-        entry.credits = {
-          used: govtribeCredits.credits_used,
-          budget: govtribeCredits.credits_budget,
-          pct: govtribeCredits.pct,
-        };
-      }
 
       return entry;
     });

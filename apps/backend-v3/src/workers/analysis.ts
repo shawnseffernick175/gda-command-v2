@@ -588,7 +588,6 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       const link = resolveUnifiedLink({
         data_source: row.data_source as string,
         sam_notice_id: row.sam_notice_id as string | null,
-        govtribe_id: row.govtribe_id as string | null,
         external_id: row.external_id as string | null,
       });
       if (link) {

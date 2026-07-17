@@ -3,7 +3,7 @@
  * internal source identifiers used by the merge/link layer.
  *
  * The unified merge layer uses short internal source names
- * ('sam' | 'govwin' | 'govtribe' | 'fast_track'). The R1 SourceRef contract
+ * ('sam' | 'govwin' | 'fast_track'). The R1 SourceRef contract
  * (src/lib/sources.ts) uses the canonical SourceKind enum. This module maps
  * between them and builds a stable public URL from a source + native id so
  * the unified detail page can render clickable provenance links.
@@ -18,8 +18,6 @@ export function sourceKindOf(source: string): SourceKind {
       return 'sam_gov';
     case 'govwin':
       return 'govwin';
-    case 'govtribe':
-      return 'govtribe';
     case 'fast_track':
       return 'internal';
     default:
@@ -34,8 +32,6 @@ export function sourceLabelOf(source: string): string {
       return 'SAM.gov';
     case 'govwin':
       return 'GovWin IQ';
-    case 'govtribe':
-      return 'GovTribe';
     case 'fast_track':
       return 'Envision Fast Track';
     default:
@@ -52,8 +48,6 @@ export function buildSourceUrl(source: string, nativeId: string): string | null 
   switch (source) {
     case 'sam':
       return `https://sam.gov/opp/${id}/view`;
-    case 'govtribe':
-      return `https://govtribe.com/opportunity/federal-contract-opportunity/${id}`;
     case 'govwin':
       return `https://iq.govwin.com/neo/opportunity/view/${id}`;
     case 'fast_track':

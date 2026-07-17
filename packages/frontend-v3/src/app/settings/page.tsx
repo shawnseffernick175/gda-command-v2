@@ -159,10 +159,6 @@ function SystemHealthSection({ sysHealth }: {
 const DOCS_URLS: Record<string, string> = {
   "sam.gov": "https://open.sam.gov",
   "usaspending.gov": "https://api.usaspending.gov",
-  "govtribe": "https://api.govtribe.com",
-  "govtribe.contacts": "https://api.govtribe.com",
-  "govtribe.vehicles": "https://api.govtribe.com",
-  "govtribe.budget": "https://api.govtribe.com",
   "govwin": "https://iq.govwin.com",
   "federalregister.gov": "https://www.federalregister.gov/developers",
   "sbir": "https://www.dodsbirsttr.mil/submissions/api-docs",
@@ -175,16 +171,13 @@ const DOCS_URLS: Record<string, string> = {
   "grants.gov": "https://www.grants.gov/web/grants/s2s/grantor/apis.html",
 };
 
-const GOVTRIBE_CHILDREN = ["govtribe.contacts", "govtribe.vehicles", "govtribe.budget"];
-
 // Retained for future re-wiring of the integrations settings panel; not currently rendered.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function IntegrationsSection({ sentinel }: { sentinel: ReturnType<typeof useSentinel>["data"] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [govtribeOpen, setGovtribeOpen] = useState(false);
 
   const sources = sentinel?.sources ?? [];
-  const topLevel = sources.filter((s) => !GOVTRIBE_CHILDREN.includes(s.source_key));
+  const topLevel = sources;
 
   function getStatusLabel(status: string) {
     if (status === "healthy") return "Connected";
@@ -202,9 +195,6 @@ function IntegrationsSection({ sentinel }: { sentinel: ReturnType<typeof useSent
 
   function SourceRow({ s, indent = false }: { s: typeof sources[0]; indent?: boolean }) {
     const isExpanded = expanded === s.source_key;
-    const isGovTribeParent = s.source_key === "govtribe";
-    const isGovTribeFamily = s.source_key === "govtribe" || s.source_key.startsWith("govtribe.");
-    const credits = isGovTribeFamily ? sentinel?.govtribe_credits : undefined;
     const lastRun = s.last_success_at ? timeAgo(new Date(s.last_success_at)) : "Never";
 
     return (
@@ -212,7 +202,6 @@ function IntegrationsSection({ sentinel }: { sentinel: ReturnType<typeof useSent
         <button
           type="button"
           onClick={() => {
-            if (isGovTribeParent) setGovtribeOpen((v) => !v);
             setExpanded(isExpanded ? null : s.source_key);
           }}
           className="flex w-full items-center gap-3 rounded border border-border bg-gda-bg-base px-4 py-2.5 text-left hover:bg-gda-panel/50 transition-colors cursor-pointer"
@@ -220,13 +209,7 @@ function IntegrationsSection({ sentinel }: { sentinel: ReturnType<typeof useSent
           <span className={cn("h-2 w-2 rounded-full shrink-0", getDotColor(s.status))} />
           <span className="text-sm font-medium text-foreground flex-1">{s.label}</span>
           <span className="text-xs text-muted-foreground font-mono">{getStatusLabel(s.status)}</span>
-          {isGovTribeFamily && credits ? (
-            <span className="text-xs text-muted-foreground font-mono">
-              {credits.credits_used}/{credits.credits_budget} credits
-            </span>
-          ) : (
-            <span className="text-xs text-muted-foreground font-mono">Last sync: {lastRun}</span>
-          )}
+          <span className="text-xs text-muted-foreground font-mono">Last sync: {lastRun}</span>
           <span className={cn("text-xs text-muted-foreground transition-transform", isExpanded && "rotate-90")}>▸</span>
         </button>
 
@@ -235,33 +218,12 @@ function IntegrationsSection({ sentinel }: { sentinel: ReturnType<typeof useSent
             <p>Status: <span className="text-foreground font-mono">{s.status}</span></p>
             <p>Last success: <span className="text-foreground font-mono">{s.last_success_at ? new Date(s.last_success_at).toLocaleString() : "Never"}</span></p>
             {s.message && <p>Message: <span className="text-foreground">{s.message}</span></p>}
-            {isGovTribeFamily && credits && (
-              <div className="space-y-1">
-                <p>Credits: <span className="text-foreground font-mono">{credits.credits_used} / {credits.credits_budget}</span></p>
-                <div className="h-1.5 w-full rounded-full bg-gda-bg-base overflow-hidden">
-                  <div
-                    className={cn("h-full rounded-full", credits.pct > 80 ? "bg-gda-red" : credits.pct > 60 ? "bg-gda-amber" : "bg-gda-green")}
-                    style={{ width: `${Math.min(credits.pct, 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
             {DOCS_URLS[s.source_key] && (
               <a href={DOCS_URLS[s.source_key]} target="_blank" rel="noopener noreferrer"
                 className="inline-block text-gda-cyan hover:underline mt-1">
                 Docs ↗
               </a>
             )}
-          </div>
-        )}
-
-        {isGovTribeParent && govtribeOpen && (
-          <div className="mt-1 space-y-1">
-            {sources
-              .filter((c) => GOVTRIBE_CHILDREN.includes(c.source_key))
-              .map((child) => (
-                <SourceRow key={child.source_key} s={child} indent />
-              ))}
           </div>
         )}
       </div>

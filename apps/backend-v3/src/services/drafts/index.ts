@@ -88,7 +88,7 @@ export function buildStubDraftText(kind: DraftKind, actionItem: ActionItemRow): 
     case 'reply':
       return `Draft reply for: ${actionItem.title}\n\nHi,\n\nFollowing up on "${actionItem.title}". ${actionItem.detail ? `Context: ${actionItem.detail}` : 'Please advise on next steps.'}\n\nBest regards`;
     case 'research':
-      return `Research outline for: ${actionItem.title}\n\n1. Key questions:\n   - What is the current status?\n   - What resources are available?\n   - What are the risks?\n\n2. Sources to consult:\n   - Internal knowledge base\n   - SAM.gov\n   - GovTribe\n\n3. Timeline considerations:\n   - ${actionItem.due_date ? `Due by: ${actionItem.due_date}` : 'No due date set'}`;
+      return `Research outline for: ${actionItem.title}\n\n1. Key questions:\n   - What is the current status?\n   - What resources are available?\n   - What are the risks?\n\n2. Sources to consult:\n   - Internal knowledge base\n   - SAM.gov\n\n3. Timeline considerations:\n   - ${actionItem.due_date ? `Due by: ${actionItem.due_date}` : 'No due date set'}`;
     case 'milestone':
       return `Milestone summary for: ${actionItem.title}\n\nObjective: ${actionItem.title}\nStatus: ${actionItem.status}\n${actionItem.due_date ? `Target date: ${actionItem.due_date}` : ''}\n\nKey accomplishments:\n- Task identified and tracked\n\nNext steps:\n- Review and validate requirements\n- Assign resources\n- Execute and report`;
   }

@@ -33,14 +33,14 @@ npm run db:migrate:dry-run
 
 ## Data Model — Unified Opportunities (F-401)
 
-The unified opportunity model consolidates records from all sources (SAM, GovTribe, GovWin, NSF, SBIR, etc.) into a single canonical representation. This replaces per-source silos with a source-agnostic graph.
+The unified opportunity model consolidates records from all sources (SAM, GovWin, NSF, SBIR, etc.) into a single canonical representation. This replaces per-source silos with a source-agnostic graph.
 
 ### Tables
 
 | Table | Purpose |
 |-------|---------|
 | `unified_opportunities` | Canonical opportunity records with lifecycle stage, agency, NAICS, due dates, pwin, and doctrine status. |
-| `unified_opportunity_links` | Maps source-native IDs (e.g. SAM notice ID, GovTribe ID) to a single `internal_id`. Tracks match confidence and method. |
+| `unified_opportunity_links` | Maps source-native IDs (e.g. SAM notice ID, GovWin ID) to a single `internal_id`. Tracks match confidence and method. |
 | `unified_opportunity_field_overrides` | Per-field overrides set by users or system agents. Latest override wins (UNIQUE on internal_id + field_name). |
 | `unified_opportunity_signals` | Upstream signals (NSF awards, SBIR topics, arXiv papers, Fed Register rules) associated with an opportunity. |
 
@@ -55,7 +55,7 @@ signal → forecast → pre_sol → solicitation → awarded → post_award → 
 ### Key Design Decisions
 
 - **UUID primary keys** (`internal_id`) — decoupled from any source's native ID scheme.
-- **Multi-source linking** — one opportunity can have links from SAM, GovTribe, GovWin, etc. simultaneously.
+- **Multi-source linking** — one opportunity can have links from SAM, GovWin, etc. simultaneously.
 - **Confidence scoring** on links — enables a review queue for fuzzy-matched records.
 - **Field overrides** — user corrections persist without mutating the base record.
 - **Existing per-source tables are untouched** — backfill happens in F-404.
@@ -71,16 +71,14 @@ signal → forecast → pre_sol → solicitation → awarded → post_award → 
 | 1 | `unified_opportunity_field_overrides` (human edits) |
 | 2 | GovWin source data |
 | 3 | SAM source data |
-| 4 | GovTribe source data |
-| 5 | Fast Track source data |
 
 #### Per-field rules
 
 | Field | Rule |
 |-------|------|
 | `title`, `agency`, `office`, `naics`, `psc`, `set_aside`, `award_at` | First non-null per precedence |
-| `estimated_value_cents` | GovWin > SAM > GovTribe (Fast Track skipped — unreliable for sols) |
-| `response_due_at` | SAM > GovWin > GovTribe (SAM authoritative for federal) |
+| `estimated_value_cents` | GovWin > SAM (Fast Track skipped — unreliable for sols) |
+| `response_due_at` | SAM > GovWin (SAM authoritative for federal) |
 | `posted_at` | Earliest non-null across all sources |
 | `pwin` | Always from `unified_opportunities` row (never merged from sources) |
 | `doctrine_status` | Always from `unified_opportunities` row (never merged from sources) |

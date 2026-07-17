@@ -845,7 +845,7 @@ export interface Contact {
   notes?: string | null;
 }
 
-/* ── GovTribe Contacts (F-494) ────────────────────────────────── */
+/* ── Contacts (F-494) ─────────────────────────────────────────── */
 
 export type ContactCategory = 'government' | 'teaming_partner' | 'competitor' | 'industry' | 'internal' | 'other';
 
@@ -865,7 +865,6 @@ export interface LinkedCapture { id: number; title: string; color_stage: string 
 
 export interface GovTriContact {
   id: number;
-  govtribe_id: string | null;
   name: string | null;
   title: string | null;
   agency: string | null;
@@ -1001,13 +1000,6 @@ export interface SentinelStatus {
       last_call_at: string | null;
     };
   }>;
-  govtribe_severity: "ok" | "warning" | "critical";
-  govtribe_credits: {
-    credits_used: number;
-    credits_budget: number;
-    pct: number;
-    last_call_at: string | null;
-  };
 }
 
 /* ── LLM Router ───────────────────────────────────────────────── */
@@ -1772,20 +1764,6 @@ export interface SentinelUpcomingBreakCard {
   severity: string;
   due_by: string | null;
   created_at: string;
-}
-
-export interface SentinelCreditPacingGovTribe {
-  month: string;
-  credits_used: number;
-  credits_budget: number;
-  pct: number;
-  burn_rate_7d: number;
-  projected_exhaustion_date: string | null;
-  days_remaining_in_month: number;
-  daily_allowance: number;
-  today_spent: number;
-  top_queries: Array<{ tool_name: string; credits: number; call_count: number }>;
-  daily_burn_history: Array<{ date: string; credits: number }>;
 }
 
 export interface SentinelCreditPacingGovWin {

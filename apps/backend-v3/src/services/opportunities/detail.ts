@@ -210,7 +210,6 @@ async function resolveDoctrineEnrichment(
        JOIN unified_opportunity_links l ON (
          (l.source = 'sam'      AND o.sam_notice_id = l.source_native_id AND o.data_source = 'sam_gov')
          OR (l.source = 'govwin'   AND o.sam_notice_id = 'govwin-' || l.source_native_id)
-         OR (l.source = 'govtribe' AND o.govtribe_id  = l.source_native_id)
        )
        WHERE l.internal_id = $1 AND o.deleted_at IS NULL
        LIMIT 1`,
@@ -479,7 +478,6 @@ export async function listUnifiedOpportunities(
  * Native-id -> opportunities lookup mirrors merge.fetchSourceRecords:
  *   sam      -> opportunities.sam_notice_id = native_id (data_source sam_gov)
  *   govwin   -> opportunities.sam_notice_id = govwin- || native_id
- *   govtribe -> opportunities.govtribe_id   = native_id
  * fast_track has no analyzable opportunities row and is skipped.
  */
 export async function resolvePrimaryOpportunityId(
@@ -505,9 +503,6 @@ export async function resolvePrimaryOpportunityId(
     } else if (source === 'govwin') {
       sql = 'SELECT id FROM opportunities WHERE sam_notice_id = $1 AND deleted_at IS NULL LIMIT 1';
       param = `govwin-${link.source_native_id}`;
-    } else if (source === 'govtribe') {
-      sql = 'SELECT id FROM opportunities WHERE govtribe_id = $1 AND deleted_at IS NULL LIMIT 1';
-      param = link.source_native_id;
     } else {
       continue; // fast_track / unknown — not analyzable
     }

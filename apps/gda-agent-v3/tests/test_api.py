@@ -13,7 +13,7 @@ class TestHealthz:
         body = resp.json()
         assert body["ok"] is True
         assert "tools" in body
-        assert len(body["tools"]) == 12
+        assert len(body["tools"]) == 11
         assert "models_available" in body
         assert "rag_ready" in body
         assert "rag_chunk_count" in body
@@ -33,7 +33,7 @@ class TestToolsEndpoint:
         resp = await client.get("/agent/tools")
         assert resp.status_code == 200
         schemas = resp.json()
-        assert len(schemas) == 12
+        assert len(schemas) == 11
         for s in schemas:
             assert "name" in s
             assert "input_schema" in s

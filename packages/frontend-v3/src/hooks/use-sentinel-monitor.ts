@@ -6,7 +6,6 @@ import type {
   SentinelHandoffCard,
   SentinelRecentWinCard,
   SentinelUpcomingBreakCard,
-  SentinelCreditPacingGovTribe,
   SentinelCreditPacingGovWin,
 } from "@/lib/types";
 
@@ -16,17 +15,6 @@ export function useSentinelHandoffs() {
     queryFn: () =>
       apiGet<{ items: SentinelHandoffCard[]; count: number }>(
         "/v3/sentinel/handoffs",
-      ),
-    refetchInterval: 60_000,
-  });
-}
-
-export function useSentinelCreditPacingGovTribe() {
-  return useQuery({
-    queryKey: ["sentinel", "credit-pacing", "govtribe"],
-    queryFn: () =>
-      apiGet<SentinelCreditPacingGovTribe>(
-        "/v3/sentinel/credit-pacing/govtribe",
       ),
     refetchInterval: 60_000,
   });

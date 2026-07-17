@@ -2,7 +2,7 @@
 /**
  * F-404: Backfill — migrate per-source rows into unified opportunities + links.
  *
- * Reads every row from the legacy `opportunities` table (sam, govtribe, govwin),
+ * Reads every row from the legacy `opportunities` table (sam, govwin),
  * normalises to NormalizedOpportunity, runs MatcherV1 for cross-source linking,
  * and writes to unified_opportunities + unified_opportunity_links.
  *
@@ -31,7 +31,7 @@ const CURSOR_ID = 'backfill_unified_v1';
 const BATCH_SIZE = 200;
 const PROGRESS_INTERVAL = 500;
 
-const SUPPORTED_SOURCES = ['sam', 'sam.gov', 'govtribe', 'govwin'];
+const SUPPORTED_SOURCES = ['sam', 'sam.gov', 'govwin'];
 
 // ─── CLI flags ───────────────────────────────────────────────────────────────
 
@@ -60,7 +60,6 @@ interface LegacyRow {
   description: string | null;
   data_source: string;
   source_uri: string | null;
-  govtribe_id: string | null;
   external_id: string | null;
   agency_subtype: string | null;
 }
@@ -91,7 +90,6 @@ function emptySourceStats(): SourceStats {
 function resolveSource(dataSource: string): PrimarySource | null {
   const ds = dataSource.toLowerCase();
   if (ds === 'sam' || ds === 'sam.gov') return 'sam';
-  if (ds === 'govtribe') return 'govtribe';
   if (ds === 'govwin') return 'govwin';
   return null;
 }
@@ -129,8 +127,6 @@ function deriveNativeId(row: LegacyRow, source: PrimarySource): string | null {
   switch (source) {
     case 'sam':
       return row.sam_notice_id ?? row.solicitation_number ?? `sam-legacy-${row.id}`;
-    case 'govtribe':
-      return row.govtribe_id ?? row.external_id ?? `govtribe-legacy-${row.id}`;
     case 'govwin':
       return row.external_id ?? extractGovwinPrefix(row.sam_notice_id) ?? `govwin-legacy-${row.id}`;
     default:
@@ -226,7 +222,7 @@ async function fetchBatch(pool: pg.Pool, afterId: number): Promise<LegacyRow[]> 
             solicitation_number, sam_notice_id, status,
             value_min::text, value_max::text,
             naics, psc, set_aside, response_due_at::text, posted_at::text,
-            description, data_source, source_uri, govtribe_id, external_id,
+            description, data_source, source_uri, external_id,
             agency_subtype
      FROM opportunities
      WHERE LOWER(data_source) = ANY($1) AND id > $2 AND deleted_at IS NULL
@@ -627,7 +623,7 @@ async function validate(): Promise<void> {
       `SELECT COUNT(*)::int AS cnt FROM unified_opportunity_links`,
     );
 
-    console.log(`Legacy source rows (sam/govtribe/govwin): ${totalSource}`);
+    console.log(`Legacy source rows (sam/govwin): ${totalSource}`);
     console.log(`Unified opportunities:                    ${totalUnified}`);
     console.log(`Opportunity links:                        ${totalLinks}`);
     console.log(`Cross-source matches (links - unified):   ${totalLinks - totalUnified}`);

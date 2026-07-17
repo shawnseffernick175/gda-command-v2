@@ -27,8 +27,6 @@ This folder holds the **ground-truth strategic documents** for GDA Command v2. E
 | `unified_opportunity_architecture_v1.md` | F-400 epic design doc — unified `opportunities` table, lifecycle stages, matching engine, field merge precedence, source adapter pattern, Fast Track catalog | 2026-06-01 |
 | `v3_completion_plan_v4_1.md` | Tactical V3 completion plan (rev 4.1) — milestone-by-milestone | 2026-06-01 |
 | `fast_track_sources_v1.md` | Fast Track source catalog — 8 free public APIs for signal/forecast ingestion (SBIR, SAM Sources Sought, NIH RePORTER, NSF, USAspending, DARPA/ONR BAA, DoD RSS, arXiv) | 2026-06-01 |
-| `govtribe_credit_table_v1.md` | Locked GovTribe pricing — $0.039–$0.09/credit by pack size, self-imposed caps | 2026-06-01 |
-| `govtribe_mcp_finding_v1.md` | F-323 discovery: GovTribe REST API deprecated 2023; real integration is MCP over Streamable HTTP at `https://govtribe.com/mcp` | 2026-06-01 |
 
 ### Superseded (kept for reference outside `canonical/`)
 

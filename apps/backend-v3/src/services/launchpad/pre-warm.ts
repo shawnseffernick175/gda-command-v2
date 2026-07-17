@@ -2,7 +2,7 @@
  * Pre-warm worker — F-308
  *
  * Materializes Daily News from ingested sources (SAM, USAspending,
- * Federal Register, GovWin, GovTribe, news) into launchpad_daily_news.
+ * Federal Register, GovWin, news) into launchpad_daily_news.
  * Runs hourly via cron. Also refreshes door summaries.
  *
  * Source: own ingest tables — NO OrangeSlices ingestion (F-308 hard rule 1).
@@ -17,7 +17,6 @@ interface PreWarmResult {
   usaspending_inserted: number;
   federal_register_inserted: number;
   govwin_inserted: number;
-  govtribe_inserted: number;
   news_inserted: number;
   total_inserted: number;
   door_summaries_refreshed: number;
@@ -29,7 +28,6 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
     usaspending_inserted: 0,
     federal_register_inserted: 0,
     govwin_inserted: 0,
-    govtribe_inserted: 0,
     news_inserted: 0,
     total_inserted: 0,
     door_summaries_refreshed: 0,
@@ -159,37 +157,6 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
     logger.warn({ error: err instanceof Error ? err.message : String(err) }, '[pre-warm] GovWin insert failed');
   }
 
-  // GovTribe opportunities from last 24h
-  try {
-    const gtRes = await pool.query<{ cnt: string }>(
-      `INSERT INTO launchpad_daily_news (source, source_id, source_url, title, agency, dollar_value, posted_at, relevance_score)
-       SELECT
-         'govtribe',
-         o.internal_id::text,
-         CASE WHEN l.source_native_id IS NOT NULL
-              THEN 'https://govtribe.com/opportunity/' || l.source_native_id
-              ELSE NULL END,
-         o.title,
-         o.agency,
-         o.estimated_value_cents,
-         o.created_at,
-         COALESCE(o.pwin, 0) * 80
-       FROM unified_opportunities o
-       LEFT JOIN unified_opportunity_links l ON l.internal_id = o.internal_id AND l.source = 'govtribe'
-       WHERE o.primary_source = 'govtribe'
-         AND o.created_at > NOW() - INTERVAL '24 hours'
-         AND NOT EXISTS (
-           SELECT 1 FROM launchpad_daily_news dn
-           WHERE dn.source = 'govtribe' AND dn.source_id = o.internal_id::text
-             AND dn.posted_at > NOW() - INTERVAL '24 hours'
-         )
-       RETURNING 1 AS cnt`,
-    );
-    result.govtribe_inserted = gtRes.rowCount ?? 0;
-  } catch (err) {
-    logger.warn({ error: err instanceof Error ? err.message : String(err) }, '[pre-warm] GovTribe insert failed');
-  }
-
   // GovCon news from news cache
   try {
     const newsRes = await pool.query<{ cnt: string }>(
@@ -221,7 +188,6 @@ export async function runLaunchpadPreWarm(): Promise<PreWarmResult> {
     result.usaspending_inserted +
     result.federal_register_inserted +
     result.govwin_inserted +
-    result.govtribe_inserted +
     result.news_inserted;
 
   // Refresh door summaries cache

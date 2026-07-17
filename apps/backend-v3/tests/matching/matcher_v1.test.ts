@@ -38,7 +38,7 @@ function makeCandidate(overrides: Partial<CandidateOpportunity> & { internal_id:
     naics: '541512',
     estimated_value_cents: 500_000_00,
     solicitation_numbers: ['W912DY-26-R-0001'],
-    links: [{ source: 'govtribe', source_native_id: 'gt-existing-001' }],
+    links: [{ source: 'grants_gov', source_native_id: 'gt-existing-001' }],
     ...overrides,
   };
 }
@@ -140,7 +140,7 @@ describe('scoring functions', () => {
 
 describe('MatcherV1 — HIGH confidence', () => {
   it('H1: matches on exact source_native_id across sources', () => {
-    const input = makeInput({ source: 'govtribe', source_native_id: 'shared-id-001' });
+    const input = makeInput({ source: 'grants_gov', source_native_id: 'shared-id-001' });
     const cand = makeCandidate({
       internal_id: 'uuid-1',
       links: [{ source: 'sam', source_native_id: 'shared-id-001' }],
@@ -154,7 +154,7 @@ describe('MatcherV1 — HIGH confidence', () => {
   });
 
   it('H2: matches on solicitation_number + agency exact', () => {
-    const input = makeInput({ source: 'govtribe', source_native_id: 'gt-999' });
+    const input = makeInput({ source: 'grants_gov', source_native_id: 'gt-999' });
     const cand = makeCandidate({
       internal_id: 'uuid-2',
       solicitation_numbers: ['W912DY-26-R-0001'],
@@ -184,7 +184,7 @@ describe('MatcherV1 — HIGH confidence', () => {
   });
 
   it('H4: notice_id match takes precedence over MEDIUM', () => {
-    const input = makeInput({ source: 'govtribe', source_native_id: 'shared-id-002' });
+    const input = makeInput({ source: 'grants_gov', source_native_id: 'shared-id-002' });
     const candHigh = makeCandidate({
       internal_id: 'uuid-high',
       title: 'Completely different title',
@@ -217,7 +217,7 @@ describe('MatcherV1 — HIGH confidence', () => {
       internal_id: 'uuid-6',
       links: [
         { source: 'sam', source_native_id: 'sam-orig' },
-        { source: 'govtribe', source_native_id: 'common-id' },
+        { source: 'grants_gov', source_native_id: 'common-id' },
       ],
     });
     const result = matcher.findCandidate(input, [cand]);
@@ -226,7 +226,7 @@ describe('MatcherV1 — HIGH confidence', () => {
   });
 
   it('H7: multiple candidates — picks first HIGH on notice_id', () => {
-    const input = makeInput({ source: 'govtribe', source_native_id: 'match-me' });
+    const input = makeInput({ source: 'grants_gov', source_native_id: 'match-me' });
     const cand1 = makeCandidate({
       internal_id: 'uuid-7a',
       links: [{ source: 'sam', source_native_id: 'match-me' }],
@@ -242,7 +242,7 @@ describe('MatcherV1 — HIGH confidence', () => {
 
   it('H8: sol_num match ignores candidate with wrong agency', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-800',
       agency: 'DEPT OF THE ARMY',
     });
@@ -264,7 +264,7 @@ describe('MatcherV1 — HIGH confidence', () => {
 
   it('H9: candidate with multiple stored solicitation numbers', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-900',
       solicitation_number: 'FA8750-26-R-0010',
     });
@@ -294,7 +294,7 @@ describe('MatcherV1 — HIGH confidence', () => {
   });
 
   it('H11: signals object contains correct flags', () => {
-    const input = makeInput({ source: 'govtribe', source_native_id: 'notice-match' });
+    const input = makeInput({ source: 'grants_gov', source_native_id: 'notice-match' });
     const cand = makeCandidate({
       internal_id: 'uuid-11',
       links: [{ source: 'sam', source_native_id: 'notice-match' }],
@@ -311,7 +311,7 @@ describe('MatcherV1 — HIGH confidence', () => {
 describe('MatcherV1 — MEDIUM confidence', () => {
   it('M1: fuzzy title + exact agency + exact naics', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m1',
       solicitation_number: null,
       title: 'IT Support Services — Army Sustainment Command',
@@ -331,7 +331,7 @@ describe('MatcherV1 — MEDIUM confidence', () => {
 
   it('M2: fuzzy title + exact agency + dollar band overlap (no naics)', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m2',
       solicitation_number: null,
       naics: null,
@@ -351,7 +351,7 @@ describe('MatcherV1 — MEDIUM confidence', () => {
 
   it('M3: title with extra words still passes threshold', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m3',
       solicitation_number: null,
       title: 'IT Support Services for Army Sustainment Command — Amendment 3',
@@ -385,7 +385,7 @@ describe('MatcherV1 — MEDIUM confidence', () => {
 
   it('M5: picks highest title score among multiple MEDIUM candidates', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m5',
       solicitation_number: null,
       title: 'IT Support Services for Army Sustainment Command',
@@ -409,7 +409,7 @@ describe('MatcherV1 — MEDIUM confidence', () => {
 
   it('M6: medium with naics match but no dollar value', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m6',
       solicitation_number: null,
       estimated_value_cents: null,
@@ -427,7 +427,7 @@ describe('MatcherV1 — MEDIUM confidence', () => {
 
   it('M7: both naics AND dollar match — still MEDIUM', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m7',
       solicitation_number: null,
     });
@@ -444,7 +444,7 @@ describe('MatcherV1 — MEDIUM confidence', () => {
 
   it('M8: signals include title_similarity numeric value', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m8',
       solicitation_number: null,
     });
@@ -459,7 +459,7 @@ describe('MatcherV1 — MEDIUM confidence', () => {
 
   it('M9: dollar band at exactly 20% boundary matches', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m9',
       solicitation_number: null,
       naics: null,
@@ -478,7 +478,7 @@ describe('MatcherV1 — MEDIUM confidence', () => {
 
   it('M10: confirmed_by is null for MEDIUM matches', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-m10',
       solicitation_number: null,
     });
@@ -526,7 +526,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
     const cand = makeCandidate({
       internal_id: 'uuid-n1',
       solicitation_numbers: [],
-      links: [{ source: 'govtribe', source_native_id: 'gt-n1' }],
+      links: [{ source: 'grants_gov', source_native_id: 'gt-n1' }],
     });
     const result = matcher.findCandidate(input, [cand]);
     expect(result!.outcome).toBe('new');
@@ -537,7 +537,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
 
   it('N2: similar title but different agency fails MEDIUM', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-n2',
       solicitation_number: null,
       agency: 'DEPT OF THE NAVY',
@@ -554,7 +554,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
 
   it('N3: same agency but title below threshold', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-n3',
       solicitation_number: null,
       title: 'Cybersecurity Assessment Services',
@@ -571,7 +571,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
 
   it('N4: title + agency match but neither naics nor dollar overlap', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-n4',
       solicitation_number: null,
       naics: '336411',
@@ -597,7 +597,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
 
   it('N6: sol_num matches but agency differs → no HIGH, falls through to new', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-n6',
       agency: 'DEPT OF THE NAVY',
       title: 'Submarine Maintenance Services',
@@ -623,7 +623,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
       internal_id: 'uuid-n7',
       agency: null,
       solicitation_numbers: [],
-      links: [{ source: 'govtribe', source_native_id: 'gt-n7' }],
+      links: [{ source: 'grants_gov', source_native_id: 'gt-n7' }],
     });
     const result = matcher.findCandidate(input, [cand]);
     expect(result!.outcome).toBe('new');
@@ -631,7 +631,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
 
   it('N8: candidate with null title → no MEDIUM match', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-n8',
       solicitation_number: null,
     });
@@ -647,7 +647,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
 
   it('N9: dollar band just outside 20% → no MEDIUM (with naics null)', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-n9',
       solicitation_number: null,
       naics: null,
@@ -666,7 +666,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
 
   it('N10: no solicitation_number on input → no HIGH sol match path', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-n10',
       solicitation_number: null,
       title: 'Completely Novel Procurement Opportunity XYZ',
@@ -686,7 +686,7 @@ describe('MatcherV1 — Negative / new_internal', () => {
 
   it('N11: title match but naics differ and dollar null → no MEDIUM', () => {
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-n11',
       solicitation_number: null,
       naics: '336411',
@@ -720,7 +720,7 @@ describe('MatcherV1 — Duplicate rejection', () => {
   });
 
   it('D2: same source_native_id different source is NOT a duplicate', () => {
-    const input = makeInput({ source: 'govtribe', source_native_id: 'id-123' });
+    const input = makeInput({ source: 'grants_gov', source_native_id: 'id-123' });
     const cand = makeCandidate({
       internal_id: 'uuid-d2',
       links: [{ source: 'sam', source_native_id: 'id-123' }],
@@ -743,7 +743,7 @@ describe('MatcherV1 — Custom scoring', () => {
       naicsExact: () => true,
     });
     const input = makeInput({
-      source: 'govtribe',
+      source: 'grants_gov',
       source_native_id: 'gt-custom',
       solicitation_number: null,
       title: 'ZZZZZ',
@@ -775,7 +775,7 @@ describe('MatcherV1 — Holdout precision', () => {
   const holdout: LabeledCase[] = [
     // ── HIGH expected ──
     {
-      input: makeInput({ source: 'govtribe', source_native_id: 'gt-h-a', solicitation_number: 'W912DY-26-R-0001' }),
+      input: makeInput({ source: 'grants_gov', source_native_id: 'gt-h-a', solicitation_number: 'W912DY-26-R-0001' }),
       candidates: [makeCandidate({ internal_id: 'u-ha', solicitation_numbers: ['W912DY-26-R-0001'], links: [{ source: 'sam', source_native_id: 'sam-ha' }] })],
       expected: 'HIGH',
     },
@@ -785,7 +785,7 @@ describe('MatcherV1 — Holdout precision', () => {
       expected: 'HIGH',
     },
     {
-      input: makeInput({ source: 'govtribe', source_native_id: 'gt-h-c', solicitation_number: 'FA8750-26-R-0010' }),
+      input: makeInput({ source: 'grants_gov', source_native_id: 'gt-h-c', solicitation_number: 'FA8750-26-R-0010' }),
       candidates: [makeCandidate({ internal_id: 'u-hc', solicitation_numbers: ['FA8750-26-R-0010'], links: [{ source: 'sam', source_native_id: 'sam-hc' }] })],
       expected: 'HIGH',
     },
@@ -795,13 +795,13 @@ describe('MatcherV1 — Holdout precision', () => {
       expected: 'HIGH',
     },
     {
-      input: makeInput({ source: 'govtribe', source_native_id: 'gt-h-e', solicitation_number: 'N00024-26-R-0100' }),
+      input: makeInput({ source: 'grants_gov', source_native_id: 'gt-h-e', solicitation_number: 'N00024-26-R-0100' }),
       candidates: [makeCandidate({ internal_id: 'u-he', agency: 'DEPT OF THE ARMY', solicitation_numbers: ['N00024-26-R-0100'], links: [{ source: 'sam', source_native_id: 'sam-he' }] })],
       expected: 'HIGH',
     },
     // ── MEDIUM expected ──
     {
-      input: makeInput({ source: 'govtribe', source_native_id: 'gt-m-a', solicitation_number: null, title: 'IT Support Services — Army Sustainment Command' }),
+      input: makeInput({ source: 'grants_gov', source_native_id: 'gt-m-a', solicitation_number: null, title: 'IT Support Services — Army Sustainment Command' }),
       candidates: [makeCandidate({ internal_id: 'u-ma', solicitation_numbers: [], links: [{ source: 'sam', source_native_id: 'sam-ma' }] })],
       expected: 'MEDIUM',
     },
@@ -811,7 +811,7 @@ describe('MatcherV1 — Holdout precision', () => {
       expected: 'MEDIUM',
     },
     {
-      input: makeInput({ source: 'govtribe', source_native_id: 'gt-m-c', solicitation_number: null, naics: null, estimated_value_cents: 550_000_00 }),
+      input: makeInput({ source: 'grants_gov', source_native_id: 'gt-m-c', solicitation_number: null, naics: null, estimated_value_cents: 550_000_00 }),
       candidates: [makeCandidate({ internal_id: 'u-mc', naics: null, estimated_value_cents: 500_000_00, solicitation_numbers: [], links: [{ source: 'sam', source_native_id: 'sam-mc' }] })],
       expected: 'MEDIUM',
     },
@@ -821,23 +821,23 @@ describe('MatcherV1 — Holdout precision', () => {
       expected: 'MEDIUM',
     },
     {
-      input: makeInput({ source: 'govtribe', source_native_id: 'gt-m-e', solicitation_number: null }),
+      input: makeInput({ source: 'grants_gov', source_native_id: 'gt-m-e', solicitation_number: null }),
       candidates: [makeCandidate({ internal_id: 'u-me', solicitation_numbers: [], links: [{ source: 'sam', source_native_id: 'sam-me' }] })],
       expected: 'MEDIUM',
     },
     // ── NEW expected ──
     {
       input: makeInput({ source: 'sam', source_native_id: 'sam-new-a', solicitation_number: null, title: 'Marine Biology Research Grant', agency: 'NSF', naics: '541711' }),
-      candidates: [makeCandidate({ internal_id: 'u-na', solicitation_numbers: [], links: [{ source: 'govtribe', source_native_id: 'gt-na' }] })],
+      candidates: [makeCandidate({ internal_id: 'u-na', solicitation_numbers: [], links: [{ source: 'grants_gov', source_native_id: 'gt-na' }] })],
       expected: 'new',
     },
     {
       input: makeInput({ source: 'sam', source_native_id: 'sam-new-b', solicitation_number: null, title: 'Cybersecurity Assessment', agency: 'DHS', naics: '541519' }),
-      candidates: [makeCandidate({ internal_id: 'u-nb', solicitation_numbers: [], links: [{ source: 'govtribe', source_native_id: 'gt-nb' }] })],
+      candidates: [makeCandidate({ internal_id: 'u-nb', solicitation_numbers: [], links: [{ source: 'grants_gov', source_native_id: 'gt-nb' }] })],
       expected: 'new',
     },
     {
-      input: makeInput({ source: 'govtribe', source_native_id: 'gt-new-c' }),
+      input: makeInput({ source: 'grants_gov', source_native_id: 'gt-new-c' }),
       candidates: [],
       expected: 'new',
     },
@@ -848,7 +848,7 @@ describe('MatcherV1 — Holdout precision', () => {
     },
     {
       input: makeInput({ source: 'sam', source_native_id: 'sam-new-e', solicitation_number: null, title: 'Cloud Migration Services', agency: 'VA', naics: '541519', estimated_value_cents: 100_000_000_00 }),
-      candidates: [makeCandidate({ internal_id: 'u-ne', naics: '541512', estimated_value_cents: 500_000_00, solicitation_numbers: [], links: [{ source: 'govtribe', source_native_id: 'gt-ne' }] })],
+      candidates: [makeCandidate({ internal_id: 'u-ne', naics: '541512', estimated_value_cents: 500_000_00, solicitation_numbers: [], links: [{ source: 'grants_gov', source_native_id: 'gt-ne' }] })],
       expected: 'new',
     },
   ];

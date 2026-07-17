@@ -27,7 +27,7 @@ const US_STATE_CODES = new Set([
  * Handles multiple formats:
  *   "Norfolk, VA"              → "VA"
  *   "Norfolk, VA 23501"        → "VA"
- *   "Aberdeen, MD, 21005, US"  → "MD"  (GovTribe)
+ *   "Aberdeen, MD, 21005, US"  → "MD"
  *   "VA"                       → "VA"
  */
 export function parseStateCode(pop: string | null | undefined): string | null {

@@ -18,7 +18,6 @@ This directory contains the executable specifications for the GDA Command V3 Com
 ## Output + Connectors (devin-ready)
 - [F-Color-Team-Reviews](./F-Color-Team-Reviews-spec.md) — 6-Color Review on Any Uploaded Doc (Pink/Red/Black/Blue/White/Green — **NO GOLD**) — issue #539
 - [F-Govwin](./F-Govwin-spec.md) — GovWin IQ Connector (OAuth2, company-paid $1.2k/yr) — issue #541
-- [F-Govtribe](./F-Govtribe-spec.md) — GovTribe Connector (paid API, company-paid, credit-aware) — issue #542
 
 ## Downstream queue (NOT devin-ready — dependency-blocked)
 These ship after Track A merges. They live as tracker issues so the plan is visible end-to-end.
@@ -37,9 +36,9 @@ These ship after Track A merges. They live as tracker issues so the plan is visi
 ## RAG Corpus Seed
 - [build_rag_corpus_seed.py](../../apps/backend-v3/scripts/build_rag_corpus_seed.py) — CEO doc chunker
 - [build_v1_corpus_seed.py](../../apps/backend-v3/scripts/build_v1_corpus_seed.py) — V1 archive chunker
-- `apps/backend-v3/data/rag-seed/corpus_seed.jsonl` — 124 CEO chunks, evidence_grade=A
-- `apps/backend-v3/data/rag-seed/corpus_seed_v1.jsonl` — 94 V1 archive chunks, evidence_grade=B
-- `apps/backend-v3/data/rag-seed/corpus_seed_combined.jsonl` — 218 chunks total
+- `apps/backend-v3/data/rag-seed/corpus_seed.jsonl` — 123 CEO chunks, evidence_grade=A
+- `apps/backend-v3/data/rag-seed/corpus_seed_v1.jsonl` — 81 V1 archive chunks, evidence_grade=B
+- `apps/backend-v3/data/rag-seed/corpus_seed_combined.jsonl` — 204 chunks total
 
 ## Standing rules
 - **No Gold pass anywhere.** 6 colors only: Pink, Red, Black, Blue, White, **Green** (executive/final). CI-enforced in F-313 + F-Color-Team-Reviews.

@@ -42,10 +42,9 @@ async function main(): Promise<void> {
       analysis: Record<string, unknown> | null;
       data_source: string;
       sam_notice_id: string | null;
-      govtribe_id: string | null;
       external_id: string | null;
     }>(
-      `SELECT id, analysis, data_source, sam_notice_id, govtribe_id, external_id
+      `SELECT id, analysis, data_source, sam_notice_id, external_id
        FROM opportunities
        WHERE deleted_at IS NULL
        ORDER BY id
@@ -127,10 +126,9 @@ async function main(): Promise<void> {
 }
 
 // Inline link resolver (mirrors unified-mirror.ts logic without importing ESM)
-const DATA_SOURCE_TO_LINK: Record<string, { source: string; field: 'sam_notice_id' | 'govtribe_id' | 'external_id' }> = {
+const DATA_SOURCE_TO_LINK: Record<string, { source: string; field: 'sam_notice_id' | 'external_id' }> = {
   'sam.gov': { source: 'sam', field: 'sam_notice_id' },
   'govwin': { source: 'govwin', field: 'sam_notice_id' },
-  'govtribe': { source: 'govtribe', field: 'govtribe_id' },
   'arxiv': { source: 'arxiv', field: 'external_id' },
   'grants_gov': { source: 'grants_gov', field: 'external_id' },
   'nsf': { source: 'nsf', field: 'external_id' },
@@ -139,7 +137,7 @@ const DATA_SOURCE_TO_LINK: Record<string, { source: string; field: 'sam_notice_i
   'dod_rss': { source: 'dod_rss', field: 'external_id' },
 };
 
-function resolveLink(row: { data_source: string; sam_notice_id: string | null; govtribe_id: string | null; external_id: string | null }): { source: string; source_native_id: string } | null {
+function resolveLink(row: { data_source: string; sam_notice_id: string | null; external_id: string | null }): { source: string; source_native_id: string } | null {
   const mapping = DATA_SOURCE_TO_LINK[row.data_source];
   if (!mapping) return null;
   const rawId = row[mapping.field];

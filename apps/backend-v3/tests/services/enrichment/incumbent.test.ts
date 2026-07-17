@@ -328,11 +328,11 @@ describe('parseStateCode', () => {
     expect(parseStateCode('  Norfolk, VA  ')).toBe('VA');
   });
 
-  it('parses GovTribe format "Aberdeen, MD, 21005, US" → "MD"', () => {
+  it('parses "Aberdeen, MD, 21005, US" → "MD"', () => {
     expect(parseStateCode('Aberdeen, MD, 21005, US')).toBe('MD');
   });
 
-  it('parses GovTribe format without zip "Norfolk, VA, US" → "VA"', () => {
+  it('parses format without zip "Norfolk, VA, US" → "VA"', () => {
     expect(parseStateCode('Norfolk, VA, US')).toBe('VA');
   });
 

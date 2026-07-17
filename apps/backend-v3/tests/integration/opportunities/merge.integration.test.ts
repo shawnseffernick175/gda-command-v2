@@ -1,11 +1,10 @@
 /**
  * Integration test for the merge service (F-405).
  *
- * Seeds an opportunity with GovWin + SAM + GovTribe linked + one override,
+ * Seeds an opportunity with GovWin + SAM linked + one override,
  * then asserts the merged view returns:
  *   - GovWin title (GovWin highest for default fields)
  *   - SAM response_due_at (SAM authoritative for federal due dates)
- *   - GovTribe credit metadata (GovTribe lowest but still contributes)
  *   - Override wins for agency
  *   - pwin + doctrine_status from unified row
  *   - Cache hit on second call
@@ -76,24 +75,7 @@ beforeAll(async () => {
     [sourceId],
   );
 
-  // ─── 4. Create GovTribe opportunity in legacy table ────────────────────
-  await pool.query(
-    `INSERT INTO opportunities (
-       title, agency, sub_agency, naics, psc, set_aside, value_min,
-       response_due_at, posted_at, description,
-       external_id, govtribe_id, data_source, status, source_id
-     ) VALUES (
-       'GovTribe — AF Cloud Services', 'Air Force',
-       'AFLCMC', '541519', 'D307', 'WOSB', 3000000,
-       '2026-08-20T23:59:00Z', '2026-02-10T00:00:00Z',
-       'GovTribe tracked cloud initiative',
-       'GT-MERGE-TEST-001', 'GT-MERGE-TEST-001', 'govtribe', 'tracking', $1
-     )
-     ON CONFLICT (data_source, external_id) WHERE external_id IS NOT NULL DO NOTHING`,
-    [sourceId],
-  );
-
-  // ─── 5. Create unified opportunity ─────────────────────────────────────
+  // ─── 4. Create unified opportunity ─────────────────────────────────────
   const { rows: unifiedRows } = await pool.query(
     `INSERT INTO unified_opportunities (
        lifecycle_stage, primary_source, pwin, doctrine_status
@@ -102,17 +84,16 @@ beforeAll(async () => {
   );
   internalId = unifiedRows[0].internal_id;
 
-  // ─── 6. Create links ──────────────────────────────────────────────────
+  // ─── 5. Create links ──────────────────────────────────────────────────
   await pool.query(
     `INSERT INTO unified_opportunity_links (internal_id, source, source_native_id, confidence, match_method, matched_at)
      VALUES
        ($1, 'sam',      'SAM-MERGE-TEST-001',   'HIGH', 'exact_notice_id', NOW()),
-       ($1, 'govwin',   'GW-MERGE-TEST-001',    'HIGH', 'sol_num_agency_exact', NOW()),
-       ($1, 'govtribe', 'GT-MERGE-TEST-001',    'MEDIUM', 'fuzzy_title_agency', NOW())`,
+       ($1, 'govwin',   'GW-MERGE-TEST-001',    'HIGH', 'sol_num_agency_exact', NOW())`,
     [internalId],
   );
 
-  // ─── 7. Add override for agency ────────────────────────────────────────
+  // ─── 6. Add override for agency ────────────────────────────────────────
   await pool.query(
     `INSERT INTO unified_opportunity_field_overrides (internal_id, field_name, field_value_json, set_by, reason)
      VALUES ($1, 'agency', '"Department of the Air Force (corrected)"', $2, 'Manual correction per CO email')`,
@@ -127,7 +108,6 @@ afterAll(async () => {
       await pool.query('DELETE FROM unified_opportunities WHERE internal_id = $1', [internalId]);
     }
     await pool.query("DELETE FROM opportunities WHERE sam_notice_id IN ('SAM-MERGE-TEST-001', 'govwin-GW-MERGE-TEST-001')");
-    await pool.query("DELETE FROM opportunities WHERE govtribe_id = 'GT-MERGE-TEST-001'");
     await pool.end();
   }
 });
@@ -156,25 +136,24 @@ describe('merge integration', () => {
     expect(result!.response_due_at).toContain('2026-09-15');
     expect(result!.field_sources['response_due_at']).toBe('sam');
 
-    // estimated_value_cents: GovWin > SAM > GovTribe (GovWin has 8M*100)
+    // estimated_value_cents: GovWin > SAM (GovWin has 8M*100)
     expect(result!.estimated_value_cents).toBe(800000000);
     expect(result!.field_sources['estimated_value_cents']).toBe('govwin');
 
-    // posted_at: earliest across sources (GovTribe was Feb 10)
-    expect(result!.posted_at).toContain('2026-02-10');
-    expect(result!.field_sources['posted_at']).toBe('govtribe');
+    // posted_at: earliest across sources (SAM was Mar 15, GovWin Apr 1)
+    expect(result!.posted_at).toContain('2026-03-15');
+    expect(result!.field_sources['posted_at']).toBe('sam');
 
     // pwin and doctrine_status from unified row
     expect(result!.pwin).toBe(65);
     expect(result!.doctrine_status).toBe('qualified');
 
-    // GovTribe contributes naics when higher sources don't have it
-    // (In this case GovWin has naics too, so GovWin wins)
+    // naics comes from GovWin (highest precedence source with the field)
     expect(result!.naics).toBe('541511');
     expect(result!.field_sources['naics']).toBe('govwin');
 
     // Links are included
-    expect(result!.links.length).toBe(3);
+    expect(result!.links.length).toBe(2);
   });
 
   it('cache hit on second call within 60s', async () => {

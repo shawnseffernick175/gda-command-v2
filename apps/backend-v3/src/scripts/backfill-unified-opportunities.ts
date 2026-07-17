@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const { rows } = await pool.query<LegacyOpportunityRow>(
-      `SELECT id, data_source, sam_notice_id, govtribe_id, external_id,
+      `SELECT id, data_source, sam_notice_id, external_id,
               title, agency, sub_agency, naics, psc, set_aside,
               value_min, value_max, posted_at::text AS posted_at,
               response_due_at::text AS response_due_at, status

@@ -9,8 +9,6 @@
  * 1. `unified_opportunity_field_overrides` (human edits)
  * 2. GovWin source data
  * 3. SAM source data
- * 4. GovTribe source data
- * 5. Fast Track source data
  *
  * ## Per-field rules
  *
@@ -22,8 +20,8 @@
  * | naics                 | First non-null per precedence                        |
  * | psc                   | First non-null per precedence                        |
  * | set_aside             | First non-null per precedence                        |
- * | estimated_value_cents | GovWin > SAM > GovTribe (skip Fast Track for sols)   |
- * | response_due_at       | SAM > GovWin > GovTribe (SAM authoritative)          |
+ * | estimated_value_cents | GovWin > SAM                                         |
+ * | response_due_at       | SAM > GovWin (SAM authoritative)                     |
  * | posted_at             | Earliest non-null across sources                     |
  * | award_at              | First non-null per precedence                        |
  * | pwin                  | Always from unified_opportunities row (never merged)  |
@@ -84,19 +82,18 @@ export interface SourceRecord {
 
 // ─── Precedence order (lower index = higher priority) ────────────────────────
 
-const SOURCE_PRECEDENCE: readonly string[] = ['govwin', 'sam', 'govtribe', 'fast_track'];
+const SOURCE_PRECEDENCE: readonly string[] = ['govwin', 'sam'];
 
 /**
- * Custom precedence for estimated_value_cents:
- * GovWin > SAM > GovTribe (Fast Track skipped for solicitations — unreliable).
+ * Custom precedence for estimated_value_cents: GovWin > SAM.
  */
-const VALUE_PRECEDENCE: readonly string[] = ['govwin', 'sam', 'govtribe'];
+const VALUE_PRECEDENCE: readonly string[] = ['govwin', 'sam'];
 
 /**
  * Custom precedence for response_due_at:
- * SAM > GovWin > GovTribe (SAM is authoritative for federal).
+ * SAM > GovWin (SAM is authoritative for federal).
  */
-const DUE_DATE_PRECEDENCE: readonly string[] = ['sam', 'govwin', 'govtribe'];
+const DUE_DATE_PRECEDENCE: readonly string[] = ['sam', 'govwin'];
 
 // ─── LRU cache (TTL-based) ──────────────────────────────────────────────────
 
@@ -154,7 +151,6 @@ export function clearMergeCache(): void {
  * Join strategy: single query using CASE-based lookup.
  * - SAM → opportunities.sam_notice_id = source_native_id, data_source = 'sam.gov' (legacy: 'sam_gov')
  * - GovWin → opportunities.sam_notice_id = 'govwin-' || source_native_id
- * - GovTribe → opportunities.govtribe_id = source_native_id
  * - Fast Track → fast_track_assessments.input_hash = source_native_id
  */
 export async function fetchSourceRecords(
@@ -197,22 +193,6 @@ export async function fetchSourceRecords(
         );
         if (res.rows[0]) {
           row = { source: 'govwin', ...res.rows[0] } as SourceRecord;
-        }
-        break;
-      }
-
-      case 'govtribe': {
-        const res = await pool.query(
-          `SELECT title, agency, sub_agency AS office, naics, psc, set_aside,
-                  CASE WHEN value_min IS NOT NULL THEN (value_min * 100)::bigint ELSE NULL END AS estimated_value_cents,
-                  posted_at::text, response_due_at::text, NULL AS award_at
-           FROM opportunities
-           WHERE govtribe_id = $1
-           LIMIT 1`,
-          [link.source_native_id],
-        );
-        if (res.rows[0]) {
-          row = { source: 'govtribe', ...res.rows[0] } as SourceRecord;
         }
         break;
       }
@@ -382,7 +362,7 @@ export async function getMergedOpportunity(
     if (ev.source) fieldSources['estimated_value_cents'] = ev.source;
   }
 
-  // response_due_at — SAM > GovWin > GovTribe
+  // response_due_at — SAM > GovWin
   let response_due_at: string | null;
   if (overrideMap.has('response_due_at')) {
     response_due_at = overrideMap.get('response_due_at') as string;

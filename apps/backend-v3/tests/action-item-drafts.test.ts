@@ -80,7 +80,7 @@ describe('F-310 — Action Item Draft Generation', () => {
     parts.push(`Regarding: ${item.title}`);
     parts.push('');
     parts.push('This capture has been stale for more than 14 days. Recommended actions:');
-    parts.push('1. Confirm the opportunity is still active (check SAM/GovTribe)');
+    parts.push('1. Confirm the opportunity is still active (check SAM)');
     parts.push('2. Schedule a color team review if one has not been held recently');
     parts.push('3. Update the capture plan with latest intelligence');
 

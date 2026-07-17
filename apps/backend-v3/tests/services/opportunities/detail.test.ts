@@ -129,7 +129,7 @@ describe('getUnifiedOpportunityDetail (F-410)', () => {
     onQuery('FROM unified_opportunities WHERE internal_id', [unifiedRow()]);
     onQuery('FROM unified_opportunity_links WHERE internal_id', [link('sam', 'N-1')]);
     onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery("data_source = 'sam_gov'", [samSrc()]);
+    onQuery("data_source IN ('sam.gov', 'sam_gov')", [samSrc()]);
 
     const result = await getUnifiedOpportunityDetail(
       mockPool as unknown as pg.Pool,
@@ -150,7 +150,7 @@ describe('getUnifiedOpportunityDetail (F-410)', () => {
       link('govwin', 'G-1'),
     ]);
     onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery("data_source = 'sam_gov'", [samSrc()]);
+    onQuery("data_source IN ('sam.gov', 'sam_gov')", [samSrc()]);
     // govwin uses sam_notice_id = 'govwin-' || id, no data_source filter
     onQuery('WHERE sam_notice_id = $1\n           LIMIT 1', [govwinSrc()]);
 
@@ -170,7 +170,7 @@ describe('getUnifiedOpportunityDetail (F-410)', () => {
       link('govwin', 'G-1'),
     ]);
     onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery("data_source = 'sam_gov'", [samSrc({ title: 'SAM Title' })]);
+    onQuery("data_source IN ('sam.gov', 'sam_gov')", [samSrc({ title: 'SAM Title' })]);
     onQuery('WHERE sam_notice_id = $1\n           LIMIT 1', [govwinSrc({ title: 'GovWin Title' })]);
 
     const result = await getUnifiedOpportunityDetail(
@@ -195,7 +195,7 @@ describe('getUnifiedOpportunityDetail (F-410)', () => {
       link('govwin', 'G-1'),
     ]);
     onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery("data_source = 'sam_gov'", [samSrc({ psc: 'D307' })]);
+    onQuery("data_source IN ('sam.gov', 'sam_gov')", [samSrc({ psc: 'D307' })]);
     onQuery('WHERE sam_notice_id = $1\n           LIMIT 1', [govwinSrc({ psc: null })]);
 
     const result = await getUnifiedOpportunityDetail(
@@ -210,7 +210,7 @@ describe('getUnifiedOpportunityDetail (F-410)', () => {
     onQuery('FROM unified_opportunities WHERE internal_id', [unifiedRow()]);
     onQuery('FROM unified_opportunity_links WHERE internal_id', [link('sam', 'N-1')]);
     onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery("data_source = 'sam_gov'", [samSrc()]);
+    onQuery("data_source IN ('sam.gov', 'sam_gov')", [samSrc()]);
 
     const result = await getUnifiedOpportunityDetail(
       mockPool as unknown as pg.Pool,
@@ -230,7 +230,7 @@ describe('getUnifiedOpportunityDetail (F-410)', () => {
     ]);
     onQuery('FROM unified_opportunity_links WHERE internal_id', [link('sam', 'N-1')]);
     onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery("data_source = 'sam_gov'", [samSrc()]);
+    onQuery("data_source IN ('sam.gov', 'sam_gov')", [samSrc()]);
 
     const result = await getUnifiedOpportunityDetail(
       mockPool as unknown as pg.Pool,
@@ -251,7 +251,7 @@ describe('merged_fields source provenance (F-420a R1)', () => {
     onQuery('FROM unified_opportunities WHERE internal_id', [unifiedRow()]);
     onQuery('FROM unified_opportunity_links WHERE internal_id', [link('sam', 'N-1')]);
     onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery("data_source = 'sam_gov'", [samSrc()]);
+    onQuery("data_source IN ('sam.gov', 'sam_gov')", [samSrc()]);
 
     const result = await getUnifiedOpportunityDetail(
       mockPool as unknown as pg.Pool,
@@ -264,28 +264,6 @@ describe('merged_fields source provenance (F-420a R1)', () => {
     expect(titleSources[0].title).toBe('SAM.gov');
     expect(titleSources[0].url).toBe('https://sam.gov/opp/N-1/view');
     expect(typeof titleSources[0].retrieved_at).toBe('string');
-  });
-
-  it('builds a GovTribe URL for govtribe-sourced fields', async () => {
-    onQuery('FROM unified_opportunities WHERE internal_id', [
-      unifiedRow({ primary_source: 'govtribe' }),
-    ]);
-    onQuery('FROM unified_opportunity_links WHERE internal_id', [link('govtribe', 'GT-9')]);
-    onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery('WHERE govtribe_id = $1', [
-      samSrc({ title: 'GovTribe Title' }),
-    ]);
-
-    const result = await getUnifiedOpportunityDetail(
-      mockPool as unknown as pg.Pool,
-      'uuid-410',
-    );
-
-    const s = result!.merged_fields.title.sources;
-    expect(s[0].kind).toBe('govtribe');
-    expect(s[0].url).toBe(
-      'https://govtribe.com/opportunity/federal-contract-opportunity/GT-9',
-    );
   });
 
   it('returns no SourceRef for fast_track (no addressable URL)', async () => {
@@ -318,7 +296,7 @@ describe('resolvePrimaryOpportunityId (F-420a R2)', () => {
     onQuery('FROM unified_opportunities WHERE internal_id', [unifiedRow()]);
     onQuery('FROM unified_opportunity_links WHERE internal_id', [link('sam', 'N-1')]);
     onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
-    onQuery("data_source = 'sam_gov'", [samSrc()]);
+    onQuery("data_source IN ('sam.gov', 'sam_gov')", [samSrc()]);
 
     const detail = await getUnifiedOpportunityDetail(
       mockPool as unknown as pg.Pool,

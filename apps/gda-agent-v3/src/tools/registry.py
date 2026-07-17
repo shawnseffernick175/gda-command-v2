@@ -11,7 +11,6 @@ from src.tools.decision_memory import decision_memory_lookup
 from src.tools.doctrine_check import doctrine_check
 from src.tools.federal_register_search import federal_register_search
 from src.tools.file_read import file_read
-from src.tools.govtribe_search import govtribe_search
 from src.tools.govwin_search import govwin_search
 from src.tools.pwin_score import pwin_score
 from src.tools.rag_search import rag_search
@@ -27,8 +26,6 @@ from src.tools.schemas import (
     FederalRegisterSearchOutput,
     FileReadInput,
     FileReadOutput,
-    GovtribeSearchInput,
-    GovtribeSearchOutput,
     GovwinSearchInput,
     GovwinSearchOutput,
     PwinScoreInput,
@@ -161,13 +158,6 @@ _register(
     GovwinSearchInput,
     GovwinSearchOutput,
     govwin_search,
-)
-_register(
-    "govtribe_search",
-    "Search GovTribe for federal contract opportunities (MCP-backed, credit-budgeted)",
-    GovtribeSearchInput,
-    GovtribeSearchOutput,
-    govtribe_search,
 )
 
 

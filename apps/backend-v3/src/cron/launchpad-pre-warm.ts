@@ -18,7 +18,6 @@ export async function runLaunchpadPreWarmCron(): Promise<void> {
         usaspending: result.usaspending_inserted,
         federal_register: result.federal_register_inserted,
         govwin: result.govwin_inserted,
-        govtribe: result.govtribe_inserted,
         news: result.news_inserted,
         total: result.total_inserted,
         door_summaries: result.door_summaries_refreshed,

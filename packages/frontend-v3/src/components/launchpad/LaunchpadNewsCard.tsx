@@ -9,7 +9,6 @@ const SOURCE_LABELS: Record<string, string> = {
   usaspending: "USAspending",
   federal_register: "Federal Register",
   govwin: "GovWin",
-  govtribe: "GovTribe",
   news: "News",
 };
 

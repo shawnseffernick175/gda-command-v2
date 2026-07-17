@@ -2,7 +2,7 @@
  * Integration test for mirrorOpportunityToUnified (F-401).
  *
  * Uses the testcontainer Postgres pattern (globalSetup -> setup.ts).
- * Seeds legacy opportunity rows for SAM, GovTribe, and arxiv, calls
+ * Seeds legacy opportunity rows for SAM and arxiv, calls
  * mirrorOpportunityToUnified, and asserts:
  *   - unified_opportunities row created with correct mapped fields
  *   - unified_opportunity_links row with correct source/native_id
@@ -42,13 +42,13 @@ afterAll(async () => {
   if (pool) {
     // Clean up test data
     await pool.query(
-      `DELETE FROM unified_opportunity_links WHERE source_native_id IN ('MIRROR-SAM-001', 'GT-MIRROR-001', 'ARXIV-MIRROR-001')`,
+      `DELETE FROM unified_opportunity_links WHERE source_native_id IN ('MIRROR-SAM-001', 'ARXIV-MIRROR-001')`,
     );
     await pool.query(
       `DELETE FROM opportunities WHERE sam_notice_id = 'MIRROR-SAM-001'`,
     );
     await pool.query(
-      `DELETE FROM opportunities WHERE external_id IN ('GT-MIRROR-001', 'ARXIV-MIRROR-001')`,
+      `DELETE FROM opportunities WHERE external_id IN ('ARXIV-MIRROR-001')`,
     );
     await pool.end();
   }
@@ -76,7 +76,7 @@ describe('mirrorOpportunityToUnified integration', () => {
     );
 
     const { rows: legacyRows } = await pool.query(
-      `SELECT id, data_source, sam_notice_id, govtribe_id, external_id,
+      `SELECT id, data_source, sam_notice_id, external_id,
               title, agency, sub_agency, naics, psc, set_aside,
               value_min, value_max, posted_at::text AS posted_at,
               response_due_at::text AS response_due_at, status
@@ -117,46 +117,6 @@ describe('mirrorOpportunityToUnified integration', () => {
     expect(linkRows[0].match_method).toBe('auto_mirror');
   });
 
-  it('mirrors a GovTribe legacy opportunity', async () => {
-    const { mirrorOpportunityToUnified } = await import(
-      '../../../src/services/opportunities/unified-mirror.js'
-    );
-
-    await pool.query(
-      `INSERT INTO opportunities (
-         title, agency, sub_agency, naics, psc, set_aside,
-         value_min, response_due_at, posted_at,
-         external_id, govtribe_id, data_source, status, source_id
-       ) VALUES (
-         'Mirror Test GovTribe Opp', 'Air Force', 'AFLCMC',
-         '541519', 'D307', 'WOSB', 3000000,
-         '2026-08-20T00:00:00Z', '2026-02-10T00:00:00Z',
-         'GT-MIRROR-001', 'GT-MIRROR-001', 'govtribe', 'tracking', $1
-       ) ON CONFLICT (data_source, external_id) WHERE external_id IS NOT NULL DO NOTHING`,
-      [sourceId],
-    );
-
-    const { rows: legacyRows } = await pool.query(
-      `SELECT id, data_source, sam_notice_id, govtribe_id, external_id,
-              title, agency, sub_agency, naics, psc, set_aside,
-              value_min, value_max, posted_at::text AS posted_at,
-              response_due_at::text AS response_due_at, status
-       FROM opportunities WHERE govtribe_id = 'GT-MIRROR-001'`,
-    );
-    const legacy = legacyRows[0];
-
-    const result = await mirrorOpportunityToUnified(pool, legacy);
-    expect(result.created).toBe(true);
-
-    // Verify link source is govtribe
-    const { rows: linkRows } = await pool.query(
-      `SELECT * FROM unified_opportunity_links WHERE internal_id = $1`,
-      [result.internal_id],
-    );
-    expect(linkRows[0].source).toBe('govtribe');
-    expect(linkRows[0].source_native_id).toBe('GT-MIRROR-001');
-  });
-
   it('mirrors an arxiv legacy opportunity', async () => {
     const { mirrorOpportunityToUnified } = await import(
       '../../../src/services/opportunities/unified-mirror.js'
@@ -176,7 +136,7 @@ describe('mirrorOpportunityToUnified integration', () => {
     );
 
     const { rows: legacyRows } = await pool.query(
-      `SELECT id, data_source, sam_notice_id, govtribe_id, external_id,
+      `SELECT id, data_source, sam_notice_id, external_id,
               title, agency, sub_agency, naics, psc, set_aside,
               value_min, value_max, posted_at::text AS posted_at,
               response_due_at::text AS response_due_at, status
@@ -201,7 +161,7 @@ describe('mirrorOpportunityToUnified integration', () => {
     );
 
     const { rows: legacyRows } = await pool.query(
-      `SELECT id, data_source, sam_notice_id, govtribe_id, external_id,
+      `SELECT id, data_source, sam_notice_id, external_id,
               title, agency, sub_agency, naics, psc, set_aside,
               value_min, value_max, posted_at::text AS posted_at,
               response_due_at::text AS response_due_at, status

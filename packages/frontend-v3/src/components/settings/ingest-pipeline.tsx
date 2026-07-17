@@ -199,30 +199,6 @@ function SourceDetail({
   );
 }
 
-function CreditsBar({ used, budget, pct }: { used: number; budget: number; pct: number }) {
-  const barColor =
-    pct > 90 ? "bg-gda-red" : pct > 70 ? "bg-gda-amber" : "bg-gda-green";
-  const textColor =
-    pct > 90 ? "text-gda-red" : pct > 70 ? "text-gda-amber" : "text-gda-green";
-
-  return (
-    <div className="flex items-center gap-3 px-3 py-2 border-t border-border">
-      <span className="font-mono text-[11px] text-muted-foreground">
-        Credits: GovTribe {used.toLocaleString()} / {budget.toLocaleString()} used this month
-      </span>
-      <div className="flex-1 max-w-[120px] h-2 rounded-full bg-gda-bg-base border border-border overflow-hidden">
-        <div
-          className={cn("h-full rounded-full transition-all", barColor)}
-          style={{ width: `${Math.min(pct, 100)}%` }}
-        />
-      </div>
-      <span className={cn("font-mono text-[11px] font-semibold", textColor)}>
-        {pct}%
-      </span>
-    </div>
-  );
-}
-
 export function IngestPipelineSection() {
   const { data: sources, isLoading } = useIngestStatus();
   const { user } = useAuth();
@@ -244,12 +220,6 @@ export function IngestPipelineSection() {
       <p className="text-xs text-muted-foreground">No ingest sources found.</p>
     );
   }
-
-  // Find GovTribe credits from any govtribe source
-  const govtribeSource = sources.find(
-    (s) => s.source_key === "govtribe" || s.source_key.startsWith("govtribe."),
-  );
-  const credits = govtribeSource?.credits;
 
   return (
     <div className="space-y-0">
@@ -320,15 +290,6 @@ export function IngestPipelineSection() {
           </div>
         );
       })}
-
-      {/* GovTribe credits bar */}
-      {credits && (
-        <CreditsBar
-          used={credits.used}
-          budget={credits.budget}
-          pct={credits.pct}
-        />
-      )}
     </div>
   );
 }

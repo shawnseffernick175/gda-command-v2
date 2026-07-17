@@ -136,7 +136,6 @@ function buildPlainContext(event: RawSentinelEvent): string {
 function deriveActionLabel(event: RawSentinelEvent, output: SentinelSummaryOutput): string | null {
   switch (event.alert_type) {
     case 'rate_limit':
-      if (event.source_key === 'govtribe') return 'Check credit usage';
       return null;
     case 'auth_failure':
       return 'Re-authenticate';
@@ -149,9 +148,6 @@ function deriveActionLabel(event: RawSentinelEvent, output: SentinelSummaryOutpu
   }
 }
 
-function deriveActionUrl(event: RawSentinelEvent): string | null {
-  if (event.source_key === 'govtribe' && event.alert_type === 'rate_limit') {
-    return 'https://govtribe.com/account/billing';
-  }
+function deriveActionUrl(_event: RawSentinelEvent): string | null {
   return null;
 }

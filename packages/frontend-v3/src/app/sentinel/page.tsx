@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   useSentinelHandoffs,
   useSentinelRecentWins,
   useSentinelUpcomingBreaks,
-  useSentinelCreditPacingGovTribe,
   useSentinelCreditPacingGovWin,
 } from "@/hooks/use-sentinel-monitor";
 import { cn } from "@/lib/utils";
-import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 import type {
   SentinelHandoffCard,
   SentinelRecentWinCard,
@@ -154,83 +152,14 @@ function UpcomingBreakRow({ card }: { card: SentinelUpcomingBreakCard }) {
 /* ── Credit Pacing Section ─────────────────────────────────────── */
 
 function CreditPacingSection() {
-  const { data: govtribe, isLoading: gtLoading } = useSentinelCreditPacingGovTribe();
   const { data: govwin, isLoading: gwLoading } = useSentinelCreditPacingGovWin();
 
-  if (gtLoading && gwLoading) {
+  if (gwLoading) {
     return <LoadingSkeleton rows={3} />;
   }
 
   return (
     <div className="space-y-4">
-      {/* GovTribe Credit Pacing */}
-      {govtribe && (
-        <div className="rounded border border-border bg-white p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-foreground">GovTribe Credits</p>
-            <span className={cn(
-              "rounded px-2 py-0.5 text-[11px] font-medium",
-              govtribe.pct >= 95
-                ? "bg-red-500/10 text-red-500"
-                : govtribe.pct >= 80
-                  ? "bg-amber-500/10 text-amber-600"
-                  : "bg-gda-green/10 text-gda-green",
-            )}>
-              {govtribe.pct}% used
-            </span>
-          </div>
-
-          {/* Usage bar */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-[11px] text-muted-foreground">
-              <span>{govtribe.credits_used} used</span>
-              <span>{govtribe.credits_budget} budget</span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-gda-bg-base overflow-hidden">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all",
-                  govtribe.pct >= 95 ? "bg-red-500" : govtribe.pct >= 80 ? "bg-amber-500" : "bg-gda-green",
-                )}
-                style={{ width: `${Math.min(govtribe.pct, 100)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Burn rate sparkline */}
-          {govtribe.daily_burn_history.length > 0 && (
-            <BurnRateSparkline data={govtribe.daily_burn_history} />
-          )}
-
-          {/* Metrics row */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricCell label="Burn rate (7d avg)" value={`${govtribe.burn_rate_7d}/day`} />
-            <MetricCell label="Days left" value={`${govtribe.days_remaining_in_month}`} />
-            <MetricCell label="Daily allowance" value={`${govtribe.daily_allowance}`} />
-            <MetricCell
-              label="Projected exhaustion"
-              value={govtribe.projected_exhaustion_date ?? "N/A"}
-              alert={govtribe.projected_exhaustion_date !== null}
-            />
-          </div>
-
-          {/* Top queries */}
-          {govtribe.top_queries.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-[11px] text-muted-foreground font-medium">Top consuming queries this month</p>
-              <div className="space-y-0.5">
-                {govtribe.top_queries.map((q) => (
-                  <div key={q.tool_name} className="flex items-center justify-between text-xs">
-                    <span className="text-foreground font-mono truncate flex-1">{q.tool_name}</span>
-                    <span className="text-muted-foreground ml-2">{q.credits} credits ({q.call_count} calls)</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* GovWin Volume */}
       {govwin && (
         <div className="rounded border border-border bg-white p-4 space-y-3">
@@ -256,67 +185,6 @@ function CreditPacingSection() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ── Burn Rate Sparkline ───────────────────────────────────────── */
-
-function BurnRateSparkline({ data }: { data: Array<{ date: string; credits: number }> }) {
-  const option = useMemo(() => ({
-    grid: { top: 4, right: 4, bottom: 16, left: 28 },
-    xAxis: {
-      type: "category" as const,
-      data: data.map((d) => d.date.slice(5)),
-      axisLine: { show: false },
-      axisTick: { show: false },
-      axisLabel: { fontSize: 9, color: "var(--color-muted-foreground)" },
-    },
-    yAxis: {
-      type: "value" as const,
-      show: false,
-      min: 0,
-    },
-    tooltip: {
-      trigger: "axis" as const,
-      formatter: (params: Array<{ name: string; value: number }>) => {
-        const p = params[0];
-        return p ? `${p.name}: ${p.value} credits` : "";
-      },
-    },
-    series: [
-      {
-        type: "line",
-        data: data.map((d) => d.credits),
-        smooth: true,
-        symbol: "circle",
-        symbolSize: 4,
-        lineStyle: { width: 2, color: "var(--color-gda-blue)" },
-        itemStyle: { color: "var(--color-gda-blue)" },
-        areaStyle: {
-          color: {
-            type: "linear",
-            x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: "rgba(68,136,255,0.15)" },
-              { offset: 1, color: "rgba(68,136,255,0)" },
-            ],
-          },
-        },
-      },
-    ],
-  }), [data]);
-
-  return (
-    <div className="space-y-1">
-      <p className="text-[11px] text-muted-foreground font-medium">Burn rate trend (7 days)</p>
-      <ReactEChartsCore
-        echarts={echarts}
-        option={option}
-        style={{ height: 64, width: "100%" }}
-        opts={{ renderer: "svg" }}
-        notMerge
-      />
     </div>
   );
 }
