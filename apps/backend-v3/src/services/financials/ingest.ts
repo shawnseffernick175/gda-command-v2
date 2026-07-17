@@ -388,7 +388,18 @@ export async function ingestFinancialRows(
       }
 
       try {
-        if (row.kind === 'plan') {
+        // BUG 5: route by source-series, not by kind alone. Company-P&L rows
+        // carry an explicit source (l1_actual / l1_target). TARGET rows arrive
+        // as kind 'plan' but MUST land in financial_actuals so the trend/variance
+        // path can read target (l1_target) against actual (l1_actual) on the same
+        // natural key. Only generic budget/plan rows (no company-P&L source) go
+        // to financial_plan.
+        const companyPnlSource =
+          row.source === 'l1_actual' || row.source === 'l1_target';
+        if (companyPnlSource) {
+          await upsertRow('financial_actuals', ACTUAL_COLUMNS, row, sourceDocId);
+          actual += 1;
+        } else if (row.kind === 'plan') {
           await upsertRow('financial_plan', PLAN_COLUMNS, row);
           plan += 1;
         } else if (row.kind === 'actual') {

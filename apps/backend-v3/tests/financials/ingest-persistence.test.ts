@@ -44,6 +44,7 @@ import {
   ingestSieRows,
   ingestProjectRevenueRows,
   ingestArRows,
+  ingestFinancialRows,
 } from '../../src/services/financials/ingest.js';
 
 const FIXTURES = join(__dirname, '../fixtures/financials');
@@ -66,6 +67,8 @@ async function extractXlsxText(filepath: string): Promise<string> {
 }
 
 const insertCalls = () => calls.filter((c) => /INSERT INTO/i.test(c.sql));
+const insertInto = (table: string) =>
+  calls.filter((c) => new RegExp(`INSERT INTO\\s+${table}\\b`, 'i').test(c.sql));
 
 describe('financial ingest persistence (parser -> mapper -> INSERT payload)', () => {
   let tbText: string;
@@ -206,5 +209,89 @@ describe('financial ingest persistence (parser -> mapper -> INSERT payload)', ()
     calls.length = 0;
     const sieInserted = await ingestSieRows(sieParsed!.rows, 1);
     expect(sieInserted).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * BUG 5: ingestFinancialRows must route company-P&L rows by their source-series,
+ * not by kind alone. A TARGET company-P&L row arrives as kind 'plan' but carries
+ * source 'l1_target'; it MUST land in financial_actuals (as source l1_target) so
+ * the trend/variance path can read target (l1_target) against actual (l1_actual)
+ * on the same natural key. Only generic budget/plan rows (no company-P&L source)
+ * belong in financial_plan.
+ */
+describe('ingestFinancialRows — company-P&L source routing (BUG 5)', () => {
+  beforeEach(() => {
+    calls.length = 0;
+  });
+
+  const mkRow = (over: Record<string, unknown>) => ({
+    period: 'FY26 Jan',
+    fiscal_year: 2026,
+    quarter: 1,
+    kind: 'actual' as const,
+    orders: null,
+    sales: 1000,
+    ebit: 120,
+    gross_margin: 30,
+    ros: 12,
+    ...over,
+  });
+
+  it('routes a TARGET row (kind plan, source l1_target) into financial_actuals, never financial_plan', async () => {
+    const row = mkRow({ kind: 'plan', source: 'l1_target', sales: 76202, ebit: 76202 });
+    const res = await ingestFinancialRows([row as never], 7);
+
+    const actuals = insertInto('financial_actuals');
+    const plans = insertInto('financial_plan');
+
+    expect(res.actual).toBe(1);
+    expect(res.plan).toBe(0);
+    expect(actuals.length).toBe(1);
+    expect(plans.length).toBe(0); // must NOT write to financial_plan
+    expect(actuals[0].params[0]).toBe('l1_target'); // source column
+    // source_doc_id is appended for financial_actuals writes.
+    expect(actuals[0].params).toContain(7);
+  });
+
+  it('lands l1_actual and l1_target for the SAME period both in financial_actuals (variance can join them)', async () => {
+    const actual = mkRow({ kind: 'actual', source: 'l1_actual', sales: 1000, ebit: 36024 });
+    const target = mkRow({ kind: 'plan', source: 'l1_target', sales: 1200, ebit: 76202 });
+    const res = await ingestFinancialRows([actual as never, target as never], 7);
+
+    const actuals = insertInto('financial_actuals');
+    const plans = insertInto('financial_plan');
+
+    expect(res.actual).toBe(2);
+    expect(res.plan).toBe(0);
+    expect(plans.length).toBe(0);
+    const sources = actuals.map((c) => c.params[0]).sort();
+    expect(sources).toEqual(['l1_actual', 'l1_target']);
+  });
+
+  it('still routes a generic plan row (no company-P&L source) into financial_plan', async () => {
+    const row = mkRow({ kind: 'plan', source: null, sales: 5000, ebit: 500 });
+    const res = await ingestFinancialRows([row as never], null);
+
+    const actuals = insertInto('financial_actuals');
+    const plans = insertInto('financial_plan');
+
+    expect(res.plan).toBe(1);
+    expect(res.actual).toBe(0);
+    expect(plans.length).toBe(1);
+    expect(actuals.length).toBe(0);
+    // resolveSource falls back to l1_target for a plan row with no explicit source.
+    expect(plans[0].params[0]).toBe('l1_target');
+  });
+
+  it('still routes a generic income_statement actual into financial_actuals', async () => {
+    const row = mkRow({ kind: 'actual', source: 'income_statement', sales: 2000, ebit: 200 });
+    const res = await ingestFinancialRows([row as never], 3);
+
+    expect(res.actual).toBe(1);
+    expect(res.plan).toBe(0);
+    expect(insertInto('financial_actuals').length).toBe(1);
+    expect(insertInto('financial_plan').length).toBe(0);
+    expect(insertInto('financial_actuals')[0].params[0]).toBe('income_statement');
   });
 });
