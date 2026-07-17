@@ -63,13 +63,20 @@ describe('discoverRecentOpportunitiesWithDetailApi — Deltek V3 sub-endpoint en
     delete process.env['GOVWIN_HOURLY_LIMIT'];
   });
 
-  it('pulls incumbent from /companies and competitors from the other companies', async () => {
+  it('pulls incumbent from /contracts (incumbent==true) and competitors from /companies', async () => {
     const list = { opportunities: [deltekSummary('GW-1')] };
+    // Related Companies carries NO incumbent flag — every name is a competitor candidate.
     const companies = {
       companies: [
-        { companyName: 'Acme Federal LLC', role: 'Incumbent' },
-        { companyName: 'Booz Allen', role: 'Competitor' },
-        { companyName: 'Leidos', relationship: 'tracking' },
+        { companyName: 'Booz Allen' },
+        { companyName: 'Leidos' },
+      ],
+    };
+    // The incumbent flag lives on the Contracts object (Boolean String).
+    const contracts = {
+      contracts: [
+        { incumbent: 'true', company: { id: 'C1', name: 'Acme Federal LLC' } },
+        { incumbent: 'false', company: { id: 'C2', name: 'Northrop' } },
       ],
     };
 
@@ -77,7 +84,7 @@ describe('discoverRecentOpportunitiesWithDetailApi — Deltek V3 sub-endpoint en
     const mockFetch = vi.fn((url: string) => {
       calledPaths.push(url);
       if (/\/opportunities\/GW-1\/companies/.test(url)) return Promise.resolve(jsonResponse(companies));
-      if (/\/opportunities\/GW-1\/contracts/.test(url)) return Promise.resolve(jsonResponse({ contracts: [] }));
+      if (/\/opportunities\/GW-1\/contracts/.test(url)) return Promise.resolve(jsonResponse(contracts));
       if (/\/opportunities\/GW-1$/.test(url)) return Promise.resolve(jsonResponse(deltekSummary('GW-1')));
       return Promise.resolve(jsonResponse(list));
     });
@@ -88,12 +95,14 @@ describe('discoverRecentOpportunitiesWithDetailApi — Deltek V3 sub-endpoint en
     );
     const result = await discoverRecentOpportunitiesWithDetailApi();
 
-    // The companies sub-endpoint was called (incumbent is NOT on the opp object).
+    // Both sub-endpoints were called (incumbent is NOT on the opp object).
     expect(calledPaths.some((p) => /\/opportunities\/GW-1\/companies/.test(p))).toBe(true);
+    expect(calledPaths.some((p) => /\/opportunities\/GW-1\/contracts/.test(p))).toBe(true);
 
     const gw1 = result.opportunities.find((o) => o.govwinId === 'GW-1')!;
     expect(gw1.incumbent).toBe('Acme Federal LLC');
-    expect(gw1.competitors).toEqual(['Booz Allen', 'Leidos']);
+    // Related Companies + non-incumbent contract companies, incumbent removed, deduped.
+    expect(gw1.competitors).toEqual(['Booz Allen', 'Leidos', 'Northrop']);
     // oppValue string parsed to numeric dollars, raw preserved.
     expect(gw1.valueMin).toBe(5_000_000);
     expect(gw1.valueMax).toBe(5_000_000);
@@ -103,12 +112,14 @@ describe('discoverRecentOpportunitiesWithDetailApi — Deltek V3 sub-endpoint en
     expect(result.detailFetches).toBe(1);
   });
 
-  it('falls back to /contracts for the incumbent when /companies is empty', async () => {
+  it('sources the incumbent from the Contracts incumbent flag when /companies is empty', async () => {
     const list = { opportunities: [deltekSummary('GW-2')] };
     const mockFetch = vi.fn((url: string) => {
       if (/\/opportunities\/GW-2\/companies/.test(url)) return Promise.resolve(jsonResponse({ companies: [] }));
       if (/\/opportunities\/GW-2\/contracts/.test(url)) {
-        return Promise.resolve(jsonResponse({ contracts: [{ primeContractor: 'Globex Corp' }] }));
+        return Promise.resolve(
+          jsonResponse({ contracts: [{ incumbent: 'true', company: { id: 'X', name: 'Globex Corp' } }] }),
+        );
       }
       if (/\/opportunities\/GW-2$/.test(url)) return Promise.resolve(jsonResponse(deltekSummary('GW-2')));
       return Promise.resolve(jsonResponse(list));

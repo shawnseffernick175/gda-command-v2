@@ -101,6 +101,9 @@ services:
       GOVWIN_API_BASE: ${GOVWIN_API_BASE:-}
       GOVWIN_TOKEN_URL: ${GOVWIN_TOKEN_URL:-}
       GOVWIN_HOURLY_LIMIT: ${GOVWIN_HOURLY_LIMIT:-3500}
+      # Discovery window: -12H for the 6-hourly cron; 01/01/1900 for a full backfill (#1140).
+      GOVWIN_OPP_SELECTION_DATE_FROM: ${GOVWIN_OPP_SELECTION_DATE_FROM:-}
+      GOVWIN_MAX_DISCOVERY_PAGES: ${GOVWIN_MAX_DISCOVERY_PAGES:-}
       GOVWIN_ALLOW_SCRAPE: ${GOVWIN_ALLOW_SCRAPE:-false}
     labels:
       - "traefik.enable=true"

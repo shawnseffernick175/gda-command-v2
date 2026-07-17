@@ -30,6 +30,7 @@ import {
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { evaluateRelevance } from '../../constants/relevance.js';
+import { ENVISION_NAICS } from '../../constants/envision-naics.js';
 
 const API_BASE = process.env['GOVWIN_API_BASE'] ?? 'https://services.govwin.com/neo-ws';
 /** WSAPI org-wide rolling hourly cap. Default 3,500 (safety margin under 4,000). */
@@ -42,6 +43,50 @@ const MAX_RATE_LIMIT_RETRIES = 3;
 const MAX_SEARCH_PAGE = 100;
 /** Bounded concurrency for per-opportunity enrichment fetches. */
 const DETAIL_CONCURRENCY = 4;
+
+/**
+ * Deltek WSAPI V3 discovery parameters (Quick Reference p22-26).
+ *
+ * - `oppType=OPP` restricts to GovWin-analyst-Tracked Opps (the high-value
+ *   forecast/pre-RFP intel we want), NOT the FBO/SAM firehose or commodity parts.
+ * - `naics` is a comma-delimited begins-with filter; we derive it from the same
+ *   ENVISION_NAICS set the relevance engine uses (numeric codes only — the GSA
+ *   MAS SINs like 54151S/54151HACS are not NAICS values).
+ * - `sort` value MUST be `updatedDate` (with the "d"); Deltek rejects
+ *   `updateDate` with a 422 even though the response FIELD is `updateDate`.
+ * - `oppCategory=2` = New and Update (default) so updates are captured.
+ */
+const DISCOVERY_OPP_TYPE = 'OPP';
+const DISCOVERY_OPP_CATEGORY = '2';
+/**
+ * Relative window for the 6-hourly cron. `-12H` overlaps two runs so nothing is
+ * missed. For a full backfill set GOVWIN_OPP_SELECTION_DATE_FROM=01/01/1900.
+ */
+const DISCOVERY_DATE_FROM = process.env['GOVWIN_OPP_SELECTION_DATE_FROM'] ?? '-12H';
+/** Bound the paging loop so a run can never fan out unbounded. */
+const MAX_DISCOVERY_PAGES = parseInt(process.env['GOVWIN_MAX_DISCOVERY_PAGES'] ?? '5', 10);
+
+/**
+ * Envision NAICS codes usable as a GovWin `naics` filter. GovWin accepts full or
+ * partial (begins-with) numeric codes; the GSA MAS SINs (54151S, 54151HACS) are
+ * not NAICS numbers and are excluded.
+ */
+const ENVISION_NAICS_CSV = ENVISION_NAICS.filter((c) => /^\d+$/.test(c)).join(',');
+
+/** Build the Deltek V3 discovery query for a single page. */
+function buildDiscoveryPath(pageSize: number, offset: number, dateFrom: string): string {
+  const params = new URLSearchParams({
+    oppType: DISCOVERY_OPP_TYPE,
+    naics: ENVISION_NAICS_CSV,
+    sort: 'updatedDate',
+    order: 'desc',
+    max: String(pageSize),
+    offset: String(offset),
+    oppSelectionDateFrom: dateFrom,
+    oppCategory: DISCOVERY_OPP_CATEGORY,
+  });
+  return `/opportunities?${params.toString()}`;
+}
 
 /** Links to the opportunity sub-endpoints (companies/contracts/contacts). */
 export interface GovWinOppLinks {
@@ -338,12 +383,17 @@ interface DeltekCompaniesResponse {
 }
 
 interface DeltekContract {
+  /** Deltek exposes the incumbent flag as a Boolean String ("true"/"false"). */
+  incumbent?: boolean | string;
+  /** The awardee company lives on the nested `company` object ({id, name}). */
+  company?: { id?: string; name?: string };
+  // Tolerate legacy/flat shapes seen in earlier payloads.
+  isIncumbent?: boolean;
   primeContractor?: string;
   contractor?: string;
   vendorName?: string;
   awardee?: string;
   companyName?: string;
-  isIncumbent?: boolean;
 }
 
 interface DeltekContractsResponse {
@@ -365,6 +415,28 @@ function isIncumbentCompany(c: DeltekCompany): boolean {
   if (c.isIncumbent === true) return true;
   const role = `${c.role ?? ''} ${c.relationship ?? ''} ${c.relationshipType ?? ''}`.toLowerCase();
   return role.includes('incumbent');
+}
+
+/** The Contracts object carries the authoritative incumbent flag (Boolean String). */
+function isIncumbentContract(c: DeltekContract): boolean {
+  if (typeof c.incumbent === 'boolean') return c.incumbent;
+  if (typeof c.incumbent === 'string') return c.incumbent.trim().toLowerCase() === 'true';
+  return c.isIncumbent === true;
+}
+
+/** Resolve the awardee company name from a contract (nested or flat shape). */
+function contractCompanyName(c: DeltekContract): string | null {
+  return (
+    (
+      c.company?.name ??
+      c.primeContractor ??
+      c.contractor ??
+      c.vendorName ??
+      c.awardee ??
+      c.companyName ??
+      ''
+    ).trim() || null
+  );
 }
 
 /** Convert a link href (absolute or relative) into a path under API_BASE. */
@@ -409,43 +481,67 @@ export async function fetchOpportunityCompanies(
 }
 
 /**
- * Fetch contract history for an opportunity. Used as a fallback source for the
- * incumbent when the companies sub-endpoint is empty.
+ * Fetch contract history for an opportunity. Per Deltek spec (p13/p14) the
+ * incumbent flag lives on the Contracts object (`incumbent` Boolean String),
+ * NOT on Related Companies. The incumbent is the contract where
+ * `incumbent == true`; every other contract company is a competitor.
  */
 export async function fetchOpportunityContracts(
   govwinId: string,
   href?: string | null,
-): Promise<{ incumbent: string | null }> {
+): Promise<{ incumbent: string | null; competitors: string[] }> {
   const path = href
     ? hrefToPath(href)
     : `/opportunities/${encodeURIComponent(govwinId)}/contracts`;
   const data = await apiGet<DeltekContractsResponse>(path);
   const list = data.contracts ?? data.data ?? data.results ?? [];
 
+  let incumbent: string | null = null;
+  const competitors: string[] = [];
   for (const c of list) {
-    if (c.isIncumbent === false) continue;
-    const name = (c.primeContractor ?? c.contractor ?? c.vendorName ?? c.awardee ?? c.companyName ?? '').trim();
-    if (name) return { incumbent: name };
+    const name = contractCompanyName(c);
+    if (!name) continue;
+    if (!incumbent && isIncumbentContract(c)) {
+      incumbent = name;
+    } else {
+      competitors.push(name);
+    }
   }
-  return { incumbent: null };
+  return { incumbent, competitors };
 }
 
 /**
- * Discover recently-modified opportunities via the Web Services API.
+ * Discover recently-modified GovWin Tracked Opportunities via the Web Services
+ * API. Filters to `oppType=OPP` + Envision NAICS, sorts by `updatedDate`, and
+ * pages via `offset` until `meta.paging.totalCount` is exhausted (bounded by
+ * MAX_DISCOVERY_PAGES).
  */
 export async function discoverRecentOpportunitiesApi(
-  maxResults = 50,
+  maxResults = MAX_SEARCH_PAGE,
 ): Promise<GovWinApiOpportunity[]> {
   if (isCasMode()) {
     return discoverRecentOpportunitiesApiCas(maxResults);
   }
-  // WSAPI rejects max > 100; clamp defensively.
-  const max = Math.min(maxResults, MAX_SEARCH_PAGE);
-  const data = await apiGet<GovWinSearchResult>(
-    `/opportunities?sort=updateDate&order=desc&max=${max}&oppSelectionDateFrom=-30D`,
-  );
+  // WSAPI rejects max > 100; clamp the page size defensively.
+  const pageSize = Math.min(maxResults, MAX_SEARCH_PAGE);
+  const rawItems: GovWinRawOpp[] = [];
+  let offset = 0;
+  let totalCount = Infinity;
 
-  const rawItems = data.opportunities ?? data.results ?? data.data ?? [];
+  for (let page = 0; page < MAX_DISCOVERY_PAGES; page += 1) {
+    const data = await apiGet<GovWinSearchResult>(
+      buildDiscoveryPath(pageSize, offset, DISCOVERY_DATE_FROM),
+    );
+    const items = data.opportunities ?? data.results ?? data.data ?? [];
+    rawItems.push(...items);
+
+    const reportedTotal = data.meta?.paging?.totalCount;
+    if (typeof reportedTotal === 'number') totalCount = reportedTotal;
+
+    offset += pageSize;
+    if (items.length < pageSize || offset >= totalCount) break;
+  }
+
   return rawItems.map(mapRawToOpp);
 }
 
@@ -544,9 +640,12 @@ async function loadStoredUpdateDates(ids: string[]): Promise<Map<string, string>
 }
 
 /**
- * Enrich a single relevant opportunity with incumbent + competitors from the
- * companies sub-endpoint, falling back to the contracts sub-endpoint for the
- * incumbent. Returns the merged record and the number of WSAPI calls made.
+ * Enrich a single relevant opportunity with incumbent + competitors.
+ *
+ * Per Deltek spec the incumbent flag lives on the Contracts object, so the
+ * incumbent is sourced from `/contracts` (the contract where `incumbent==true`).
+ * Competitors are the Related Companies (`/companies`) plus other, non-incumbent
+ * contract companies, with the incumbent removed and duplicates collapsed.
  */
 async function enrichOneOpportunity(
   summary: GovWinApiOpportunity,
@@ -556,13 +655,14 @@ async function enrichOneOpportunity(
   let calls = 0;
 
   let incumbent: string | null = null;
-  let competitors: string[] = [];
+  const competitorNames: string[] = [];
 
   try {
     const companies = await fetchOpportunityCompanies(merged.govwinId, merged.links?.companies);
     calls += 1;
-    incumbent = companies.incumbent;
-    competitors = companies.competitors;
+    // Related Companies carries no incumbent flag; treat all as candidate competitors.
+    if (companies.incumbent) competitorNames.push(companies.incumbent);
+    competitorNames.push(...companies.competitors);
   } catch (err) {
     logger.warn(
       { govwinId: merged.govwinId, error: err instanceof Error ? err.message : String(err) },
@@ -570,27 +670,46 @@ async function enrichOneOpportunity(
     );
   }
 
-  if (!incumbent) {
-    try {
-      const contracts = await fetchOpportunityContracts(merged.govwinId, merged.links?.contracts);
-      calls += 1;
-      incumbent = contracts.incumbent;
-    } catch (err) {
-      logger.warn(
-        { govwinId: merged.govwinId, error: err instanceof Error ? err.message : String(err) },
-        'govwin_contracts_fetch_error',
-      );
-    }
+  try {
+    const contracts = await fetchOpportunityContracts(merged.govwinId, merged.links?.contracts);
+    calls += 1;
+    incumbent = contracts.incumbent;
+    competitorNames.push(...contracts.competitors);
+  } catch (err) {
+    logger.warn(
+      { govwinId: merged.govwinId, error: err instanceof Error ? err.message : String(err) },
+      'govwin_contracts_fetch_error',
+    );
   }
+
+  const resolvedIncumbent = incumbent ?? merged.incumbent;
+  const competitors = dedupeCompetitors(competitorNames, resolvedIncumbent);
 
   return {
     opp: {
       ...merged,
-      incumbent: incumbent ?? merged.incumbent,
+      incumbent: resolvedIncumbent,
       competitors: competitors.length > 0 ? competitors : merged.competitors,
     },
     calls,
   };
+}
+
+/** Collapse duplicates (case-insensitive) and drop the incumbent from competitors. */
+function dedupeCompetitors(names: string[], incumbent: string | null): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const incumbentKey = incumbent?.trim().toLowerCase();
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (key === incumbentKey) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
 }
 
 /**
@@ -609,7 +728,7 @@ async function enrichOneOpportunity(
  * summaries are returned unchanged (no extra calls).
  */
 export async function discoverRecentOpportunitiesWithDetailApi(
-  maxResults = 50,
+  maxResults = MAX_SEARCH_PAGE,
 ): Promise<DiscoverWithDetailResult> {
   const summaries = await discoverRecentOpportunitiesApi(maxResults);
 
