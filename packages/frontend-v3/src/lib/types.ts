@@ -748,12 +748,21 @@ export interface ProjectTrendData {
 
 /* ── Ingestion Coverage (F-625) ───────────────────────────────── */
 
+export type IngestionCoverageStatus =
+  | "ingested"
+  | "skipped_duplicate"
+  | "not_ingested"
+  | "extraction_failed";
+
 export interface IngestionCoverageDoc {
   doc_id: number;
   filename: string;
   extraction_status: string;
   destinations: Array<{ table: string; row_count: number }>;
-  status: "ingested" | "no_handler" | "extraction_failed";
+  row_count: number;
+  status: IngestionCoverageStatus;
+  reason: string | null;
+  duplicate_of: number | null;
 }
 
 export interface IngestionCoverageData {
@@ -761,8 +770,11 @@ export interface IngestionCoverageData {
   summary: {
     total: number;
     ingested: number;
-    no_handler: number;
+    skipped_duplicate: number;
+    not_ingested: number;
     extraction_failed: number;
+    /** Back-compat: NOT-INGESTED rows whose reason is `no_handler`. */
+    no_handler: number;
   };
 }
 

@@ -5,6 +5,14 @@ import { llmRouter } from '../lib/llm-router.js';
 import type { FinancialAnalyzeInput } from '../lib/llm-router.types.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
 import { parseCalendarMode, getMonthsForMode, fiscalMonthIndex, type CalendarMode } from '../lib/fiscal-calendar.js';
+import { classifyFinancialDoc } from '../services/financials/reingest-doc.js';
+import {
+  classifyCoverage,
+  primaryTypeOf,
+  handlerMatched,
+  inferDocPeriod,
+  type CoverageDocInput,
+} from '../services/financials/coverage.js';
 
 // Live, user-specific financials read from the DB on every request. They must
 // never be served from an HTTP cache (browser/proxy) or a 304 revalidation,
@@ -86,6 +94,14 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
              AND source IN ('income_statement', 'l1_actual')
              AND is_seed = false
              AND period NOT LIKE '%Q%'
+             -- Exclude phantom periods that carry no P&L signal (e.g. an
+             -- orders-only row for a month with no ingested actuals), so a
+             -- backlog/orders figure can never surface as Orders in the header.
+             AND (
+               COALESCE(actual_sales, 0) <> 0
+               OR COALESCE(actual_ebit, 0) <> 0
+               OR COALESCE(actual_gross_margin, 0) <> 0
+             )
            ORDER BY period,
              CASE source WHEN 'income_statement' THEN 1 ELSE 2 END
          ) ranked`,
@@ -194,6 +210,16 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
               actual_ros AS ros
        FROM financial_actuals
        WHERE source IN ('income_statement', 'l1_actual')
+         -- Never emit a monthly P&L row for a period with no ingested actuals.
+         -- Quarter rows (period LIKE '%Q%') are recomputed aggregates and always
+         -- kept; month rows must carry a real sales/ebit/gross-margin signal so a
+         -- phantom orders-only period (the June bug) is not rendered in the trend.
+         AND (
+           period LIKE '%Q%'
+           OR COALESCE(actual_sales, 0) <> 0
+           OR COALESCE(actual_ebit, 0) <> 0
+           OR COALESCE(actual_gross_margin, 0) <> 0
+         )
        ORDER BY period,
                 CASE source WHEN 'income_statement' THEN 0 WHEN 'l1_actual' THEN 1 ELSE 2 END`,
     );
@@ -795,75 +821,99 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /v3/financials/ingestion-coverage
-  // For each financial vault doc, show destination table + row count, or reason it didn't ingest.
+  // For each financial vault doc, show destination table + row count, or an
+  // explicit, human-readable reason it did not ingest. Zero-touch requirement
+  // (F-1142): NO file may fail silently. Every doc resolves to one of:
+  //   ingested | skipped_duplicate | not_ingested (reason) | extraction_failed
   app.get('/v3/financials/ingestion-coverage', async (req, reply) => {
     noStore(reply);
     const { rows: docs } = await pool.query(
-      `SELECT id, filename, doc_type, extraction_status, uploaded_at
+      `SELECT id, filename, doc_type, extraction_status, extracted_text, uploaded_at
        FROM vault_documents
        WHERE deleted_at IS NULL
          AND (doc_type = 'financial' OR doc_type = 'other')
        ORDER BY uploaded_at DESC`,
     );
 
-    const coverage: Array<{
-      doc_id: number;
-      filename: string;
-      extraction_status: string;
-      destinations: Array<{ table: string; row_count: number }>;
-      status: 'ingested' | 'no_handler' | 'extraction_failed';
-    }> = [];
+    const tables = [
+      'financial_actuals',
+      'balance_sheet_actuals',
+      'cost_detail_actuals',
+      'indirect_expense_actuals',
+      'ap_actuals',
+      'ar_actuals',
+      'trial_balance',
+      'project_revenue_actuals',
+    ];
 
-    for (const doc of docs) {
-      const docId = Number(doc.id);
-      const destinations: Array<{ table: string; row_count: number }> = [];
-
-      const tables = [
-        'financial_actuals',
-        'balance_sheet_actuals',
-        'cost_detail_actuals',
-        'indirect_expense_actuals',
-        'ap_actuals',
-        'ar_actuals',
-        'trial_balance',
-        'project_revenue_actuals',
-      ];
-
-      for (const table of tables) {
-        const { rows: [countRow] } = await pool.query(
-          `SELECT COUNT(*) AS cnt FROM ${table} WHERE source_doc_id = $1`,
-          [docId],
-        );
-        const cnt = Number(countRow?.cnt ?? 0);
-        if (cnt > 0) destinations.push({ table, row_count: cnt });
+    // One grouped query per table (not one per doc) → destinations per doc_id.
+    const destinationsByDoc = new Map<number, Array<{ table: string; row_count: number }>>();
+    for (const table of tables) {
+      const { rows: counts } = await pool.query(
+        `SELECT source_doc_id, COUNT(*) AS cnt
+         FROM ${table}
+         WHERE source_doc_id IS NOT NULL
+         GROUP BY source_doc_id`,
+      );
+      for (const c of counts) {
+        const docId = Number(c.source_doc_id);
+        const cnt = Number(c.cnt ?? 0);
+        if (cnt <= 0) continue;
+        const list = destinationsByDoc.get(docId) ?? [];
+        list.push({ table, row_count: cnt });
+        destinationsByDoc.set(docId, list);
       }
-
-      const extractionStatus = doc.extraction_status as string;
-      let status: 'ingested' | 'no_handler' | 'extraction_failed';
-      if (extractionStatus !== 'success') {
-        status = 'extraction_failed';
-      } else if (destinations.length > 0) {
-        status = 'ingested';
-      } else {
-        status = 'no_handler';
-      }
-
-      coverage.push({
-        doc_id: docId,
-        filename: doc.filename as string,
-        extraction_status: extractionStatus,
-        destinations,
-        status,
-      });
     }
+
+    // Build the per-doc facts the coverage classifier needs.
+    const docInputs: CoverageDocInput[] = docs.map((doc) => {
+      const docId = Number(doc.id);
+      const filename = doc.filename as string;
+      const destinations = destinationsByDoc.get(docId) ?? [];
+      const rowCount = destinations.reduce((s, d) => s + d.row_count, 0);
+      const cls = classifyFinancialDoc(
+        filename,
+        (doc.extracted_text as string | null) ?? '',
+        (doc.doc_type as string | null) ?? null,
+      );
+      return {
+        doc_id: docId,
+        filename,
+        extraction_status: doc.extraction_status as string,
+        row_count: rowCount,
+        primary_type: primaryTypeOf(cls),
+        period: inferDocPeriod(filename),
+        handler_matched: handlerMatched(cls),
+      };
+    });
+
+    const verdicts = classifyCoverage(docInputs);
+
+    const coverage = docInputs.map((d) => {
+      const verdict = verdicts.get(d.doc_id)!;
+      const destinations = destinationsByDoc.get(d.doc_id) ?? [];
+      return {
+        doc_id: d.doc_id,
+        filename: d.filename,
+        extraction_status: d.extraction_status,
+        destinations,
+        row_count: d.row_count,
+        status: verdict.status,
+        reason: verdict.reason,
+        duplicate_of: verdict.duplicate_of,
+      };
+    });
 
     return reply.send(successEnvelope({
       coverage,
       summary: {
         total: coverage.length,
         ingested: coverage.filter((c) => c.status === 'ingested').length,
-        no_handler: coverage.filter((c) => c.status === 'no_handler').length,
+        skipped_duplicate: coverage.filter((c) => c.status === 'skipped_duplicate').length,
+        not_ingested: coverage.filter((c) => c.status === 'not_ingested').length,
         extraction_failed: coverage.filter((c) => c.status === 'extraction_failed').length,
+        // Back-compat alias: NOT-INGESTED includes the former `no_handler` bucket.
+        no_handler: coverage.filter((c) => c.status === 'not_ingested' && c.reason === 'no_handler').length,
       },
     }, req.requestId));
   });

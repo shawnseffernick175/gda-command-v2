@@ -173,7 +173,7 @@ function parseNum(v: string): number {
 }
 
 /** Infer period and fiscal year from filename. */
-function inferPeriod(filename: string): { period: string; fiscal_year: number; quarter: number } | null {
+export function inferPeriod(filename: string): { period: string; fiscal_year: number; quarter: number } | null {
   const months: Record<string, { num: number; label: string }> = {
     jan: { num: 1, label: 'Jan' }, feb: { num: 2, label: 'Feb' }, mar: { num: 3, label: 'Mar' },
     apr: { num: 4, label: 'Apr' }, may: { num: 5, label: 'May' }, jun: { num: 6, label: 'Jun' },
