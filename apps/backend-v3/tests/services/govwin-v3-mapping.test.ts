@@ -145,6 +145,67 @@ describe('fetchOpportunityByIdApi — Deltek V3 field mapping', () => {
   });
 });
 
+describe('discoverRecentOpportunitiesApi — Deltek V3 discovery query', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    process.env['GOVWIN_AUTH_MODE'] = 'oauth2';
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env['GOVWIN_AUTH_MODE'];
+    delete process.env['GOVWIN_OPP_SELECTION_DATE_FROM'];
+  });
+
+  it('uses sort=updatedDate, oppType=OPP and a NAICS filter (never sort=updateDate)', async () => {
+    const calledUrls: string[] = [];
+    const mockFetch = vi.fn((url: string) => {
+      calledUrls.push(url);
+      // Single short page so the pager stops after one call.
+      return Promise.resolve(jsonResponse({ opportunities: [], meta: { paging: { totalCount: 0 } } }));
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { discoverRecentOpportunitiesApi } = await import('../../src/services/govwin/api_client.js');
+    await discoverRecentOpportunitiesApi();
+
+    expect(calledUrls.length).toBeGreaterThan(0);
+    const url = calledUrls[0]!;
+    const qs = new URLSearchParams(url.split('?')[1]);
+
+    // Bug 1 regression guard: the sort VALUE must be updatedDate (with the "d").
+    expect(qs.get('sort')).toBe('updatedDate');
+    expect(url).not.toMatch(/sort=updateDate(&|$)/);
+    // Bug 2: restrict to GovWin Tracked Opps, not the FBO/SAM firehose.
+    expect(qs.get('oppType')).toBe('OPP');
+    // Bug 3: a non-empty Envision NAICS filter that excludes GSA MAS SINs.
+    const naics = qs.get('naics') ?? '';
+    expect(naics.length).toBeGreaterThan(0);
+    expect(naics.split(',')).toContain('541330');
+    expect(naics).not.toMatch(/54151S|54151HACS/);
+    // Bug 4: capture updates and use the relative window default.
+    expect(qs.get('oppCategory')).toBe('2');
+    expect(qs.get('oppSelectionDateFrom')).toBe('-12H');
+  });
+
+  it('honours GOVWIN_OPP_SELECTION_DATE_FROM for a full backfill', async () => {
+    process.env['GOVWIN_OPP_SELECTION_DATE_FROM'] = '01/01/1900';
+    const calledUrls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        calledUrls.push(url);
+        return Promise.resolve(jsonResponse({ opportunities: [], meta: { paging: { totalCount: 0 } } }));
+      }),
+    );
+
+    const { discoverRecentOpportunitiesApi } = await import('../../src/services/govwin/api_client.js');
+    await discoverRecentOpportunitiesApi();
+
+    const qs = new URLSearchParams(calledUrls[0]!.split('?')[1]);
+    expect(qs.get('oppSelectionDateFrom')).toBe('01/01/1900');
+  });
+});
+
 describe('hourly rolling limiter + 429 backoff', () => {
   beforeEach(() => {
     vi.resetModules();
