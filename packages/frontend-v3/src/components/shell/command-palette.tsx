@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { NAV_ITEMS, SETTINGS_ITEM } from "./nav-items";
+import { NAV_ITEMS } from "./nav-items";
 
 const ALL_COMMANDS = [
   ...NAV_ITEMS.map((n) => ({
@@ -10,11 +10,6 @@ const ALL_COMMANDS = [
     action: n.href,
     section: "Navigation",
   })),
-  {
-    label: "Go to Settings",
-    action: SETTINGS_ITEM.href,
-    section: "Navigation",
-  },
   {
     label: "Run OODA on...",
     action: "/opportunities",
