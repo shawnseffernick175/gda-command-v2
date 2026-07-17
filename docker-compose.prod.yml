@@ -83,6 +83,8 @@ services:
       SAM_GOV_API_KEY: ${SAM_GOV_API_KEY:-}
       AGENT_V3_URL: http://gda-agent-v3:8001
       AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
+      # --- Research feeds (nsf/arxiv/nih/sbir/dod_rss) — default OFF (#1132) ---
+      RESEARCH_FEEDS_ENABLED: ${RESEARCH_FEEDS_ENABLED:-false}
       # --- SBIR/STTR (DoD DSIP) ingest (F-431) ---
       ENABLE_SBIR_INGEST: ${ENABLE_SBIR_INGEST:-}
       # --- GovWin IQ connector — CAS session auth is the DEFAULT (#1099) ---

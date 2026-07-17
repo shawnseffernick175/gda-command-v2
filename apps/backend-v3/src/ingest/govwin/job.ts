@@ -17,12 +17,13 @@ import type { PoolClient } from 'pg';
 import { logger } from '../../lib/logger.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import {
-  discoverRecentOpportunitiesApi,
+  discoverRecentOpportunitiesWithDetailApi,
   logQuotaStatus,
   getDailyCallCount,
   getDailyLimit,
   type GovWinApiOpportunity,
 } from '../../services/govwin/api_client.js';
+import { classifyGovWinStage } from './adapter.js';
 import type { IngestResult } from '../framework/registry.js';
 
 const CACHE_RETENTION_DAYS = 30;
@@ -100,6 +101,9 @@ async function upsertOpportunity(
     const existingSamId = await findExistingSAMOpp(client, opp);
 
     if (existingSamId) {
+      // Enrich the SAM-authoritative row with GovWin's unique intel. Value
+      // follows merge precedence (GovWin > SAM), so GovWin overrides when
+      // present. response_due_at is SAM-authoritative and is left untouched.
       await client.query(
         `UPDATE opportunities
          SET tags = array_append(
@@ -110,12 +114,20 @@ async function upsertOpportunity(
              incumbent = COALESCE($3, incumbent),
              incumbent_confidence = CASE WHEN $3 IS NOT NULL THEN 'high' ELSE incumbent_confidence END,
              incumbent_source = CASE WHEN $3 IS NOT NULL THEN 'govwin' ELSE incumbent_source END,
+             competitors = CASE WHEN jsonb_array_length($4::jsonb) > 0 THEN $4::jsonb ELSE competitors END,
+             value_min = COALESCE($5, value_min),
+             value_max = COALESCE($6, value_max),
+             lifecycle_stage = COALESCE(lifecycle_stage, $7),
              updated_at = NOW()
          WHERE id = $2`,
         [
           opp.description,
           existingSamId,
           opp.incumbent,
+          JSON.stringify(opp.competitors ?? []),
+          opp.valueMin,
+          opp.valueMax,
+          classifyGovWinStage(opp.status),
         ],
       );
 
@@ -141,9 +153,9 @@ async function upsertOpportunity(
          set_aside, response_due_at, posted_at,
          description, data_source, tags, source_id,
          incumbent, incumbent_confidence, incumbent_source, department,
-         department_name
+         department_name, competitors, lifecycle_stage
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        ON CONFLICT (sam_notice_id) DO UPDATE SET
          title               = EXCLUDED.title,
          agency              = EXCLUDED.agency,
@@ -163,6 +175,8 @@ async function upsertOpportunity(
          incumbent_source    = CASE WHEN EXCLUDED.incumbent IS NOT NULL THEN 'govwin' ELSE opportunities.incumbent_source END,
          department          = EXCLUDED.department,
          department_name     = EXCLUDED.department_name,
+         competitors         = CASE WHEN jsonb_array_length(EXCLUDED.competitors) > 0 THEN EXCLUDED.competitors ELSE opportunities.competitors END,
+         lifecycle_stage     = EXCLUDED.lifecycle_stage,
          updated_at          = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
@@ -187,6 +201,8 @@ async function upsertOpportunity(
         opp.incumbent ? 'govwin' : null,
         department,
         department,
+        JSON.stringify(opp.competitors ?? []),
+        classifyGovWinStage(opp.status),
       ],
     );
 
@@ -222,8 +238,13 @@ export async function runGovWinIngest(): Promise<IngestResult> {
   logger.info('govwin_ingest_start');
 
   let opps: GovWinApiOpportunity[];
+  let detailFetches = 0;
+  let detailCapSkipped = 0;
   try {
-    opps = await discoverRecentOpportunitiesApi();
+    const discovery = await discoverRecentOpportunitiesWithDetailApi();
+    opps = discovery.opportunities;
+    detailFetches = discovery.detailFetches;
+    detailCapSkipped = discovery.detailCapSkipped;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ error: message }, 'govwin_api_discovery_failed');
@@ -238,7 +259,10 @@ export async function runGovWinIngest(): Promise<IngestResult> {
     };
   }
 
-  logger.info({ count: opps.length }, 'govwin_ingest_discovered');
+  logger.info(
+    { count: opps.length, detailFetches, detailCapSkipped },
+    'govwin_ingest_discovered',
+  );
 
   if (opps.length === 0) {
     logQuotaStatus();
@@ -275,7 +299,15 @@ export async function runGovWinIngest(): Promise<IngestResult> {
 
   logQuotaStatus();
   logger.info(
-    { inserted, updated, skipped, dailyUsed: getDailyCallCount(), dailyLimit: getDailyLimit() },
+    {
+      inserted,
+      updated,
+      skipped,
+      detailFetches,
+      detailCapSkipped,
+      dailyUsed: getDailyCallCount(),
+      dailyLimit: getDailyLimit(),
+    },
     'govwin_ingest_complete',
   );
   return { inserted, updated, skipped };

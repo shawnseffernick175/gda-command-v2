@@ -142,4 +142,5 @@ v3_133_launchpad_f308.sql
 v3_134_soak_metrics_unique_idx.sql
 v3_135_launchpad_sitrep.sql
 v3_136_capability_matches_opportunity_id_bigint.sql
-v3_137_remove_govtribe.sql
+v3_137_govwin_enrichment_columns.sql
+v3_138_remove_govtribe.sql

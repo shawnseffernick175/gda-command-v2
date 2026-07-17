@@ -4,8 +4,10 @@
  */
 
 import { registerSource } from '../framework/registry.js';
+import { isResearchFeedsEnabled } from '../framework/research-feeds.js';
 import { runArxivIngest } from './job.js';
 
 export function registerArxivSource(): void {
+  if (!isResearchFeedsEnabled()) return;
   registerSource('arxiv', 'arXiv Defense/Tech Papers', runArxivIngest);
 }

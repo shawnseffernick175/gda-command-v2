@@ -29,6 +29,23 @@ export interface NormalizedOpportunity {
   award_at: string | null;
   source_url: string | null;
   description: string | null;
+  /**
+   * Enrichment fields (currently populated by GovWin's detail endpoint).
+   * Optional so existing adapters that do not source them are unaffected.
+   */
+  incumbent?: string | null;
+  /** 'high' | 'medium' | 'low' — GovWin analyst-sourced incumbents are 'high'. */
+  incumbent_confidence?: 'high' | 'medium' | 'low' | null;
+  /** Which source provided the incumbent (e.g. 'govwin'). */
+  incumbent_source?: string | null;
+  /** Known/likely competitor names. */
+  competitors?: string[];
+  /** Estimated value floor, in whole dollars (matches opportunities.value_min). */
+  value_min?: number | null;
+  /** Estimated value ceiling, in whole dollars (matches opportunities.value_max). */
+  value_max?: number | null;
+  /** Raw source lifecycle/solicitation status passed through for classification. */
+  source_status?: string | null;
 }
 
 export interface FetchOpts {

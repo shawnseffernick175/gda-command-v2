@@ -12,6 +12,7 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import { getRegisteredSourcesWithLabels, runIngest, getRegisteredSources } from '../ingest/framework/registry.js';
 import { getIngestInsertStatus } from '../ingest/framework/run_logger.js';
+import { isResearchFeedsEnabled } from '../ingest/framework/research-feeds.js';
 import type { JwtPayload } from '../middleware/auth.js';
 
 /** Cron schedules — mirrors apps/backend-v3/src/cron/index.ts JOBS array */
@@ -19,11 +20,15 @@ const SCHEDULE_MAP: Record<string, { cron: string; intervalHours: number }> = {
   'sam.gov': { cron: '0 */4 * * *', intervalHours: 4 },
   'usaspending.gov': { cron: '0 7 * * *', intervalHours: 24 },
   'federalregister.gov': { cron: '15 */6 * * *', intervalHours: 6 },
-  'sbir': { cron: '0 9 * * *', intervalHours: 24 },
-  'nsf': { cron: '0 8 * * *', intervalHours: 24 },
-  'dod_rss': { cron: '30 22 * * *', intervalHours: 24 },
-  'nih': { cron: '0 7 * * 1', intervalHours: 168 },
-  'arxiv': { cron: '0 6 * * 1', intervalHours: 168 },
+  ...(isResearchFeedsEnabled()
+    ? {
+        'sbir': { cron: '0 9 * * *', intervalHours: 24 },
+        'nsf': { cron: '0 8 * * *', intervalHours: 24 },
+        'dod_rss': { cron: '30 22 * * *', intervalHours: 24 },
+        'nih': { cron: '0 7 * * 1', intervalHours: 168 },
+        'arxiv': { cron: '0 6 * * 1', intervalHours: 168 },
+      }
+    : {}),
   'govwin': { cron: '0 */6 * * *', intervalHours: 6 },
   'grants.gov': { cron: '0 11 * * *', intervalHours: 24 },
 };
