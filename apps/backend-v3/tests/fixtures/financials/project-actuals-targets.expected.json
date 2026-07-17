@@ -1,0 +1,56 @@
+{
+  "l2-actual-jan-2026": {
+    "file": "l2-actual-jan-2026.extracted.txt",
+    "source_filename": "L2 - ACTUAL - JAN-2026.xlsx",
+    "kind": "actual",
+    "source": "l1_actual",
+    "projectRows": 16,
+    "sales_revenue": 2873445.24,
+    "ebit_profit": 18011.97
+  },
+  "l2-target-jan-2026": {
+    "file": "l2-target-jan-2026.extracted.txt",
+    "source_filename": "L2 - TARGET - JAN-2026.xlsx",
+    "kind": "plan",
+    "source": "l1_target",
+    "projectRows": 16,
+    "sales_revenue": 2704558.64,
+    "ebit_profit": 38101.05
+  },
+  "l2-actual-may-2026": {
+    "file": "l2-actual-may-2026.extracted.txt",
+    "source_filename": "L2 - ACTUAL - MAY-2026.xlsx",
+    "kind": "actual",
+    "source": "l1_actual",
+    "projectRows": 22,
+    "sales_revenue": 1986705.04,
+    "ebit_profit": -24299.75
+  },
+  "l2-target-may-2026": {
+    "file": "l2-target-may-2026.extracted.txt",
+    "source_filename": "L2 - TARGET - MAY-2026.xlsx",
+    "kind": "plan",
+    "source": "l1_target",
+    "projectRows": 14,
+    "sales_revenue": 1695938.53,
+    "ebit_profit": 12937.94
+  },
+  "l1-actual-mar-2026": {
+    "file": "l1-actual-mar-2026.extracted.txt",
+    "source_filename": "L1-ACTUAL Proj Revenue Summary MAR-26.xlsx",
+    "kind": "actual",
+    "source": "l1_actual",
+    "projectRows": 10,
+    "sales_revenue": 4179445.1,
+    "ebit_profit": 34457.65
+  },
+  "l1-target-mar-2026": {
+    "file": "l1-target-mar-2026.extracted.txt",
+    "source_filename": "L1-TARGET Proj Revenue Summary MAR-26.xlsx",
+    "kind": "plan",
+    "source": "l1_target",
+    "projectRows": 9,
+    "sales_revenue": 4088616.56,
+    "ebit_profit": 43779.07
+  }
+}

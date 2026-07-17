@@ -36,6 +36,7 @@ import {
   parseTrendSie,
   parseYtdGlDetail,
   parseProjectRevenueSummary,
+  parseProjectActualsTargets,
 } from './deterministic-parsers.js';
 
 /**
@@ -54,6 +55,8 @@ export interface FinancialDocClassification {
   is_ar: boolean;
   is_trial_balance: boolean;
   is_project_revenue: boolean;
+  /** L2/L1 ACTUAL & TARGET company P&L (DataSetLandTbl "Period Cost/Prof/Rev"). */
+  is_project_actuals_targets: boolean;
 }
 
 /**
@@ -93,9 +96,18 @@ export function classifyFinancialDoc(
     .trim();
 
   // --- Specialized types: filename keyword OR header-signature content sniff ---
+
+  // Bug 2: L2/L1 ACTUAL & TARGET company P&L files (sheet DataSetLandTbl). The
+  // header cells are ExcelJS RichText and render as "[object Object]", so this is
+  // keyed on the filename token (e.g. "L2 - ACTUAL", "L1-TARGET"). This MUST win
+  // over is_project_revenue: an "L1-ACTUAL Proj Revenue Summary" is this 7-column
+  // company format, NOT the 29-column project-revenue ITD format.
+  const is_project_actuals_targets = /\bl[12]\b[\s-]*(actual|target)/i.test(fn);
+
   const is_project_revenue =
-    /proj.*revenue|revenue.*summary|full.?proj/i.test(fn) ||
-    (/revenue project/.test(headNorm) && /\bitd\b/.test(headNorm));
+    !is_project_actuals_targets &&
+    (/proj.*revenue|revenue.*summary|full.?proj/i.test(fn) ||
+      (/revenue project/.test(headNorm) && /\bitd\b/.test(headNorm)));
 
   const is_ar =
     /aged.?ar|accounts?.?receivable|\bar\b/i.test(fn) ||
@@ -134,7 +146,8 @@ export function classifyFinancialDoc(
     is_ap ||
     is_ar ||
     is_trial_balance ||
-    is_project_revenue;
+    is_project_revenue ||
+    is_project_actuals_targets;
 
   // Generic P&L / KPI parser. The keyword set is intentionally broad (it must
   // catch L1-TARGET / L1-ACTUAL income statements), but it is gated on
@@ -153,6 +166,7 @@ export function classifyFinancialDoc(
     is_ar,
     is_trial_balance,
     is_project_revenue,
+    is_project_actuals_targets,
   };
 }
 
@@ -426,6 +440,27 @@ export async function reingestFinancialDoc(params: {
     }
   }
 
+  // --- Parser 9: L2/L1 ACTUAL & TARGET company P&L (Bug 2) ---
+  if (cls.is_project_actuals_targets && !skipParsers.includes('project_actuals_targets_extract')) {
+    try {
+      const patResult = parseProjectActualsTargets(extractedText, filename);
+      if (patResult && patResult.rows.length > 0) {
+        result.parsers_run.push('project_actuals_targets_extract (deterministic)');
+        const counts = await ingestFinancialRows(patResult.rows, docId);
+        result.plan += counts.plan;
+        result.actual += counts.actual;
+        result.rejected += counts.rejected;
+        if (counts.parse_warnings.length > 0) result.parse_warnings.push(...counts.parse_warnings);
+        if (counts.plan > 0 || counts.actual > 0) result.any_ingested = true;
+      } else {
+        logger.warn({ docId, filename }, 'reingest: project_actuals_targets returned 0 rows — expected DataSetLandTbl with per-project Period Cost/Profit/Revenue columns');
+        result.parse_warnings.push('project_actuals_targets_extract: 0 rows (header/row detection failed)');
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: Project Actuals/Targets parser failed');
+    }
+  }
+
   // Populate parsers_skipped: any parser whose heuristic didn't match.
   const allParsers = [
     { key: 'financial_statement_extract', matched: cls.is_financial },
@@ -436,6 +471,7 @@ export async function reingestFinancialDoc(params: {
     { key: 'ar_extract', matched: cls.is_ar },
     { key: 'trial_balance_extract', matched: cls.is_trial_balance },
     { key: 'project_revenue_extract', matched: cls.is_project_revenue },
+    { key: 'project_actuals_targets_extract', matched: cls.is_project_actuals_targets },
   ];
   for (const p of allParsers) {
     if (!p.matched && !skipParsers.includes(p.key)) {
