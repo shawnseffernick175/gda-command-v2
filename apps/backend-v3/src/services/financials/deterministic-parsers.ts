@@ -1085,8 +1085,9 @@ export function parseYtdGlDetail(
 // ---------------------------------------------------------------------------
 // Parser: L2 / L1 ACTUAL & TARGET — sheet "DataSetLandTbl" (Bug 2)
 // Company monthly P&L: sums per-project "Period" columns into one company row.
-// ACTUAL -> financial_actuals (source l1_actual); TARGET -> financial_plan
-// (source l1_target), so the KPI/trend variance columns populate.
+// ACTUAL -> financial_actuals (source l1_actual); TARGET -> financial_actuals
+// (source l1_target) as well (BUG 5), so the trend/variance path can read target
+// vs actual on the same natural key and the KPI/variance columns populate.
 // ---------------------------------------------------------------------------
 
 /**

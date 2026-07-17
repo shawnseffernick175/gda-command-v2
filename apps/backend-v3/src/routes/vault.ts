@@ -178,7 +178,12 @@ export async function extractTextFromBuffer(buf: Buffer, filename: string): Prom
     await workbook.xlsx.load(buf as unknown as ArrayBuffer);
     const blocks: string[] = [];
     let total = 0;
-    const MAX = 200_000;
+    // BUG 6: YTD ledgers (GL Detail) are sorted by period and a single month can
+    // fill a small cap, truncating every later period. A 200K cap left only
+    // January visible, so cost-detail could never emit Feb-May. Size the cap to
+    // hold a full fiscal year of GL Detail rows; RAG chunks the text downstream,
+    // so a larger ceiling does not change embedding behavior.
+    const MAX = 5_000_000;
     for (const sheet of workbook.worksheets) {
       if (total >= MAX) break;
       const lines: string[] = [`## Sheet: ${sheet.name}`];

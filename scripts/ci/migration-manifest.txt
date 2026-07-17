@@ -144,3 +144,4 @@ v3_135_launchpad_sitrep.sql
 v3_136_capability_matches_opportunity_id_bigint.sql
 v3_137_govwin_enrichment_columns.sql
 v3_138_remove_govtribe.sql
+v3_139_financial_plan_drop_l1_target.sql

@@ -80,6 +80,42 @@ describe('parseYtdGlDetail — multi-period YTD (Bug 1 / 1b)', () => {
   });
 });
 
+describe('parseYtdGlDetail — single-period slice starting mid-year (Bug 6 regression)', () => {
+  // A GL Detail whose earliest period is PD=4 (April). Before the extraction-cap
+  // fix, later periods were truncated and April never reached the parser; this
+  // fixture guarantees the parser emits April rows on its own, keyed by the PD
+  // column rather than the filename month.
+  const text = readFix('gl-detail-ytd-apr-2026.extracted.txt');
+  const result = parseYtdGlDetail(text, 'YTD APR-2026 GL Detail.xlsx');
+
+  it('parses the April-only GL fixture into rows', () => {
+    expect(result).not.toBeNull();
+    expect(result!.rows.length).toBeGreaterThan(0);
+  });
+
+  it('emits ONLY FY26 Apr rows, all tagged quarter 2 / fiscal_year 2026', () => {
+    const periods = Array.from(new Set(result!.rows.map((r) => r.period)));
+    expect(periods).toEqual(['FY26 Apr']);
+    for (const r of result!.rows) {
+      expect(r.fiscal_year).toBe(2026);
+      expect(r.quarter).toBe(2);
+    }
+  });
+
+  it('Direct Labor and total actuals match the independent oracle', () => {
+    const dl = result!.rows
+      .filter((r) => /direct labor/i.test(r.cost_element))
+      .reduce((a, r) => a + (r.actual_amount ?? 0), 0);
+    const total = result!.rows.reduce((a, r) => a + (r.actual_amount ?? 0), 0);
+    expect(dl).toBeCloseTo(3679.49, 2);
+    expect(total).toBeCloseTo(672602.96, 2);
+  });
+
+  it('uses Account NAME as cost_element, never a bare Account ID', () => {
+    expect(result!.rows.filter((r) => /^\d{3}-\d{3}$/.test(r.cost_element.trim()))).toHaveLength(0);
+  });
+});
+
 describe('parseProjectActualsTargets — L2/L1 ACTUAL & TARGET (Bug 2)', () => {
   const expected = readExpected('project-actuals-targets.expected.json');
 

@@ -159,24 +159,26 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /v3/financials/forecast
-  // Quarter-level plan vs actuals. Use the l1_target plan quarter rows against
-  // the income_statement actuals quarter rows (period LIKE '%Q%') so the join
-  // stays 1:1 per quarter now that several source-series coexist.
+  // Quarter-level target vs actuals. BUG 5: l1_target now lives in
+  // financial_actuals (company-P&L target series), not financial_plan, so read
+  // the target quarter rows (actual_* columns under source l1_target) and join
+  // them against the income_statement actuals quarter rows (period LIKE '%Q%')
+  // so the join stays 1:1 per quarter.
   app.get('/v3/financials/forecast', async (req, reply) => {
     const { rows } = await pool.query(
       `SELECT
-         p.period,
-         p.plan_orders,
-         p.plan_sales,
+         t.period,
+         t.actual_orders AS plan_orders,
+         t.actual_sales  AS plan_sales,
          COALESCE(a.actual_orders, 0) AS actual_orders,
          COALESCE(a.actual_sales, 0)  AS actual_sales,
          (a.id IS NOT NULL) AS has_actuals
-       FROM financial_plan p
+       FROM financial_actuals t
        LEFT JOIN financial_actuals a
-         ON a.fiscal_year = p.fiscal_year AND a.quarter = p.quarter
+         ON a.fiscal_year = t.fiscal_year AND a.quarter = t.quarter
         AND a.source = 'income_statement' AND a.period LIKE '%Q%'
-       WHERE p.source = 'l1_target' AND p.period LIKE '%Q%'
-       ORDER BY p.fiscal_year, p.quarter`,
+       WHERE t.source = 'l1_target' AND t.period LIKE '%Q%'
+       ORDER BY t.fiscal_year, t.quarter`,
     );
 
     const items = rows.map((r) => ({
@@ -244,7 +246,66 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       return fiscalMonthIndex(aMonth) - fiscalMonthIndex(bMonth);
     });
 
-    return reply.send(successEnvelope({ items }, req.requestId));
+    // BUG 5: per-period actual-vs-target variance. Target is the company-P&L
+    // target series (source l1_target); actual prefers the company-P&L actual
+    // series (l1_actual) and falls back to income_statement when l1_actual is
+    // absent for that period, so a period with a target always resolves an
+    // actual counterpart. variance = actual - target for each dollar metric.
+    const { rows: varRows } = await pool.query(
+      `SELECT
+         t.period, t.fiscal_year, t.quarter,
+         (t.period LIKE '%Q%') AS is_quarter,
+         a.actual_orders AS actual_orders, a.actual_sales AS actual_sales, a.actual_ebit AS actual_ebit,
+         t.actual_orders AS target_orders, t.actual_sales AS target_sales, t.actual_ebit AS target_ebit
+       FROM financial_actuals t
+       LEFT JOIN LATERAL (
+         SELECT x.actual_orders, x.actual_sales, x.actual_ebit
+           FROM financial_actuals x
+          WHERE x.period = t.period AND x.fiscal_year = t.fiscal_year AND x.quarter = t.quarter
+            AND x.source IN ('l1_actual', 'income_statement')
+          ORDER BY CASE x.source WHEN 'l1_actual' THEN 0 ELSE 1 END
+          LIMIT 1
+       ) a ON true
+       WHERE t.source = 'l1_target'
+       ORDER BY t.fiscal_year, t.quarter`,
+    );
+
+    const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
+    const diff = (act: number | null, tgt: number | null): number | null =>
+      act === null || tgt === null ? null : act - tgt;
+
+    const variance = varRows.map((r) => {
+      const actualSales = num(r.actual_sales);
+      const actualEbit = num(r.actual_ebit);
+      const actualOrders = num(r.actual_orders);
+      const targetSales = num(r.target_sales);
+      const targetEbit = num(r.target_ebit);
+      const targetOrders = num(r.target_orders);
+      return {
+        period: r.period as string,
+        is_quarter: Boolean(r.is_quarter),
+        actual_orders: actualOrders,
+        actual_sales: actualSales,
+        actual_ebit: actualEbit,
+        target_orders: targetOrders,
+        target_sales: targetSales,
+        target_ebit: targetEbit,
+        orders_variance: diff(actualOrders, targetOrders),
+        sales_variance: diff(actualSales, targetSales),
+        ebit_variance: diff(actualEbit, targetEbit),
+      };
+    });
+
+    variance.sort((a, b) => {
+      const aQ = a.is_quarter ? 1 : 0;
+      const bQ = b.is_quarter ? 1 : 0;
+      if (aQ !== bQ) return aQ - bQ;
+      const aMonth = a.period.split(' ')[1] || '';
+      const bMonth = b.period.split(' ')[1] || '';
+      return fiscalMonthIndex(aMonth) - fiscalMonthIndex(bMonth);
+    });
+
+    return reply.send(successEnvelope({ items, variance }, req.requestId));
   });
 
   // GET /v3/financials/plan
@@ -1400,18 +1461,20 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     // always represented — even months with no actuals yet.
     const fyShort = `FY${fiscalYear % 100}`;
 
-    // Plan: source precedence user_aop > l1_target. DISTINCT ON picks the
-    // highest-priority source per period so we never double-count.
+    // Plan: the annual operating plan (user_aop) is the AOP-execution baseline
+    // and covers all 12 months. BUG 5: l1_target is the company-P&L TARGET
+    // series and now lives exclusively in financial_actuals (feeding the
+    // trend/variance path); it is no longer read here. DISTINCT ON keeps one row
+    // per period defensively.
     const { rows: planRows } = await pool.query(
       `SELECT DISTINCT ON (period)
               period, source, plan_orders, plan_sales, plan_ebit,
               plan_gross_margin, plan_ros
        FROM financial_plan
        WHERE is_seed = false
-         AND source IN ('user_aop', 'l1_target')
+         AND source = 'user_aop'
          AND fiscal_year = $1 AND period NOT LIKE '%Q%'
-       ORDER BY period,
-                CASE source WHEN 'user_aop' THEN 0 WHEN 'l1_target' THEN 1 ELSE 2 END`,
+       ORDER BY period`,
       [fiscalYear],
     );
 
