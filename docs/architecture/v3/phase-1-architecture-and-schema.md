@@ -229,6 +229,8 @@ CREATE TABLE opportunities (
   incumbent           TEXT,
   incumbent_confidence TEXT CHECK (incumbent_confidence IN ('high', 'medium', 'low')),
   incumbent_source    TEXT,
+  competitors         JSONB         NOT NULL DEFAULT '[]'::jsonb,  -- v3_137: known/likely competitor names (GovWin detail)
+  lifecycle_stage     TEXT,                    -- v3_137: source lifecycle (e.g. GovWin 'forecast'/'solicitation'); distinct from workflow `status`
   value_source        TEXT,                    -- provenance: sam, govwin_estimate, govtribe_estimate, manual
   value_confidence    TEXT CHECK (value_confidence IN ('confirmed', 'estimated', 'forecasted')),
   date_source         TEXT,                    -- provenance for response_due_at

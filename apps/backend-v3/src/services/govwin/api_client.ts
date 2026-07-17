@@ -27,6 +27,8 @@ import { logger } from '../../lib/logger.js';
 const API_BASE = process.env['GOVWIN_API_BASE'] ?? 'https://services.govwin.com/neo-ws';
 const DAILY_LIMIT = parseInt(process.env['GOVWIN_DAILY_LIMIT'] ?? '200', 10);
 const BACKOFF_429_MS = 60_000; // 1 min backoff on 429
+/** Bounded concurrency for per-opportunity detail fetches (#1134). */
+const DETAIL_CONCURRENCY = 4;
 
 /** Re-export the GovWinOpportunity shape unchanged so job.ts keeps working. */
 export interface GovWinApiOpportunity {
@@ -223,6 +225,109 @@ export async function fetchOpportunityByIdApi(
     );
     return null;
   }
+}
+
+/**
+ * Alias for the per-opportunity detail endpoint (`/opportunities/${govwinId}`).
+ * The list/summary endpoint omits incumbent, competitors, value and full
+ * status — those only come from this detail call (#1134).
+ */
+export const fetchOpportunityDetail = fetchOpportunityByIdApi;
+
+/**
+ * Merge a detail payload onto a summary/list record. Detail fields take
+ * precedence when present; the summary is the fallback so we never lose data
+ * the list already provided.
+ */
+export function mergeDetailIntoSummary(
+  summary: GovWinApiOpportunity,
+  detail: GovWinApiOpportunity | null,
+): GovWinApiOpportunity {
+  if (!detail) return summary;
+  return {
+    ...summary,
+    agency: detail.agency ?? summary.agency,
+    subAgency: detail.subAgency ?? summary.subAgency,
+    solicitationNumber: detail.solicitationNumber ?? summary.solicitationNumber,
+    status: detail.status ?? summary.status,
+    naics: detail.naics ?? summary.naics,
+    setAside: detail.setAside ?? summary.setAside,
+    incumbent: detail.incumbent ?? summary.incumbent,
+    competitors: detail.competitors.length > 0 ? detail.competitors : summary.competitors,
+    valueMin: detail.valueMin ?? summary.valueMin,
+    valueMax: detail.valueMax ?? summary.valueMax,
+    responseDueAt: detail.responseDueAt ?? summary.responseDueAt,
+    postedAt: detail.postedAt ?? summary.postedAt,
+    description: detail.description ?? summary.description,
+  };
+}
+
+export interface DiscoverWithDetailResult {
+  opportunities: GovWinApiOpportunity[];
+  /** Number of detail-endpoint fetches actually performed this run. */
+  detailFetches: number;
+  /** Opportunities left summary-only because the daily cap was reached. */
+  detailCapSkipped: number;
+}
+
+/**
+ * Discover recent opportunities and enrich each with its detail payload
+ * (incumbent, competitors, value, full status) via the per-opportunity
+ * detail endpoint, using bounded concurrency and respecting the daily cap.
+ *
+ * In CAS mode the discovery path already fetches per-opportunity detail, so
+ * the summaries are returned unchanged (no extra calls).
+ */
+export async function discoverRecentOpportunitiesWithDetailApi(
+  maxResults = 50,
+): Promise<DiscoverWithDetailResult> {
+  const summaries = await discoverRecentOpportunitiesApi(maxResults);
+
+  if (isCasMode()) {
+    return { opportunities: summaries, detailFetches: 0, detailCapSkipped: 0 };
+  }
+
+  const enriched: GovWinApiOpportunity[] = new Array(summaries.length);
+  let detailFetches = 0;
+  let detailCapSkipped = 0;
+  let cursor = 0;
+
+  async function worker(): Promise<void> {
+    for (;;) {
+      const idx = cursor;
+      cursor += 1;
+      if (idx >= summaries.length) return;
+
+      const summary = summaries[idx]!;
+      // Respect the OAuth2 daily download cap: once hit, keep the summary
+      // record rather than erroring the whole run.
+      if (isDailyLimitReached()) {
+        enriched[idx] = summary;
+        detailCapSkipped += 1;
+        continue;
+      }
+
+      const detail = await fetchOpportunityDetail(summary.govwinId);
+      if (detail) detailFetches += 1;
+      enriched[idx] = mergeDetailIntoSummary(summary, detail);
+    }
+  }
+
+  const workerCount = Math.min(DETAIL_CONCURRENCY, summaries.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+  logger.info(
+    {
+      discovered: summaries.length,
+      detailFetches,
+      detailCapSkipped,
+      dailyUsed: getDailyCallCount(),
+      dailyLimit: DAILY_LIMIT,
+    },
+    'govwin_detail_enrichment_complete',
+  );
+
+  return { opportunities: enriched, detailFetches, detailCapSkipped };
 }
 
 /**
