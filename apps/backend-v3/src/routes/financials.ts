@@ -213,7 +213,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
          -- Never emit a monthly P&L row for a period with no ingested actuals.
          -- Quarter rows (period LIKE '%Q%') are recomputed aggregates and always
          -- kept; month rows must carry a real sales/ebit/gross-margin signal so a
-         -- phantom orders-only period (the June bug) is not rendered in the trend.
+         -- phantom orders-only period (the June bug) does not appear in the trend.
          AND (
            period LIKE '%Q%'
            OR COALESCE(actual_sales, 0) <> 0
