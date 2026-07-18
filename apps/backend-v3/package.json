@@ -25,6 +25,7 @@
     "backfill:unified-validate": "tsx scripts/backfill_unified_opportunities.ts --validate",
     "backfill:validate-opps": "tsx src/scripts/backfill_validate_existing_opps.ts",
     "backfill:incumbent": "tsx src/scripts/backfill_incumbent.ts",
+    "backfill:govwin-incumbent": "tsx src/scripts/backfill_govwin_incumbent.ts",
     "backfill:auto-pass-set-aside": "tsx src/scripts/backfill_auto_pass_set_aside.ts"
   },
   "dependencies": {

@@ -26,6 +26,7 @@ import {
   discoverRecentOpportunitiesApiCas,
   fetchOpportunityByIdApiCas,
   fetchOpportunityDetailHtmlCas,
+  fetchOpportunitySubEndpointCas,
 } from './cas_client.js';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
@@ -456,14 +457,31 @@ function hrefToPath(href: string): string {
  * Fetch related companies for an opportunity and classify them into the
  * incumbent (role/relationship = incumbent) and other competitors.
  */
+/**
+ * Mode-aware raw fetch of a per-opportunity sub-endpoint. In OAuth2 mode it
+ * targets the WSAPI path (using the payload `href` when available); in CAS mode
+ * it delegates to the NEO portal session client. The response shape is the same
+ * Deltek JSON either way, so the classifier below is shared.
+ */
+async function fetchSubEndpointRaw<T>(
+  kind: 'companies' | 'contracts',
+  govwinId: string,
+  href?: string | null,
+): Promise<T> {
+  if (isCasMode()) {
+    return fetchOpportunitySubEndpointCas<T>(kind, govwinId);
+  }
+  const path = href
+    ? hrefToPath(href)
+    : `/opportunities/${encodeURIComponent(govwinId)}/${kind}`;
+  return apiGet<T>(path);
+}
+
 export async function fetchOpportunityCompanies(
   govwinId: string,
   href?: string | null,
 ): Promise<GovWinRelatedCompanies> {
-  const path = href
-    ? hrefToPath(href)
-    : `/opportunities/${encodeURIComponent(govwinId)}/companies`;
-  const data = await apiGet<DeltekCompaniesResponse>(path);
+  const data = await fetchSubEndpointRaw<DeltekCompaniesResponse>('companies', govwinId, href);
   const list = data.companies ?? data.relatedCompanies ?? data.data ?? data.results ?? [];
 
   let incumbent: string | null = null;
@@ -490,10 +508,7 @@ export async function fetchOpportunityContracts(
   govwinId: string,
   href?: string | null,
 ): Promise<{ incumbent: string | null; competitors: string[] }> {
-  const path = href
-    ? hrefToPath(href)
-    : `/opportunities/${encodeURIComponent(govwinId)}/contracts`;
-  const data = await apiGet<DeltekContractsResponse>(path);
+  const data = await fetchSubEndpointRaw<DeltekContractsResponse>('contracts', govwinId, href);
   const list = data.contracts ?? data.data ?? data.results ?? [];
 
   let incumbent: string | null = null;
@@ -654,8 +669,24 @@ async function enrichOneOpportunity(
   const merged = mergeDetailIntoSummary(summary, detail);
   let calls = 0;
 
+  const detailIncumbent = merged.incumbent;
+  const detailCompetitors = merged.competitors ?? [];
+
+  // Fast path: the detail payload (CAS JSON/HTML) already carries the incumbent
+  // AND competitors, so we avoid spending any sub-endpoint calls.
+  if (detailIncumbent && detailCompetitors.length > 0) {
+    return {
+      opp: {
+        ...merged,
+        incumbent: detailIncumbent,
+        competitors: dedupeCompetitors(detailCompetitors, detailIncumbent),
+      },
+      calls,
+    };
+  }
+
   let incumbent: string | null = null;
-  const competitorNames: string[] = [];
+  const competitorNames: string[] = [...detailCompetitors];
 
   try {
     const companies = await fetchOpportunityCompanies(merged.govwinId, merged.links?.companies);
@@ -682,7 +713,7 @@ async function enrichOneOpportunity(
     );
   }
 
-  const resolvedIncumbent = incumbent ?? merged.incumbent;
+  const resolvedIncumbent = incumbent ?? detailIncumbent;
   const competitors = dedupeCompetitors(competitorNames, resolvedIncumbent);
 
   return {
@@ -724,23 +755,16 @@ function dedupeCompetitors(names: string[], incumbent: string | null): string[] 
  *    sub-endpoint calls;
  *  - the rest cost ~2-3 WSAPI calls each (detail + companies [+ contracts]).
  *
- * In CAS mode the discovery path already fetches per-opportunity detail, so the
- * summaries are returned unchanged (no extra calls).
+ * Both auth modes run the same enrichment loop. In CAS mode the per-opportunity
+ * detail + companies/contracts fetches go through the NEO portal session client
+ * (#1145); the same relevance gate and updateDate skip keep the 200/day CAS
+ * discovery cap from being blown. `subEndpointCalls` therefore exceeds 0 in CAS
+ * mode, which is what actually lands incumbent/competitors on GovWin rows.
  */
 export async function discoverRecentOpportunitiesWithDetailApi(
   maxResults = MAX_SEARCH_PAGE,
 ): Promise<DiscoverWithDetailResult> {
   const summaries = await discoverRecentOpportunitiesApi(maxResults);
-
-  if (isCasMode()) {
-    return {
-      opportunities: summaries,
-      detailFetches: 0,
-      subEndpointCalls: 0,
-      skippedUnchanged: 0,
-      skippedIrrelevant: 0,
-    };
-  }
 
   const storedDates = await loadStoredUpdateDates(summaries.map((s) => s.govwinId));
 
@@ -809,6 +833,55 @@ export async function discoverRecentOpportunitiesWithDetailApi(
   );
 
   return { opportunities: enriched, detailFetches, subEndpointCalls, skippedUnchanged, skippedIrrelevant };
+}
+
+/** Result of re-enriching a single opportunity by GovWin ID (backfill path). */
+export interface OpportunityEnrichment {
+  incumbent: string | null;
+  incumbent_confidence: 'high' | null;
+  incumbent_source: 'govwin' | null;
+  competitors: string[];
+  /** Detail + sub-endpoint calls issued (0 means nothing was fetched). */
+  subEndpointCalls: number;
+}
+
+/**
+ * Re-enrich a single existing opportunity by GovWin ID and return its incumbent
+ * + competitors. Idempotent and side-effect free (no DB writes) — the backfill
+ * script owns persistence. Works in both auth modes: in CAS mode the detail and
+ * companies/contracts fetches go through the NEO portal session client.
+ */
+export async function enrichGovWinOpportunityById(
+  govwinId: string,
+): Promise<OpportunityEnrichment> {
+  const detail = await fetchOpportunityDetail(govwinId);
+  const base: GovWinApiOpportunity = detail ?? {
+    govwinId,
+    title: 'Untitled GovWin Opportunity',
+    agency: null,
+    subAgency: null,
+    solicitationNumber: null,
+    status: null,
+    naics: null,
+    setAside: null,
+    incumbent: null,
+    competitors: [],
+    valueMin: null,
+    valueMax: null,
+    responseDueAt: null,
+    postedAt: null,
+    description: null,
+    sourceUri: `https://iq.govwin.com/neo/opportunity/view/${govwinId}`,
+  };
+
+  const { opp, calls } = await enrichOneOpportunity(base, detail);
+  return {
+    incumbent: opp.incumbent,
+    incumbent_confidence: opp.incumbent ? 'high' : null,
+    incumbent_source: opp.incumbent ? 'govwin' : null,
+    competitors: opp.competitors,
+    subEndpointCalls: calls + (detail ? 1 : 0),
+  };
 }
 
 /**

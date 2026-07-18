@@ -37,6 +37,19 @@ const OPP_DETAIL_PATH = envOrDefault(
   'GOVWIN_CAS_OPP_DETAIL_PATH',
   '/neo/rest/opportunities',
 );
+/**
+ * NEO portal sub-endpoint base paths for per-opportunity enrichment. The
+ * incumbent flag lives on the Contracts object; Related Companies carries the
+ * competitor names. Overridable via env in case Deltek relocates them.
+ */
+const OPP_COMPANIES_PATH = envOrDefault(
+  'GOVWIN_CAS_OPP_COMPANIES_PATH',
+  '/neo/rest/opportunities',
+);
+const OPP_CONTRACTS_PATH = envOrDefault(
+  'GOVWIN_CAS_OPP_CONTRACTS_PATH',
+  '/neo/rest/opportunities',
+);
 
 function buildCookieHeader(cookies: string[]): string {
   return cookies.map((c) => c.split(';')[0]).join('; ');
@@ -118,6 +131,11 @@ interface GovWinRawOpp {
   solicitation_number?: string;
   status?: string;
   state?: string;
+  updateDate?: string;
+  updated_date?: string;
+  updatedDate?: string;
+  createdDate?: string;
+  created_date?: string;
   naics?: string;
   naicsCode?: string;
   naics_code?: string;
@@ -187,6 +205,8 @@ function mapRawToOpp(raw: GovWinRawOpp): GovWinApiOpportunity {
     sourceUri:
       firstDefined(raw.url, raw.sourceUrl, raw.source_url) ??
       `${IQ_BASE}/neo/opportunity/view/${govwinId}`,
+    updateDate: firstDefined(raw.updateDate, raw.updated_date, raw.updatedDate),
+    createdDate: firstDefined(raw.createdDate, raw.created_date),
   };
 }
 
@@ -225,6 +245,25 @@ export async function fetchOpportunityByIdApiCas(
     );
     return null;
   }
+}
+
+/**
+ * Fetch a per-opportunity sub-endpoint (companies or contracts) under the CAS
+ * session. Returns the raw JSON payload so the shared Deltek classifier in
+ * `api_client.ts` can map incumbent (from Contracts) and competitors (from
+ * Related Companies) identically across auth modes.
+ *
+ * CAS links point at the NEO portal host, so any `href` from the OAuth2 payload
+ * (services.govwin.com) is ignored here; the path is always built from the
+ * NEO portal template.
+ */
+export async function fetchOpportunitySubEndpointCas<T>(
+  kind: 'companies' | 'contracts',
+  govwinId: string,
+): Promise<T> {
+  const base = kind === 'companies' ? OPP_COMPANIES_PATH : OPP_CONTRACTS_PATH;
+  const path = `${base}/${encodeURIComponent(govwinId)}/${kind}`;
+  return casGetJson<T>(path);
 }
 
 /**
