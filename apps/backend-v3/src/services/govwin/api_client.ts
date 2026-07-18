@@ -370,10 +370,15 @@ interface DeltekCompany {
   companyName?: string;
   name?: string;
   title?: string;
+  vendorName?: string;
+  /** Some NEO shapes nest the company under `company: {name}`. */
+  company?: { id?: string; name?: string; companyName?: string };
   role?: string;
   relationship?: string;
   relationshipType?: string;
+  type?: string;
   isIncumbent?: boolean;
+  incumbent?: boolean | string;
 }
 
 interface DeltekCompaniesResponse {
@@ -381,6 +386,8 @@ interface DeltekCompaniesResponse {
   relatedCompanies?: DeltekCompany[];
   data?: DeltekCompany[];
   results?: DeltekCompany[];
+  items?: DeltekCompany[];
+  content?: DeltekCompany[];
 }
 
 interface DeltekContract {
@@ -401,20 +408,67 @@ interface DeltekContractsResponse {
   contracts?: DeltekContract[];
   data?: DeltekContract[];
   results?: DeltekContract[];
+  items?: DeltekContract[];
+  content?: DeltekContract[];
 }
 
 export interface GovWinRelatedCompanies {
   incumbent: string | null;
   competitors: string[];
+  /** Raw sub-endpoint payload, retained for diagnostics / govwin_cache. */
+  raw?: unknown;
+  /** Number of records the sub-endpoint returned. */
+  count: number;
+}
+
+/**
+ * Persist a raw sub-endpoint payload to the govwin_cache debug store so a live
+ * ingest/backfill run reveals the exact NEO/Deltek response shape (#1145). The
+ * (govwin_id, endpoint) pair is unique, so re-runs overwrite in place. Best
+ * effort: cache failures never break enrichment.
+ */
+async function cacheSubEndpointRaw(
+  govwinId: string,
+  endpoint: 'companies' | 'contracts' | 'detail',
+  raw: unknown,
+): Promise<void> {
+  if (raw === undefined || !govwinId) return;
+  try {
+    await pool.query(
+      `INSERT INTO govwin_cache (govwin_id, endpoint, raw_payload)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (govwin_id, endpoint)
+       DO UPDATE SET raw_payload = $3, fetched_at = NOW()`,
+      [govwinId, endpoint, JSON.stringify(raw ?? null)],
+    );
+  } catch (err) {
+    logger.warn(
+      { govwinId, endpoint, error: err instanceof Error ? err.message : String(err) },
+      'govwin_subendpoint_cache_failed',
+    );
+  }
 }
 
 function companyName(c: DeltekCompany): string | null {
-  return (c.companyName ?? c.name ?? c.title ?? '').trim() || null;
+  return (
+    (
+      c.companyName ??
+      c.name ??
+      c.title ??
+      c.vendorName ??
+      c.company?.name ??
+      c.company?.companyName ??
+      ''
+    ).trim() || null
+  );
 }
 
 function isIncumbentCompany(c: DeltekCompany): boolean {
   if (c.isIncumbent === true) return true;
-  const role = `${c.role ?? ''} ${c.relationship ?? ''} ${c.relationshipType ?? ''}`.toLowerCase();
+  if (c.incumbent === true) return true;
+  if (typeof c.incumbent === 'string' && c.incumbent.trim().toLowerCase() === 'true') return true;
+  const role =
+    `${c.role ?? ''} ${c.relationship ?? ''} ${c.relationshipType ?? ''} ${c.type ?? ''}`.toLowerCase();
   return role.includes('incumbent');
 }
 
@@ -462,11 +516,22 @@ export async function fetchOpportunityCompanies(
   href?: string | null,
 ): Promise<GovWinRelatedCompanies> {
   const data = isCasMode()
-    ? await fetchOpportunitySubEndpointCas<DeltekCompaniesResponse>(govwinId, 'companies')
-    : await apiGet<DeltekCompaniesResponse>(
+    ? await fetchOpportunitySubEndpointCas<DeltekCompaniesResponse | DeltekCompany[]>(
+        govwinId,
+        'companies',
+      )
+    : await apiGet<DeltekCompaniesResponse | DeltekCompany[]>(
         href ? hrefToPath(href) : `/opportunities/${encodeURIComponent(govwinId)}/companies`,
       );
-  const list = data.companies ?? data.relatedCompanies ?? data.data ?? data.results ?? [];
+  const list = Array.isArray(data)
+    ? data
+    : data.companies ??
+      data.relatedCompanies ??
+      data.data ??
+      data.results ??
+      data.items ??
+      data.content ??
+      [];
 
   let incumbent: string | null = null;
   const competitors: string[] = [];
@@ -479,7 +544,7 @@ export async function fetchOpportunityCompanies(
       competitors.push(name);
     }
   }
-  return { incumbent, competitors };
+  return { incumbent, competitors, raw: data, count: list.length };
 }
 
 /**
@@ -491,13 +556,18 @@ export async function fetchOpportunityCompanies(
 export async function fetchOpportunityContracts(
   govwinId: string,
   href?: string | null,
-): Promise<{ incumbent: string | null; competitors: string[] }> {
+): Promise<{ incumbent: string | null; competitors: string[]; raw?: unknown; count: number }> {
   const data = isCasMode()
-    ? await fetchOpportunitySubEndpointCas<DeltekContractsResponse>(govwinId, 'contracts')
-    : await apiGet<DeltekContractsResponse>(
+    ? await fetchOpportunitySubEndpointCas<DeltekContractsResponse | DeltekContract[]>(
+        govwinId,
+        'contracts',
+      )
+    : await apiGet<DeltekContractsResponse | DeltekContract[]>(
         href ? hrefToPath(href) : `/opportunities/${encodeURIComponent(govwinId)}/contracts`,
       );
-  const list = data.contracts ?? data.data ?? data.results ?? [];
+  const list = Array.isArray(data)
+    ? data
+    : data.contracts ?? data.data ?? data.results ?? data.items ?? data.content ?? [];
 
   let incumbent: string | null = null;
   const competitors: string[] = [];
@@ -510,7 +580,7 @@ export async function fetchOpportunityContracts(
       competitors.push(name);
     }
   }
-  return { incumbent, competitors };
+  return { incumbent, competitors, raw: data, count: list.length };
 }
 
 /**
@@ -556,8 +626,20 @@ export async function fetchOpportunityByIdApi(
 ): Promise<GovWinApiOpportunity | null> {
   if (isCasMode()) {
     const viaJson = await fetchOpportunityByIdApiCas(govwinId);
-    if (viaJson) return viaJson;
-    return fetchOpportunityDetailHtmlCas(govwinId);
+    // The NEO portal frequently serves a JS-app shell / partial JSON with no
+    // incumbent or competitors. When the JSON detail already carries that
+    // intel, use it directly; otherwise merge in the HTML view page so inline
+    // incumbent/competitors are not lost when the sub-endpoints come back empty.
+    if (viaJson && (viaJson.incumbent || viaJson.competitors.length > 0)) return viaJson;
+    const viaHtml = await fetchOpportunityDetailHtmlCas(govwinId);
+    if (!viaJson) return viaHtml;
+    if (!viaHtml) return viaJson;
+    return {
+      ...viaJson,
+      incumbent: viaJson.incumbent ?? viaHtml.incumbent,
+      competitors: viaJson.competitors.length > 0 ? viaJson.competitors : viaHtml.competitors,
+      description: viaJson.description ?? viaHtml.description,
+    };
   }
   try {
     const raw = await apiGet<GovWinRawOpp>(`/opportunities/${encodeURIComponent(govwinId)}`);
@@ -675,10 +757,14 @@ export async function enrichIncumbentCompetitors(
   let calls = 0;
   let incumbent: string | null = null;
   const competitorNames: string[] = [];
+  let companiesCount = 0;
+  let contractsCount = 0;
 
   try {
     const companies = await fetchOpportunityCompanies(govwinId, links?.companies);
     calls += 1;
+    companiesCount = companies.count;
+    await cacheSubEndpointRaw(govwinId, 'companies', companies.raw);
     // Related Companies carries no incumbent flag; treat all as candidate competitors.
     if (companies.incumbent) competitorNames.push(companies.incumbent);
     competitorNames.push(...companies.competitors);
@@ -692,6 +778,8 @@ export async function enrichIncumbentCompetitors(
   try {
     const contracts = await fetchOpportunityContracts(govwinId, links?.contracts);
     calls += 1;
+    contractsCount = contracts.count;
+    await cacheSubEndpointRaw(govwinId, 'contracts', contracts.raw);
     incumbent = contracts.incumbent;
     competitorNames.push(...contracts.competitors);
   } catch (err) {
@@ -704,6 +792,21 @@ export async function enrichIncumbentCompetitors(
   const resolvedIncumbent = incumbent ?? fallbackIncumbent;
   competitorNames.push(...fallbackCompetitors);
   const competitors = dedupeCompetitors(competitorNames, resolvedIncumbent);
+
+  // Per-opportunity diagnostic: makes a live run show whether the sub-endpoints
+  // returned records and whether an incumbent was resolved (#1145).
+  logger.info(
+    {
+      govwinId,
+      companiesCount,
+      contractsCount,
+      incumbentFound: resolvedIncumbent !== null,
+      incumbentSource: incumbent !== null ? 'contracts' : fallbackIncumbent !== null ? 'fallback' : 'none',
+      competitors: competitors.length,
+      calls,
+    },
+    'govwin_enrich_result',
+  );
 
   return { incumbent: resolvedIncumbent, competitors, calls };
 }
