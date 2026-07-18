@@ -33,7 +33,7 @@ import {
 } from '../services/govwin/api_client.js';
 
 /** Delay between opportunities to stay well under the discovery/rate caps. */
-const REQUEST_DELAY_MS = parseInt(process.env['GOVWIN_BACKFILL_DELAY_MS'] ?? '250', 10);
+const REQUEST_DELAY_MS = 250;
 
 interface GovWinRow {
   id: number;
