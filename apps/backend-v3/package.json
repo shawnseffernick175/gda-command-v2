@@ -25,6 +25,7 @@
     "backfill:unified-validate": "tsx scripts/backfill_unified_opportunities.ts --validate",
     "backfill:validate-opps": "tsx src/scripts/backfill_validate_existing_opps.ts",
     "backfill:incumbent": "tsx src/scripts/backfill_incumbent.ts",
+    "backfill:govwin-incumbent": "tsx src/scripts/backfill_govwin_incumbent.ts",
     "backfill:auto-pass-set-aside": "tsx src/scripts/backfill_auto_pass_set_aside.ts"
   },
   "dependencies": {
@@ -39,7 +40,7 @@
     "@fastify/swagger-ui": "^5.2.1",
     "@kenjiuno/msgreader": "^1.28.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.0",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "docx": "^9.7.1",

@@ -26,6 +26,7 @@ import {
   discoverRecentOpportunitiesApiCas,
   fetchOpportunityByIdApiCas,
   fetchOpportunityDetailHtmlCas,
+  fetchOpportunitySubEndpointCas,
 } from './cas_client.js';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
@@ -460,10 +461,11 @@ export async function fetchOpportunityCompanies(
   govwinId: string,
   href?: string | null,
 ): Promise<GovWinRelatedCompanies> {
-  const path = href
-    ? hrefToPath(href)
-    : `/opportunities/${encodeURIComponent(govwinId)}/companies`;
-  const data = await apiGet<DeltekCompaniesResponse>(path);
+  const data = isCasMode()
+    ? await fetchOpportunitySubEndpointCas<DeltekCompaniesResponse>(govwinId, 'companies')
+    : await apiGet<DeltekCompaniesResponse>(
+        href ? hrefToPath(href) : `/opportunities/${encodeURIComponent(govwinId)}/companies`,
+      );
   const list = data.companies ?? data.relatedCompanies ?? data.data ?? data.results ?? [];
 
   let incumbent: string | null = null;
@@ -490,10 +492,11 @@ export async function fetchOpportunityContracts(
   govwinId: string,
   href?: string | null,
 ): Promise<{ incumbent: string | null; competitors: string[] }> {
-  const path = href
-    ? hrefToPath(href)
-    : `/opportunities/${encodeURIComponent(govwinId)}/contracts`;
-  const data = await apiGet<DeltekContractsResponse>(path);
+  const data = isCasMode()
+    ? await fetchOpportunitySubEndpointCas<DeltekContractsResponse>(govwinId, 'contracts')
+    : await apiGet<DeltekContractsResponse>(
+        href ? hrefToPath(href) : `/opportunities/${encodeURIComponent(govwinId)}/contracts`,
+      );
   const list = data.contracts ?? data.data ?? data.results ?? [];
 
   let incumbent: string | null = null;
@@ -647,48 +650,81 @@ async function loadStoredUpdateDates(ids: string[]): Promise<Map<string, string>
  * Competitors are the Related Companies (`/companies`) plus other, non-incumbent
  * contract companies, with the incumbent removed and duplicates collapsed.
  */
-async function enrichOneOpportunity(
-  summary: GovWinApiOpportunity,
-  detail: GovWinApiOpportunity | null,
-): Promise<{ opp: GovWinApiOpportunity; calls: number }> {
-  const merged = mergeDetailIntoSummary(summary, detail);
-  let calls = 0;
+export interface EnrichmentResult {
+  incumbent: string | null;
+  competitors: string[];
+  /** Sub-endpoint calls issued (companies + contracts). */
+  calls: number;
+}
 
+/**
+ * Fetch and classify incumbent + competitors for a single opportunity from the
+ * companies/contracts sub-endpoints. Works in both auth modes: the sub-endpoint
+ * fetchers dispatch on GOVWIN_AUTH_MODE, so this fires under CAS session auth
+ * too. Reused by ingest enrichment and by the backfill script.
+ *
+ * `fallbackIncumbent` / `fallbackCompetitors` (e.g. inline values already on the
+ * detail payload) are used when the sub-endpoints yield nothing.
+ */
+export async function enrichIncumbentCompetitors(
+  govwinId: string,
+  links?: GovWinOppLinks,
+  fallbackIncumbent: string | null = null,
+  fallbackCompetitors: string[] = [],
+): Promise<EnrichmentResult> {
+  let calls = 0;
   let incumbent: string | null = null;
   const competitorNames: string[] = [];
 
   try {
-    const companies = await fetchOpportunityCompanies(merged.govwinId, merged.links?.companies);
+    const companies = await fetchOpportunityCompanies(govwinId, links?.companies);
     calls += 1;
     // Related Companies carries no incumbent flag; treat all as candidate competitors.
     if (companies.incumbent) competitorNames.push(companies.incumbent);
     competitorNames.push(...companies.competitors);
   } catch (err) {
     logger.warn(
-      { govwinId: merged.govwinId, error: err instanceof Error ? err.message : String(err) },
+      { govwinId, error: err instanceof Error ? err.message : String(err) },
       'govwin_companies_fetch_error',
     );
   }
 
   try {
-    const contracts = await fetchOpportunityContracts(merged.govwinId, merged.links?.contracts);
+    const contracts = await fetchOpportunityContracts(govwinId, links?.contracts);
     calls += 1;
     incumbent = contracts.incumbent;
     competitorNames.push(...contracts.competitors);
   } catch (err) {
     logger.warn(
-      { govwinId: merged.govwinId, error: err instanceof Error ? err.message : String(err) },
+      { govwinId, error: err instanceof Error ? err.message : String(err) },
       'govwin_contracts_fetch_error',
     );
   }
 
-  const resolvedIncumbent = incumbent ?? merged.incumbent;
+  const resolvedIncumbent = incumbent ?? fallbackIncumbent;
+  competitorNames.push(...fallbackCompetitors);
   const competitors = dedupeCompetitors(competitorNames, resolvedIncumbent);
+
+  return { incumbent: resolvedIncumbent, competitors, calls };
+}
+
+async function enrichOneOpportunity(
+  summary: GovWinApiOpportunity,
+  detail: GovWinApiOpportunity | null,
+): Promise<{ opp: GovWinApiOpportunity; calls: number }> {
+  const merged = mergeDetailIntoSummary(summary, detail);
+
+  const { incumbent, competitors, calls } = await enrichIncumbentCompetitors(
+    merged.govwinId,
+    merged.links,
+    merged.incumbent,
+    merged.competitors,
+  );
 
   return {
     opp: {
       ...merged,
-      incumbent: resolvedIncumbent,
+      incumbent,
       competitors: competitors.length > 0 ? competitors : merged.competitors,
     },
     calls,
@@ -724,23 +760,14 @@ function dedupeCompetitors(names: string[], incumbent: string | null): string[] 
  *    sub-endpoint calls;
  *  - the rest cost ~2-3 WSAPI calls each (detail + companies [+ contracts]).
  *
- * In CAS mode the discovery path already fetches per-opportunity detail, so the
- * summaries are returned unchanged (no extra calls).
+ * This runs in BOTH auth modes. Under CAS session auth the detail + sub-endpoint
+ * fetchers dispatch to the NEO portal (via `cas_client.ts`), so enrichment fires
+ * and `subEndpointCalls` can exceed 0 — the OAuth2 tier is not required (#1145).
  */
 export async function discoverRecentOpportunitiesWithDetailApi(
   maxResults = MAX_SEARCH_PAGE,
 ): Promise<DiscoverWithDetailResult> {
   const summaries = await discoverRecentOpportunitiesApi(maxResults);
-
-  if (isCasMode()) {
-    return {
-      opportunities: summaries,
-      detailFetches: 0,
-      subEndpointCalls: 0,
-      skippedUnchanged: 0,
-      skippedIrrelevant: 0,
-    };
-  }
 
   const storedDates = await loadStoredUpdateDates(summaries.map((s) => s.govwinId));
 
