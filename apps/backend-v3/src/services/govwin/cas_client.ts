@@ -53,7 +53,7 @@ function looksLikeLogin(contentType: string | null, body: string): boolean {
  * session cookie and returns the parsed JSON body. Re-authenticates once if
  * the session has expired (login page returned).
  */
-async function casGetJson<T>(path: string, retry = true): Promise<T> {
+export async function casGetJson<T>(path: string, retry = true): Promise<T> {
   let url: URL;
   try {
     const base = new URL(IQ_BASE);
@@ -225,6 +225,18 @@ export async function fetchOpportunityByIdApiCas(
     );
     return null;
   }
+}
+
+/**
+ * Fetch an opportunity sub-endpoint (companies / contracts / contacts) under the
+ * CAS-authenticated NEO portal. Mirrors the WSAPI `/opportunities/{id}/{suffix}`
+ * shape so `api_client.ts` can parse the JSON identically regardless of auth mode.
+ */
+export async function fetchOpportunitySubEndpointCas<T>(
+  govwinId: string,
+  suffix: 'companies' | 'contracts' | 'contacts',
+): Promise<T> {
+  return casGetJson<T>(`${OPP_DETAIL_PATH}/${encodeURIComponent(govwinId)}/${suffix}`);
 }
 
 /**
