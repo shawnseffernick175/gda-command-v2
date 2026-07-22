@@ -67,5 +67,5 @@ export const config = {
 
   fpdsApiBaseUrl: env('FPDS_API_BASE_URL', 'https://www.fpds.gov/ezsearch/fpdsportal'),
 
-  samApiKey: env('SAM_API_KEY', ''),
+  samApiKey: env('SAM_API_KEY', '') || env('SAM_GOV_API_KEY', ''),
 } as const;
