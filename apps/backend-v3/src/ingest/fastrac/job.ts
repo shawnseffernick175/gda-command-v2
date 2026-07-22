@@ -47,6 +47,9 @@ export async function runFasTracTier1Ingest(): Promise<{
   inserted: number;
   updated: number;
   skipped: number;
+  degraded?: boolean;
+  degradedReason?: string;
+  stats?: Record<string, unknown>;
 }> {
   logger.info({ adapterCount: TIER1_SOURCES.length }, 'fastrac_tier1_ingest_start');
 
@@ -114,20 +117,39 @@ export async function runFasTracTier1Ingest(): Promise<{
     }
   }
 
+  const failedSources = results.filter((r) => r.errors > 0).map((r) => r.source);
+  const zeroSignalSources = results
+    .filter((r) => r.errors === 0 && r.inserted === 0 && r.updated === 0)
+    .map((r) => r.source);
+
   logger.info(
     {
       totalSources: TIER1_SOURCES.length,
       totalInserted,
       totalUpdated,
       totalErrors,
+      failedSources,
+      zeroSignalSources,
       results: results.map((r) => `${r.source}: +${r.inserted} ~${r.updated} !${r.errors}`),
     },
     'fastrac_tier1_ingest_complete',
   );
 
+  // A batch that finishes with per-adapter failures previously logged as a
+  // clean success (errors were only counted as `skipped`), so a broken
+  // innovation-org adapter stayed invisible. Surface it as a degraded run so
+  // Sentinel records it instead of resolving the source as healthy.
+  const degraded = failedSources.length > 0;
+  const degradedReason = degraded
+    ? `${failedSources.length}/${TIER1_SOURCES.length} adapters failed: ${failedSources.join(', ')}`
+    : undefined;
+
   return {
     inserted: totalInserted,
     updated: totalUpdated,
     skipped: totalErrors,
+    degraded,
+    degradedReason,
+    stats: { failedSources, zeroSignalSources, totalSources: TIER1_SOURCES.length },
   };
 }
