@@ -1370,6 +1370,79 @@ function isTotalLabel(norm: string): 'total_revenue' | 'total_direct_costs' | 'c
   return null;
 }
 
+// The eight canonical Cost-of-Revenue (direct-cost) statement lines. These MUST
+// match the frontend P2FinancialsTab detailKeys exactly (case-insensitive) or the
+// Income Statement renders "—" for the line. Ordering is significant: the more
+// specific "subcontractor materials/travel" and on/offsite labor tests run before
+// the generic ones so a raw element is never mis-bucketed.
+export const CANONICAL_DIRECT_COST_LINES = [
+  'DL Onsite', 'DL Offsite', 'Subcontractor', 'Consultant',
+  'Dir Travel', 'Sub Material', 'Direct Material', 'ODC',
+] as const;
+
+/**
+ * Collapse a raw direct-cost element label (statement line item OR GL account
+ * name) to one of the eight canonical Cost-of-Revenue lines, or null when the
+ * element is not a direct cost-of-revenue line (indirect/OH/G&A account, an
+ * account-code-only or balance-sheet junk row, a subtotal, etc.) and must be
+ * dropped. Subcontractor Travel folds into the single Travel ("Dir Travel") line
+ * so the eight lines reconcile exactly to the statement's Total Direct Costs.
+ * The caller MUST restrict to the DIRECT pool first — e.g. "OH Labor - OFFSITE"
+ * would otherwise match the offsite-labor test.
+ */
+export function canonicalDirectCostElement(raw: string): string | null {
+  const s = (raw || '').toLowerCase();
+  if (!s.trim()) return null;
+  // Subtotals / totals are never line items.
+  if (/^total\b/.test(s.trim())) return null;
+  const hasLabor = /\blabor\b/.test(s);
+  if (hasLabor && /offsite/.test(s)) return 'DL Offsite';
+  if (hasLabor && /onsite/.test(s)) return 'DL Onsite';
+  if (/subcontractor|subk|\bsub\b/.test(s) && /material/.test(s)) return 'Sub Material';
+  if (/subcontractor|subk|\bsub\b/.test(s) && /travel/.test(s)) return 'Dir Travel';
+  if (/subcontractor/.test(s)) return 'Subcontractor';
+  if (/consultant/.test(s)) return 'Consultant';
+  if (/travel/.test(s)) return 'Dir Travel';
+  if (/material/.test(s)) return 'Direct Material';
+  if (/other direct cost|^\s*odc\s*$/.test(s)) return 'ODC';
+  return null;
+}
+
+/**
+ * Collapse raw cost-detail rows (from any source doc) to the canonical, DIRECT-
+ * only, deduplicated cost-of-revenue set: one row per (period, canonical line).
+ * Non-DIRECT pools and non-cost-of-revenue elements are dropped; folded lines
+ * (e.g. Subcontractor Travel into Travel) are SUMMED. Pure and DB-free so the
+ * reconciliation guard is unit-testable: the eight lines for a month must sum to
+ * that month's Total Direct Costs and no cost_element may appear twice.
+ */
+export function aggregateDirectCostRows(rows: CostDetailRowT[]): CostDetailRowT[] {
+  const agg = new Map<string, CostDetailRowT>();
+  for (const row of rows) {
+    if (!row.period || !row.fiscal_year || !row.cost_element || !row.pool) continue;
+    if (String(row.pool).trim().toLowerCase() !== 'direct') continue;
+    const canonical = canonicalDirectCostElement(row.cost_element);
+    if (!canonical) continue;
+    const key = `${row.period}|||${canonical}`;
+    const cur = agg.get(key);
+    if (cur) {
+      cur.target_amount = (Number(cur.target_amount) || 0) + (Number(row.target_amount) || 0);
+      cur.actual_amount = (Number(cur.actual_amount) || 0) + (Number(row.actual_amount) || 0);
+    } else {
+      agg.set(key, {
+        period: row.period,
+        fiscal_year: row.fiscal_year,
+        quarter: row.quarter,
+        cost_element: canonical,
+        pool: 'DIRECT',
+        target_amount: Number(row.target_amount) || 0,
+        actual_amount: Number(row.actual_amount) || 0,
+      });
+    }
+  }
+  return [...agg.values()];
+}
+
 /**
  * Parse a Trended Income Statement or Trended Balance Sheet. Returns null when
  * the document is not a recognizable trended grid.
@@ -1447,22 +1520,15 @@ function parseTrendedIncomeStatement(text: string, filename: string): TrendedSta
       }
       continue;
     }
-    // Line-item rows inside Direct Costs become cost_detail rows (pool DIRECT).
+    // Direct-cost line items are NOT taken from the SUMMARY grid: it carries a
+    // single combined "Direct Labor" line, but the statement needs the Onsite /
+    // Offsite split, which only the DETAIL grid (account-level) provides. Here we
+    // only note which months carry data so phantom all-zero months are dropped;
+    // the cost_detail rows themselves are built from the DETAIL grid below.
     if (section === 'direct costs') {
       for (const mc of grid.monthCols) {
         const cell = cols[mc.col] ?? '';
-        if (!isNumericCell(cell)) continue;
-        const v = parseNum(cell);
-        if (v !== 0) monthHasData.set(mc.num, true);
-        costDetail.push({
-          period: periodLabel(grid.fiscalYear, mc.label),
-          fiscal_year: grid.fiscalYear,
-          quarter: Math.ceil(mc.num / 3),
-          cost_element: label,
-          pool: 'DIRECT',
-          target_amount: 0,
-          actual_amount: v,
-        });
+        if (isNumericCell(cell) && parseNum(cell) !== 0) monthHasData.set(mc.num, true);
       }
     }
   }
@@ -1491,6 +1557,30 @@ function parseTrendedIncomeStatement(text: string, filename: string): TrendedSta
       const hasNumbers = detGrid.monthCols.some((mc) => isNumericCell(cols[mc.col] ?? ''));
       if (!hasNumbers) {
         if (sec === 'cost of operations' && norm) pool = label || first;
+        continue;
+      }
+      // Direct-cost account rows (pool DIRECT). The account name (e.g. "Direct
+      // Labor ONSITE", "Subcontractor Travel") is canonicalized to one of the
+      // eight statement lines at ingest time; raw names are emitted here.
+      if (sec === 'direct costs') {
+        if (/^total\b/i.test(first) || /^total\b/i.test(label)) continue;
+        const accountName = label || first;
+        if (!accountName) continue;
+        for (const mc of detGrid.monthCols) {
+          const cell = cols[mc.col] ?? '';
+          if (!isNumericCell(cell)) continue;
+          const v = parseNum(cell);
+          if (v !== 0) monthHasData.set(mc.num, true);
+          costDetail.push({
+            period: periodLabel(detGrid.fiscalYear, mc.label),
+            fiscal_year: detGrid.fiscalYear,
+            quarter: Math.ceil(mc.num / 3),
+            cost_element: accountName,
+            pool: 'DIRECT',
+            target_amount: 0,
+            actual_amount: v,
+          });
+        }
         continue;
       }
       if (sec !== 'cost of operations') continue;

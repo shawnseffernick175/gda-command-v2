@@ -32,6 +32,7 @@
 
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
+import { aggregateDirectCostRows } from './deterministic-parsers.js';
 import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput, ApExtractOutput, ArExtractOutput, TrialBalanceExtractOutput, ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js';
 
 type FinancialRow = FinancialStatementExtractOutput['rows'][number];
@@ -509,31 +510,36 @@ export async function ingestCostDetailRows(
   sourceDocId?: number | null,
   source = 'tgt_vs_act',
 ): Promise<number> {
+  // Cost-of-revenue is DIRECT-pool only, and every element is collapsed to one of
+  // the eight canonical statement lines. This is the single source of truth: any
+  // source doc that mentions a direct-cost figure lands on the SAME (period,
+  // canonical line, DIRECT) key, so the same dollars are never stored under two
+  // labels/pools. Folded lines (e.g. Direct Travel + Subcontractor Travel) are
+  // summed by aggregateDirectCostRows, so the per-key upsert is idempotent.
   let count = 0;
-  for (const row of rows) {
-    if (!row.period || !row.fiscal_year || !row.cost_element || !row.pool) continue;
+  for (const r of aggregateDirectCostRows(rows)) {
     try {
       await pool.query(
         `INSERT INTO cost_detail_actuals
            (period, fiscal_year, quarter, cost_element, pool,
             target_amount, actual_amount, source, source_doc_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $9, $8)
+         VALUES ($1, $2, $3, $4, 'DIRECT', $5, $6, $8, $7)
          ON CONFLICT (source, period, cost_element, pool)
          DO UPDATE SET
            target_amount = EXCLUDED.target_amount,
            actual_amount = EXCLUDED.actual_amount,
            source_doc_id = EXCLUDED.source_doc_id`,
         [
-          row.period, row.fiscal_year, row.quarter,
-          row.cost_element, row.pool,
-          row.target_amount, row.actual_amount,
+          r.period, r.fiscal_year, r.quarter,
+          r.cost_element,
+          r.target_amount, r.actual_amount,
           sourceDocId ?? null,
           source,
         ],
       );
       count++;
     } catch (err) {
-      logger.warn({ err, period: row.period, cost_element: row.cost_element }, 'Cost detail row upsert failed');
+      logger.warn({ err, period: r.period, cost_element: r.cost_element }, 'Cost detail row upsert failed');
     }
   }
   return count;
