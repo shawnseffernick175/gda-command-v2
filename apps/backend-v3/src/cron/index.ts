@@ -2,11 +2,14 @@
  * Cron scheduler — uses node-cron to schedule periodic ingest jobs.
  * Boots with the backend and logs registered jobs at startup.
  *
- * DIBBS + NECO crons are gated behind ENABLE_DIBBS_INGEST / ENABLE_NECO_INGEST
- * env flags (default OFF). Both .mil sites firewall commercial VPS IPs, so
- * crons fail with TCP connect timeouts from Hostinger. The ingest code is
- * correct — only the transport is blocked. Re-enable once egress proxy or
- * alternative infra is in place. See GitHub issue #513.
+ * DIBBS + NECO are intentionally PARKED, not gated: their adapters and
+ * registerDIBBSSource / registerNECOSource exist but are never called, and
+ * there are no ENABLE_DIBBS_INGEST / ENABLE_NECO_INGEST flags (an earlier
+ * version of this comment referenced flags that do not exist). Both .mil sites
+ * firewall commercial VPS IPs, so ingest fails with TCP connect timeouts from
+ * Hostinger — the ingest code is correct, only the transport is blocked. To
+ * revive: wire the register* calls into registerIngestSources() and add a cron
+ * JOB entry, once an egress proxy or alternative infra is in place. See #513.
  *
  * SBIR cron is gated behind ENABLE_SBIR_INGEST (default OFF).
  * Source: DoD DSIP API (dodsbirsttr.mil). Orchestrator flips flag after
