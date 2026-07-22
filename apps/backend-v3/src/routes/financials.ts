@@ -422,12 +422,26 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const whereClause = period ? 'WHERE period = $1' : '';
     const params = period ? [period] : [];
 
+    // Per-period source preference: the deterministic Trended Income Statement
+    // (source income_statement) is the authoritative, reconcilable dollar figure,
+    // so when it exists for a period we return ONLY those rows and hide the legacy
+    // tgt_vs_act rows (which summed to garbage / cents). Falls back to legacy for
+    // any period the income statement never covered. Non-destructive: both source
+    // rows remain in the table.
     const { rows } = await pool.query(
-      `SELECT period, fiscal_year, quarter, cost_element, pool,
-              target_amount, actual_amount, variance_amount
-       FROM cost_detail_actuals
-       ${whereClause}
-       ORDER BY cost_element, pool`,
+      `WITH ranked AS (
+         SELECT period, fiscal_year, quarter, cost_element, pool,
+                target_amount, actual_amount, variance_amount,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM cost_detail_actuals
+         ${whereClause}
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period)
+       SELECT r.period, r.fiscal_year, r.quarter, r.cost_element, r.pool,
+              r.target_amount, r.actual_amount, r.variance_amount
+       FROM ranked r
+       JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       ORDER BY r.cost_element, r.pool`,
       params,
     );
 
@@ -448,11 +462,21 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/financials/cost-detail/trend
   // All periods, all cost elements
   app.get('/v3/financials/cost-detail/trend', async (req, reply) => {
+    // Same per-period income_statement-first source preference as the single
+    // period route, applied across all periods (see that route for rationale).
     const { rows } = await pool.query(
-      `SELECT period, fiscal_year, quarter, cost_element, pool,
-              target_amount, actual_amount, variance_amount
-       FROM cost_detail_actuals
-       ORDER BY fiscal_year, quarter, period, cost_element, pool`,
+      `WITH ranked AS (
+         SELECT period, fiscal_year, quarter, cost_element, pool,
+                target_amount, actual_amount, variance_amount,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM cost_detail_actuals
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period)
+       SELECT r.period, r.fiscal_year, r.quarter, r.cost_element, r.pool,
+              r.target_amount, r.actual_amount, r.variance_amount
+       FROM ranked r
+       JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       ORDER BY r.fiscal_year, r.quarter, r.period, r.cost_element, r.pool`,
     );
 
     const items = rows.map((r) => ({
@@ -476,13 +500,24 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const whereClause = period ? 'WHERE period = $1' : '';
     const params = period ? [period] : [];
 
+    // Per-period source preference: prefer the deterministic income_statement
+    // indirect rows (real per-account dollars reconciling to Total Cost of
+    // Operations) over the legacy sie rows (which carried rates / cents). Falls
+    // back to legacy for uncovered periods. Non-destructive.
     const { rows } = await pool.query(
-      `SELECT period, fiscal_year, quarter, pool, account_code, account_name,
-              current_period_actual, current_period_budget,
-              ytd_actual, ytd_budget
-       FROM indirect_expense_actuals
-       ${whereClause}
-       ORDER BY pool, account_code NULLS LAST, account_name`,
+      `WITH ranked AS (
+         SELECT period, fiscal_year, quarter, pool, account_code, account_name,
+                current_period_actual, current_period_budget, ytd_actual, ytd_budget,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM indirect_expense_actuals
+         ${whereClause}
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period)
+       SELECT r.period, r.fiscal_year, r.quarter, r.pool, r.account_code, r.account_name,
+              r.current_period_actual, r.current_period_budget, r.ytd_actual, r.ytd_budget
+       FROM ranked r
+       JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       ORDER BY r.pool, r.account_code NULLS LAST, r.account_name`,
       params,
     );
 
@@ -505,13 +540,27 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/financials/indirect-expenses/trend
   // Time series of total indirect by pool
   app.get('/v3/financials/indirect-expenses/trend', async (req, reply) => {
+    // Aggregate per pool AFTER applying the per-period income_statement-first
+    // source preference, so a period's totals never mix authoritative and legacy
+    // rows (see /indirect-expenses for rationale).
     const { rows } = await pool.query(
-      `SELECT period, fiscal_year, quarter, pool,
+      `WITH ranked AS (
+         SELECT period, fiscal_year, quarter, pool,
+                current_period_actual, current_period_budget, ytd_actual, ytd_budget,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM indirect_expense_actuals
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       )
+       SELECT period, fiscal_year, quarter, pool,
               SUM(current_period_actual) AS period_actual,
               SUM(current_period_budget) AS period_budget,
               SUM(ytd_actual) AS ytd_actual,
               SUM(ytd_budget) AS ytd_budget
-       FROM indirect_expense_actuals
+       FROM preferred
        GROUP BY period, fiscal_year, quarter, pool
        ORDER BY fiscal_year, quarter, period, pool`,
     );
@@ -1422,13 +1471,25 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const fiscalYear = normalizeFiscalYear(fy);
     const orderedMonths = getMonthsForMode(mode);
 
+    // Aggregate after applying the per-period income_statement-first source
+    // preference so each period's cost lines come from a single source.
     const { rows } = await pool.query(
-      `SELECT period, cost_element, pool,
+      `WITH ranked AS (
+         SELECT period, cost_element, pool, target_amount, actual_amount, variance_amount,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM cost_detail_actuals
+         WHERE fiscal_year = $1
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       )
+       SELECT period, cost_element, pool,
               SUM(target_amount) AS planned,
               SUM(actual_amount) AS actual,
               SUM(variance_amount) AS variance
-       FROM cost_detail_actuals
-       WHERE fiscal_year = $1
+       FROM preferred
        GROUP BY period, cost_element, pool
        ORDER BY cost_element, pool, period`,
       [fiscalYear],
@@ -1914,13 +1975,24 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        LIMIT 1`,
     );
 
-    // Cost detail aggregated by pool (contract P&L proxy)
+    // Cost detail aggregated by pool (contract P&L proxy). Per-period
+    // income_statement-first source preference applied before the pool rollup.
     const { rows: costByPool } = await pool.query(
-      `SELECT pool,
+      `WITH ranked AS (
+         SELECT period, pool, target_amount, actual_amount, variance_amount,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM cost_detail_actuals
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       )
+       SELECT pool,
               SUM(target_amount) AS total_target,
               SUM(actual_amount) AS total_actual,
               SUM(variance_amount) AS total_variance
-       FROM cost_detail_actuals
+       FROM preferred
        GROUP BY pool
        ORDER BY SUM(actual_amount) DESC`,
     );
@@ -1930,19 +2002,40 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     // element. Aggregated cost elements are mapped to proper labels in the
     // frontend; only the DIRECT pool is used here.
     const { rows: directCostRows } = await pool.query(
-      `SELECT period, cost_element,
+      `WITH ranked AS (
+         SELECT period, cost_element, actual_amount, LOWER(pool) AS lpool,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM cost_detail_actuals
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       )
+       SELECT period, cost_element,
               SUM(actual_amount) AS amount
-       FROM cost_detail_actuals
-       WHERE LOWER(pool) = 'direct'
+       FROM preferred
+       WHERE lpool = 'direct'
        GROUP BY period, cost_element
        ORDER BY period, cost_element`,
     );
 
     // Indirect expense breakdown by period and pool (Fringe, Overhead, G&A).
+    // Per-period income_statement-first source preference applied before rollup.
     const { rows: indirectRows } = await pool.query(
-      `SELECT period, pool,
+      `WITH ranked AS (
+         SELECT period, pool, current_period_actual,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM indirect_expense_actuals
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       )
+       SELECT period, pool,
               SUM(current_period_actual) AS amount
-       FROM indirect_expense_actuals
+       FROM preferred
        GROUP BY period, pool
        ORDER BY period, pool`,
     );

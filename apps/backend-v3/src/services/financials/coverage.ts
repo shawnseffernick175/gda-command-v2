@@ -35,6 +35,9 @@ export type CoverageStatus =
 
 /** The specialized parser types, in the priority order used to name a doc. */
 const SPECIALIZED_TYPES: Array<[keyof FinancialDocClassification, string]> = [
+  // Trended IS/BS is the authoritative reconcilable source and is recognized by
+  // content fingerprint, so it wins over every legacy filename-driven type.
+  ['is_income_statement', 'income_statement'],
   ['is_balance_sheet', 'balance_sheet'],
   ['is_trial_balance', 'trial_balance'],
   ['is_sie', 'sie'],

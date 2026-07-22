@@ -37,6 +37,8 @@ import {
   parseYtdGlDetail,
   parseProjectRevenueSummary,
   parseProjectActualsTargets,
+  parseTrendedStatement,
+  sanitizeExtractedText,
 } from './deterministic-parsers.js';
 
 /**
@@ -57,6 +59,16 @@ export interface FinancialDocClassification {
   is_project_revenue: boolean;
   /** L2/L1 ACTUAL & TARGET company P&L (DataSetLandTbl "Period Cost/Prof/Rev"). */
   is_project_actuals_targets: boolean;
+  /**
+   * Trended Income Statement / Trended Balance Sheet — recognized by the
+   * structural fingerprint (an "Account Name | Jan | Feb | ..." month grid with
+   * Total Direct Costs / Total Cost of Operations, or Total Assets / Total
+   * Equity), NOT by filename. This is the authoritative, reconcilable source for
+   * per-month Total Direct Costs and Total Cost of Operations, so it is handled
+   * by the deterministic parseTrendedStatement path and SUPPRESSES the generic
+   * KPI / cost_detail / SIE / balance-sheet parsers for the same doc.
+   */
+  is_income_statement: boolean;
 }
 
 /**
@@ -139,6 +151,31 @@ export function classifyFinancialDoc(
 
   const is_balance_sheet = /balance.?sheet/i.test(fn) || /balance.?sheet/i.test(head);
 
+  // Trended Income Statement structural fingerprint (content, not filename): an
+  // "Account Name | Jan | Feb | Mar | ..." month grid together with the Total
+  // Direct Costs / Total Cost of Operations F/S subtotals. Scanned over a wide
+  // window because the SUMMARY header + subtotals sit in the first sheet. The
+  // filename is only a weak confirmation — a renamed file still fingerprints.
+  const bodyNorm = (extractedText || '')
+    .slice(0, 8000)
+    .toLowerCase()
+    .replace(/_x000d_/gi, ' ')
+    .replace(/\s+/g, ' ');
+  const hasMonthGrid =
+    /account name.*\bjan\b.*\bfeb\b.*\bmar\b/.test(bodyNorm) ||
+    /\bjan\b.{0,6}\bfeb\b.{0,6}\bmar\b.{0,6}\bapr\b/.test(bodyNorm);
+  const hasIsTotals =
+    /total direct costs/.test(bodyNorm) || /total cost of operations/.test(bodyNorm);
+  // Trended Balance Sheet fingerprint (same month grid, different subtotals). The
+  // deterministic parseTrendedStatement handles both kinds and self-identifies,
+  // so both feed the same is_income_statement route.
+  const hasBsTotals =
+    (/total current assets/.test(bodyNorm) && /total current liabilities/.test(bodyNorm)) ||
+    /liabilities & equity/.test(bodyNorm) ||
+    /trended balance sheet/.test(bodyNorm);
+  const is_income_statement =
+    hasMonthGrid && (hasIsTotals || hasBsTotals) && !is_ap && !is_ar && !is_trial_balance;
+
   const anySpecialized =
     is_balance_sheet ||
     is_cost_detail ||
@@ -147,7 +184,8 @@ export function classifyFinancialDoc(
     is_ar ||
     is_trial_balance ||
     is_project_revenue ||
-    is_project_actuals_targets;
+    is_project_actuals_targets ||
+    is_income_statement;
 
   // Generic P&L / KPI parser. The keyword set is intentionally broad (it must
   // catch L1-TARGET / L1-ACTUAL income statements), but it is gated on
@@ -167,6 +205,7 @@ export function classifyFinancialDoc(
     is_trial_balance,
     is_project_revenue,
     is_project_actuals_targets,
+    is_income_statement,
   };
 }
 
@@ -181,6 +220,7 @@ export interface ReingestResult {
   ar: number;
   trial_balance: number;
   project_revenue: number;
+  income_statement: number;
   parsers_run: string[];
   parsers_skipped: string[];
   any_ingested: boolean;
@@ -200,7 +240,12 @@ export async function reingestFinancialDoc(params: {
   docType?: string | null;
   skipParsers?: string[];
 }): Promise<ReingestResult> {
-  const { docId, filename, extractedText, docType, skipParsers = [] } = params;
+  const { docId, filename, extractedText, docType } = params;
+  // Working set of parsers to skip. The deterministic Trended-statement branch
+  // adds to this at runtime so the generic KPI / cost_detail / SIE / balance-sheet
+  // parsers never re-process a doc the trended parser already authoritatively
+  // ingested (which would double-write stale tgt_vs_act / sie dollars).
+  const skipParsers = [...(params.skipParsers ?? [])];
 
   const result: ReingestResult = {
     plan: 0,
@@ -213,6 +258,7 @@ export async function reingestFinancialDoc(params: {
     ar: 0,
     trial_balance: 0,
     project_revenue: 0,
+    income_statement: 0,
     parsers_run: [],
     parsers_skipped: [],
     any_ingested: false,
@@ -227,6 +273,64 @@ export async function reingestFinancialDoc(params: {
   // types suppress the generic P&L parser so non-P&L docs are never fed to
   // financial_statement_extract (which would reject every row as "implausible").
   const cls = classifyFinancialDoc(filename, extractedText, docType);
+
+  // --- Parser 0: Trended Income Statement / Trended Balance Sheet ---
+  // This runs FIRST and is the authoritative, reconcilable source for per-month
+  // Total Direct Costs (cost_detail, source income_statement) and Total Cost of
+  // Operations (indirect, source income_statement). When it yields rows it
+  // suppresses the generic KPI / cost_detail / SIE (income statement) or
+  // balance_sheet (balance sheet) parsers for the SAME doc so they cannot
+  // re-write the stale tgt_vs_act / sie dollars over the good numbers.
+  if (cls.is_income_statement && !skipParsers.includes('income_statement_extract')) {
+    try {
+      const trended = parseTrendedStatement(extractedText, filename);
+      if (trended && trended.kind === 'income_statement') {
+        result.parsers_run.push('income_statement_extract (deterministic)');
+        let ingested = 0;
+        if (trended.costDetail.length > 0) {
+          result.cost_detail += await ingestCostDetailRows(trended.costDetail, docId, 'income_statement');
+          ingested += trended.costDetail.length;
+        }
+        if (trended.sie.length > 0) {
+          result.sie += await ingestSieRows(trended.sie, docId, 'income_statement');
+          ingested += trended.sie.length;
+        }
+        if (trended.financial.length > 0) {
+          const counts = await ingestFinancialRows(trended.financial, docId);
+          result.actual += counts.actual;
+          result.plan += counts.plan;
+          result.rejected += counts.rejected;
+          if (counts.parse_warnings.length > 0) result.parse_warnings.push(...counts.parse_warnings);
+          ingested += counts.actual + counts.plan;
+        }
+        result.income_statement = ingested;
+        if (ingested > 0) {
+          result.any_ingested = true;
+          // Suppress the LLM/legacy parsers that would otherwise overwrite the
+          // authoritative income_statement rows with stale dollars.
+          skipParsers.push('financial_statement_extract', 'cost_detail_extract', 'sie_extract');
+        } else {
+          result.parse_warnings.push('income_statement_extract: 0 rows (trended grid detected but no month data)');
+        }
+      } else if (trended && trended.kind === 'balance_sheet') {
+        result.parsers_run.push('income_statement_extract (deterministic balance sheet)');
+        if (trended.balanceSheet.length > 0) {
+          result.balance_sheet += await ingestBalanceSheetRows(trended.balanceSheet, docId);
+          result.income_statement = trended.balanceSheet.length;
+          if (result.balance_sheet > 0) {
+            result.any_ingested = true;
+            skipParsers.push('balance_sheet_extract', 'financial_statement_extract');
+          }
+        }
+      } else {
+        logger.warn({ docId, filename }, 'reingest: income_statement fingerprint matched but parseTrendedStatement returned null');
+        result.parse_warnings.push('income_statement_extract: fingerprint matched but grid not parseable');
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: Trended statement parser failed');
+      result.parse_warnings.push('income_statement_extract: parser threw');
+    }
+  }
 
   // --- Parser 1: KPI (Income Statement / L1-TARGET / L1-ACTUAL) ---
   if (cls.is_financial && !skipParsers.includes('financial_statement_extract')) {
@@ -472,6 +576,7 @@ export async function reingestFinancialDoc(params: {
     { key: 'trial_balance_extract', matched: cls.is_trial_balance },
     { key: 'project_revenue_extract', matched: cls.is_project_revenue },
     { key: 'project_actuals_targets_extract', matched: cls.is_project_actuals_targets },
+    { key: 'income_statement_extract', matched: cls.is_income_statement },
   ];
   for (const p of allParsers) {
     if (!p.matched && !skipParsers.includes(p.key)) {
@@ -480,4 +585,56 @@ export async function reingestFinancialDoc(params: {
   }
 
   return result;
+}
+
+/**
+ * The explicit, human-facing outcome vocabulary (F-1142 Pillar 4). Every doc a
+ * caller runs through the financial pipeline resolves to exactly one of these —
+ * there is no silent warn-and-continue and no "no_handler" dead-end. SUPERSEDED
+ * is a cross-doc verdict (a newer copy of the same content ingested) and is
+ * decided by the coverage classifier, not here; FAILED is reserved for a thrown
+ * parser (the caller's catch). This helper covers the single-doc outcomes.
+ */
+export type FinancialVerdict =
+  | 'INGESTED'
+  | 'NEEDS_REVIEW'
+  | 'SKIPPED'
+  | 'FAILED';
+
+export interface VerdictResult {
+  verdict: FinancialVerdict;
+  detail: string;
+}
+
+/**
+ * Map a single-doc ReingestResult to an explicit verdict + reason. Rows landed
+ * -> INGESTED. No rows but a handler ran (parser attempted or emitted a warning)
+ * -> NEEDS_REVIEW (a real parse gap a human must look at, never swallowed). No
+ * rows and no handler even attempted -> SKIPPED (nothing financial recognized).
+ */
+export function computeVerdict(r: ReingestResult): VerdictResult {
+  if (r.any_ingested) {
+    const parts: string[] = [];
+    if (r.income_statement > 0) parts.push(`income_statement=${r.income_statement}`);
+    if (r.plan > 0) parts.push(`plan=${r.plan}`);
+    if (r.actual > 0) parts.push(`actual=${r.actual}`);
+    if (r.balance_sheet > 0) parts.push(`balance_sheet=${r.balance_sheet}`);
+    if (r.cost_detail > 0) parts.push(`cost_detail=${r.cost_detail}`);
+    if (r.sie > 0) parts.push(`sie=${r.sie}`);
+    if (r.ap > 0) parts.push(`ap=${r.ap}`);
+    if (r.ar > 0) parts.push(`ar=${r.ar}`);
+    if (r.trial_balance > 0) parts.push(`trial_balance=${r.trial_balance}`);
+    if (r.project_revenue > 0) parts.push(`project_revenue=${r.project_revenue}`);
+    return { verdict: 'INGESTED', detail: parts.join(', ') || 'rows ingested' };
+  }
+  const handlerAttempted = r.parsers_run.length > 0 || r.parse_warnings.length > 0;
+  if (handlerAttempted) {
+    return {
+      verdict: 'NEEDS_REVIEW',
+      detail: r.parse_warnings.length > 0
+        ? r.parse_warnings.join('; ')
+        : `handler ran (${r.parsers_run.join(', ')}) but produced 0 rows`,
+    };
+  }
+  return { verdict: 'SKIPPED', detail: 'no financial handler recognized this document' };
 }
