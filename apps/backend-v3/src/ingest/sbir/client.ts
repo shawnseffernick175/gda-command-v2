@@ -12,6 +12,7 @@
 
 import { request } from 'undici';
 import { logger } from '../../lib/logger.js';
+import { envStr, envInt } from '../../lib/env.js';
 import type {
   DSIPTopicListItem,
   DSIPTopicDetail,
@@ -21,9 +22,9 @@ import type {
 
 const DEFAULT_BASE_URL = 'https://www.dodsbirsttr.mil/topics/api/public';
 
-const BASE_URL = process.env.SBIR_DSIP_BASE_URL ?? DEFAULT_BASE_URL;
-const REQUEST_TIMEOUT_MS = parseInt(process.env.SBIR_REQUEST_TIMEOUT_MS ?? '60000', 10);
-const MAX_RETRIES = parseInt(process.env.SBIR_MAX_RETRIES ?? '3', 10);
+const BASE_URL = envStr('SBIR_DSIP_BASE_URL', DEFAULT_BASE_URL);
+const REQUEST_TIMEOUT_MS = envInt('SBIR_REQUEST_TIMEOUT_MS', 60000);
+const MAX_RETRIES = envInt('SBIR_MAX_RETRIES', 3);
 const INITIAL_BACKOFF_MS = 2_000;
 const PAGE_SIZE = 50;
 const DETAIL_DELAY_MS = 300;

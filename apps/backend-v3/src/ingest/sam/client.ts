@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../../lib/logger.js';
+import { envInt, envFirst } from '../../lib/env.js';
 import type { SAMOpportunityRaw, SAMSearchResponse } from './types.js';
 
 export type { SAMOpportunityRaw };
@@ -15,16 +16,13 @@ export type { SAMOpportunityRaw };
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2/search';
 const PAGE_SIZE = 1000;
 const REQUEST_DELAY_MS = 500;
-const REQUEST_TIMEOUT_MS = parseInt(
-  process.env.SAM_REQUEST_TIMEOUT_MS ?? '60000',
-  10,
-);
+const REQUEST_TIMEOUT_MS = envInt('SAM_REQUEST_TIMEOUT_MS', 60000);
 const MAX_PAGES = 20;
-const MAX_RETRIES = parseInt(process.env.SAM_MAX_RETRIES ?? '3', 10);
+const MAX_RETRIES = envInt('SAM_MAX_RETRIES', 3);
 const INITIAL_BACKOFF_MS = 2_000;
 
 export function getSAMApiKey(): string {
-  const key = process.env.SAM_GOV_API_KEY ?? process.env.SAM_API_KEY;
+  const key = envFirst(['SAM_GOV_API_KEY', 'SAM_API_KEY']);
   if (!key) {
     throw new Error('SAM_GOV_API_KEY is not set — SAM ingest cannot run');
   }

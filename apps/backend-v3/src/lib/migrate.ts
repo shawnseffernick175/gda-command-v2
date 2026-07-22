@@ -15,6 +15,7 @@ import { runner, type RunnerOption } from 'node-pg-migrate';
 import pg from 'pg';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
+import { envFirst } from './env.js';
 
 const { Client } = pg;
 
@@ -33,9 +34,7 @@ export async function runMigrations(opts?: {
 }): Promise<MigrateResult> {
   const dryRun = opts?.dryRun ?? false;
   const databaseUrl =
-    opts?.databaseUrl ??
-    process.env['DATABASE_URL'] ??
-    process.env['V3_DATABASE_URL'];
+    opts?.databaseUrl || envFirst(['DATABASE_URL', 'V3_DATABASE_URL']);
 
   if (!databaseUrl) {
     throw new Error('DATABASE_URL or V3_DATABASE_URL must be set');
