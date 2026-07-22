@@ -164,3 +164,42 @@ describe('phantom-June guard — orders-only rows carry no P&L signal', () => {
     expect(rejectReason(r, r)).toBeNull();
   });
 });
+
+describe('classifyCoverage — cumulative trended supersession (F-1142 Pillar 4)', () => {
+  it('demotes an older monthly trended IS (0 rows) to a duplicate of the newest cumulative one', () => {
+    const docs: CoverageDocInput[] = [
+      { doc_id: 173, filename: 'Trended Income Statement MAR-2026.xlsx', extraction_status: 'success', row_count: 0, primary_type: 'income_statement', period: 'FY26 Mar', handler_matched: true },
+      { doc_id: 221, filename: 'Trended Income Statement JUN-26.xlsx', extraction_status: 'success', row_count: 48, primary_type: 'income_statement', period: 'FY26 Jun', handler_matched: true },
+    ];
+    const v = classifyCoverage(docs);
+    expect(v.get(221)!.status).toBe('ingested');
+    expect(v.get(173)!.status).toBe('skipped_duplicate');
+    expect(v.get(173)!.duplicate_of).toBe(221);
+  });
+
+  it('demotes a GL Detail (cost_detail, 0 rows) superseded by the trended IS umbrella', () => {
+    const docs: CoverageDocInput[] = [
+      { doc_id: 179, filename: 'YTD APR-2026 GL Detail.xlsx', extraction_status: 'success', row_count: 0, primary_type: 'cost_detail', period: 'FY26 Apr', handler_matched: true },
+      { doc_id: 221, filename: 'Trended Income Statement JUN-26.xlsx', extraction_status: 'success', row_count: 48, primary_type: 'income_statement', period: 'FY26 Jun', handler_matched: true },
+    ];
+    const v = classifyCoverage(docs);
+    expect(v.get(179)!.status).toBe('skipped_duplicate');
+    expect(v.get(179)!.duplicate_of).toBe(221);
+  });
+
+  it('demotes a no-month trend rollup (null period) covered by the trended BS', () => {
+    const docs: CoverageDocInput[] = [
+      { doc_id: 82, filename: '2026 Trend Balance Sheet.xlsx', extraction_status: 'success', row_count: 0, primary_type: 'balance_sheet', period: null, handler_matched: true },
+      { doc_id: 220, filename: 'Trended Balance Sheet JUN-26.xlsx', extraction_status: 'success', row_count: 6, primary_type: 'balance_sheet', period: 'FY26 Jun', handler_matched: true },
+    ];
+    expect(classifyCoverage(docs).get(82)!.status).toBe('skipped_duplicate');
+  });
+
+  it('does NOT demote a genuinely newer trended IS that failed (period beyond the keeper stays parse_error)', () => {
+    const docs: CoverageDocInput[] = [
+      { doc_id: 300, filename: 'Trended Income Statement JUL-2026.xlsx', extraction_status: 'success', row_count: 0, primary_type: 'income_statement', period: 'FY26 Jul', handler_matched: true },
+      { doc_id: 221, filename: 'Trended Income Statement JUN-26.xlsx', extraction_status: 'success', row_count: 48, primary_type: 'income_statement', period: 'FY26 Jun', handler_matched: true },
+    ];
+    expect(classifyCoverage(docs).get(300)).toMatchObject({ status: 'not_ingested', reason: 'parse_error' });
+  });
+});

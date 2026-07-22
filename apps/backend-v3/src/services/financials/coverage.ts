@@ -116,6 +116,34 @@ export function inferDocPeriod(filename: string): string | null {
   return info ? info.period : null;
 }
 
+/** Absolute month ordinal (fiscal_year*12 + month) for period comparison, or null. */
+const MONTH_ORD: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+export function periodOrdinal(period: string | null): number | null {
+  if (!period) return null;
+  const m = period.match(/FY(\d{2})\s+([A-Za-z]{3})/);
+  if (!m) return null;
+  const mo = MONTH_ORD[m[2].toLowerCase()];
+  if (!mo) return null;
+  return (2000 + parseInt(m[1], 10)) * 12 + mo;
+}
+
+/**
+ * The authoritative "umbrella" type that supersedes a doc for coverage purposes.
+ * The trended Income Statement is the reconcilable source for its cost-detail and
+ * SIE lines too, so all three collapse to income_statement; the balance sheet is
+ * its own umbrella. Everything else has no cross-type umbrella (returns null).
+ */
+export function canonicalCoverageType(primaryType: string | null): string | null {
+  if (primaryType === 'income_statement' || primaryType === 'cost_detail' || primaryType === 'sie') {
+    return 'income_statement';
+  }
+  if (primaryType === 'balance_sheet') return 'balance_sheet';
+  return null;
+}
+
 /**
  * Classify every financial doc's ingestion result. Returns a verdict per doc_id.
  *
@@ -134,6 +162,12 @@ export function classifyCoverage(
   const ingestedByContent = new Map<string, CoverageDocInput>();
   const ingestedByStem = new Map<string, CoverageDocInput>();
   const ingestedTypes = new Set<string>();
+  // Newest cumulative snapshot per umbrella type: the trended IS/BS statements
+  // are cumulative, and on re-ingest the newest file wins the ON CONFLICT and
+  // owns every period's rows (the read side keys per period from it). The
+  // keeper is the ingested doc of that umbrella with the greatest period
+  // ordinal (ties broken by doc_id) — it covers every earlier period.
+  const authoritativeByCanon = new Map<string, { keeper: CoverageDocInput; maxOrd: number | null }>();
   for (const d of docs) {
     const ingested = d.extraction_status === 'success' && d.row_count > 0;
     if (!ingested) continue;
@@ -144,6 +178,15 @@ export function classifyCoverage(
     const stem = filenameStem(d.filename);
     if (stem && !ingestedByStem.has(stem)) ingestedByStem.set(stem, d);
     if (d.primary_type) ingestedTypes.add(d.primary_type);
+    const canon = canonicalCoverageType(d.primary_type);
+    if (canon) {
+      const ord = periodOrdinal(d.period);
+      const cur = authoritativeByCanon.get(canon);
+      const better = !cur
+        || (ord ?? -Infinity) > (cur.maxOrd ?? -Infinity)
+        || ((ord ?? -Infinity) === (cur.maxOrd ?? -Infinity) && d.doc_id > cur.keeper.doc_id);
+      if (better) authoritativeByCanon.set(canon, { keeper: d, maxOrd: ord });
+    }
   }
 
   for (const d of docs) {
@@ -172,6 +215,30 @@ export function classifyCoverage(
           duplicate_of: twin.doc_id,
         });
         continue;
+      }
+    }
+
+    // (1b) Superseded by the newest cumulative trended statement of its umbrella
+    // type. A monthly Trended IS/BS (or its GL-detail / SIE inputs, or a full-year
+    // trend rollup) parses fine but its period rows are re-attributed to the newest
+    // snapshot on re-ingest, so it lands 0 rows here. That is supersession, not a
+    // parse failure — demote to a duplicate pointing at the authoritative keeper.
+    // The ordinal guard keeps a genuinely NEWER file that failed as not_ingested:
+    // it is only a duplicate when the keeper's period covers this doc's period.
+    const canon = canonicalCoverageType(d.primary_type);
+    if (canon) {
+      const auth = authoritativeByCanon.get(canon);
+      if (auth && auth.keeper.doc_id !== d.doc_id) {
+        const dOrd = periodOrdinal(d.period);
+        const covered = dOrd === null || auth.maxOrd === null || dOrd <= auth.maxOrd;
+        if (covered) {
+          result.set(d.doc_id, {
+            status: 'skipped_duplicate',
+            reason: `superseded by doc #${auth.keeper.doc_id} (${auth.keeper.filename}) — newest trended ${canon} covers ${d.period ?? 'all periods'}`,
+            duplicate_of: auth.keeper.doc_id,
+          });
+          continue;
+        }
       }
     }
 
