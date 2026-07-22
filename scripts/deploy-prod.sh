@@ -10,7 +10,7 @@ set -euo pipefail
 DRY_RUN="${1:-false}"
 DEPLOY_DIR="/root/gda-command-v2"
 COMPOSE_FILE="docker-compose.prod.yml"
-SERVICES="backend-v3 frontend-v3 gda-agent-v3"
+SERVICES="backend-v3 worker-v3 frontend-v3 gda-agent-v3"
 BACKEND_CONTAINER="gda-backend-v3"
 FRONTEND_CONTAINER="gda-frontend-v3"
 AGENT_CONTAINER="gda-agent-v3"
