@@ -133,6 +133,24 @@ export async function onIngestFailure(
 }
 
 /**
+ * Hook for ingest framework: called when an ingest run finishes DEGRADED
+ * (completed without throwing, but the source flagged a partial/soft failure —
+ * e.g. GovWin discovery returned a 422 that the job swallowed into a
+ * degradedReason). These are exactly the "silent" failures that never threw,
+ * so they must still surface as a Sentinel event.
+ */
+export async function onIngestDegraded(sourceKey: string, reason?: string): Promise<void> {
+  await recordSentinelEvent({
+    event_type: 'break',
+    source_key: sourceKey,
+    alert_type: 'degraded',
+    component: sourceKey,
+    details: reason ?? 'Ingest run completed in a degraded state.',
+    raw_event: { degraded_reason: reason, timestamp: new Date().toISOString() },
+  });
+}
+
+/**
  * Hook for ingest framework: called when an ingest run succeeds.
  * Resolves any open break/handoff events for that source.
  */

@@ -5,7 +5,7 @@
 
 import { logger } from '../../lib/logger.js';
 import { startRun, finishRun } from './run_logger.js';
-import { onIngestFailure, onIngestSuccess } from '../../services/sentinel/hooks.js';
+import { onIngestFailure, onIngestSuccess, onIngestDegraded } from '../../services/sentinel/hooks.js';
 
 export interface IngestResult {
   inserted: number;
@@ -72,8 +72,14 @@ export async function runIngest(sourceKey: string): Promise<{
       'ingest_completed',
     );
 
-    // Resolve any open sentinel events for this source on success
-    onIngestSuccess(sourceKey).catch(() => {});
+    // A degraded run completed without throwing but flagged a soft failure —
+    // record it (do NOT resolve, which would hide the problem). Only a clean
+    // success resolves open events for the source.
+    if (result.degraded) {
+      onIngestDegraded(sourceKey, result.degradedReason).catch(() => {});
+    } else {
+      onIngestSuccess(sourceKey).catch(() => {});
+    }
 
     return { runId, result, durationMs };
   } catch (err) {
