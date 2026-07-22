@@ -134,7 +134,7 @@ describe('Aged A/R — grouped/blank-label rows extract non-zero; classified ope
 
 // ── 4. Trended IS / BS reconcile to the printed statement subtotals ───────────
 describe('Trended statements reconcile to the printed subtotals', () => {
-  it('June Trended Income Statement direct costs reconcile per month', () => {
+  it('June Trended Income Statement owns only its closing quarter (Apr–Jun) and reconciles per month', () => {
     const is = parseTrendedStatement(
       readFix('income-statement-jun-2026.extracted.txt'),
       'income-statement-jun-2026.xlsx',
@@ -143,10 +143,10 @@ describe('Trended statements reconcile to the printed subtotals', () => {
     expect(is!.kind).toBe('income_statement');
     const byPeriod: Record<string, number> = {};
     for (const r of is!.costDetail) byPeriod[r.period] = (byPeriod[r.period] ?? 0) + (r.actual_amount ?? 0);
+    // #1142 quarter-end ownership: the JUN snapshot restates Jan..Jun but owns
+    // cost_detail only for Q2 (Apr/May/Jun). Q1 (Jan/Feb/Mar) is owned by the MAR
+    // snapshot, so the same figure is never written from two docs.
     const expected: Record<string, number> = {
-      'FY26 Jan': 2373157.37,
-      'FY26 Feb': 2249701.82,
-      'FY26 Mar': 3673672.19,
       'FY26 Apr': 4094976.59,
       'FY26 May': 1426578.86,
       'FY26 Jun': 2043031.87,
@@ -154,6 +154,10 @@ describe('Trended statements reconcile to the printed subtotals', () => {
     for (const [period, amt] of Object.entries(expected)) {
       expect(byPeriod[period]).toBeCloseTo(amt, 2);
     }
+    // Q1 months are NOT emitted by the June snapshot (owned by the MAR snapshot).
+    expect(byPeriod['FY26 Jan']).toBeUndefined();
+    expect(byPeriod['FY26 Feb']).toBeUndefined();
+    expect(byPeriod['FY26 Mar']).toBeUndefined();
   });
 
   it('June Trended Balance Sheet subtotals reconcile (FY26 Jan)', () => {

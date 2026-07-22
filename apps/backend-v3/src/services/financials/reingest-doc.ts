@@ -34,7 +34,6 @@ import {
   parseOpenAp,
   parseTrialBalance,
   parseTrendSie,
-  parseYtdGlDetail,
   parseProjectRevenueSummary,
   parseProjectActualsTargets,
   parseTrendedStatement,
@@ -370,33 +369,18 @@ export async function reingestFinancialDoc(params: {
     }
   }
 
-  // --- Parser 3: Cost Detail (TGT vs ACT / YTD GL Detail) ---
+  // --- Parser 3: Cost Detail (TGT vs ACT / YTD GL Detail) — DISABLED ---
+  // TGT vs ACT and YTD GL Detail files are year-to-date CUMULATIVE and only cover
+  // the months that have a monthly GL export; storing their figures as per-month
+  // cost_detail double-counts against the prior months and leaves later months
+  // empty. The deterministic Trended Income Statement (Parser 0, source
+  // income_statement) is the single authoritative, reconcilable monthly source for
+  // direct costs, so tgt_vs_act / GL docs no longer write cost_detail_actuals. The
+  // same docs still feed the indirect (SIE) and KPI parsers below.
   if (cls.is_cost_detail && !skipParsers.includes('cost_detail_extract')) {
-    try {
-      // Try deterministic GL Detail parser first (handles large files)
-      const detGl = parseYtdGlDetail(extractedText, filename);
-      if (detGl && detGl.rows.length > 0) {
-        result.parsers_run.push('cost_detail_extract (deterministic)');
-        result.cost_detail = await ingestCostDetailRows(detGl.rows, docId);
-        if (result.cost_detail > 0) result.any_ingested = true;
-      } else {
-        // Fallback to LLM parser
-        const cdResult = await llmRouter.route({
-          task: 'cost_detail_extract' as const,
-          input: { filename, extracted_text: extractedText },
-        });
-        result.parsers_run.push('cost_detail_extract');
-        if (cdResult.ok && cdResult.output.is_cost_detail && cdResult.output.rows.length > 0) {
-          result.cost_detail = await ingestCostDetailRows(cdResult.output.rows, docId);
-          if (result.cost_detail > 0) result.any_ingested = true;
-        } else {
-          logger.warn({ docId, filename, is_cost_detail: cdResult.ok ? cdResult.output.is_cost_detail : false }, 'reingest: cost_detail_extract returned 0 rows — header/row detection failed');
-          result.parse_warnings.push('cost_detail_extract: 0 rows (header/row detection failed)');
-        }
-      }
-    } catch (err) {
-      logger.warn({ err, docId, filename }, 'reingest: cost detail parser failed');
-    }
+    result.parse_warnings.push(
+      'cost_detail_extract: skipped — tgt_vs_act/GL no longer feed cost_detail (income_statement is authoritative)',
+    );
   }
 
   // --- Parser 4: SIE (Statement of Indirect Expenses / Trend Rate Summary) ---

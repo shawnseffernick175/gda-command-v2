@@ -528,7 +528,9 @@ export async function ingestCostDetailRows(
          DO UPDATE SET
            target_amount = EXCLUDED.target_amount,
            actual_amount = EXCLUDED.actual_amount,
-           source_doc_id = EXCLUDED.source_doc_id`,
+           source_doc_id = EXCLUDED.source_doc_id,
+           superseded_at = NULL,
+           superseded_reason = NULL`,
         [
           r.period, r.fiscal_year, r.quarter,
           r.cost_element,
