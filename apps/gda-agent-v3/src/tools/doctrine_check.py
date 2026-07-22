@@ -32,6 +32,6 @@ async def doctrine_check(inp: DoctrineCheckInput) -> DoctrineCheckOutput:
                 f"Stub evaluation for: '{inp.claim_text[:100]}'. "
                 "Full doctrine evaluation requires F-303 rules engine."
             ),
-            source_url="https://docs.gda-command.internal/doctrine",
+            source_url=None,
         )
     )

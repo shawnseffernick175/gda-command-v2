@@ -255,3 +255,17 @@ async def run_readonly_query(sql: str) -> list[dict[str, Any]]:
     async with pool.connection() as conn:
         rows = await conn.execute(sql)
         return [dict(r) for r in await rows.fetchall()]
+
+
+async def fetch_readonly(sql: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Parametrized read-only query for internal tools.
+
+    Unlike run_readonly_query (which backs the agent-facing db_query tool and
+    takes raw SQL), this accepts bound parameters so tool code can safely embed
+    user-supplied values. Still SELECT/WITH-only, still on the read-only role.
+    """
+    _validate_readonly_sql(sql)
+    pool = await get_ro_pool()
+    async with pool.connection() as conn:
+        rows = await conn.execute(sql, params or {})
+        return [dict(r) for r in await rows.fetchall()]
