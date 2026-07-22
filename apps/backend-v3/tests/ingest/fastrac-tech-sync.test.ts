@@ -19,7 +19,7 @@ describe('assessTechRelevance — FasTrac tech-pipeline relevance filter', () =>
       published_at: null,
       source_url: 'https://arxiv.org/abs/2601.00001',
     });
-    expect(tags).toContain('autonomy');
+    expect(tags).toContain('autonomous systems');
     expect(tags.length).toBeGreaterThan(0);
   });
 

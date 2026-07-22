@@ -47,7 +47,7 @@ const LANE_KEYWORDS: Array<{ tag: string; patterns: RegExp }> = [
   { tag: 'cyber', patterns: /\b(cyber|zero.?trust|malware|ransomware|intrusion|encryption|cryptograph|vulnerabilit|exploit|threat intelligence)\b/i },
   { tag: 'C5ISR', patterns: /\b(isr|c2|c4isr|c5isr|jadc2|command and control|sensor fusion|electronic warfare|sigint|signals intelligence|radar|spectrum|geospatial|imagery)\b/i },
   { tag: 'AI/ML', patterns: /\b(machine learning|deep learning|artificial intelligence|\bai\b|\bml\b|neural network|computer vision|natural language|large language model|\bllm\b|reinforcement learning)\b/i },
-  { tag: 'autonomy', patterns: /\b(autonomous|autonomy|unmanned|\buav\b|\buas\b|\bugv\b|drone|swarm|robotic)\b/i },
+  { tag: 'autonomous systems', patterns: /\b(autonomous|autonomy|unmanned|\buav\b|\buas\b|\bugv\b|drone|swarm|robotic)\b/i },
   { tag: 'networking', patterns: /\b(satcom|5g\b|mesh network|tactical network|communications|waveform|software.?defined radio|\bsdr\b|resilient network)\b/i },
   { tag: 'space', patterns: /\b(space|satellite|orbital|hypersonic|missile|launch vehicle)\b/i },
   { tag: 'cloud/edge', patterns: /\b(edge computing|cloud migration|devsecops|kubernetes|containeriz|zero.?trust architecture)\b/i },
