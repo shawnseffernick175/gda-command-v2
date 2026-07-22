@@ -1526,8 +1526,22 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       idFilter ? [idFilter] : [],
     );
 
+    // Dedup overlapping re-uploads: when the same file was uploaded more than
+    // once (two batches), keep only the newest vault row per normalized filename
+    // so a re-upload never double-processes. Normalization lowercases and
+    // collapses whitespace but KEEPS the extension, so a PDF twin stays distinct
+    // from its xlsx source. All ingest paths upsert on natural keys, but pruning
+    // here also keeps source_doc_id attribution on the surviving (newest) copy.
+    const bestByName = new Map<string, (typeof docs)[number]>();
+    for (const d of docs) {
+      const norm = (d.filename || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const prev = bestByName.get(norm);
+      if (!prev || d.id > prev.id) bestByName.set(norm, d);
+    }
+    const dedupedDocs = [...bestByName.values()].sort((a, b) => a.id - b.id);
+
     async function runReingest(job: ReingestJob): Promise<void> {
-      for (const doc of docs) {
+      for (const doc of dedupedDocs) {
         try {
           const r = await reingestFinancialDoc({
             docId: doc.id,
@@ -1586,7 +1600,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       const job: ReingestJob = {
         id: `reingest_${Date.now()}`,
         state: 'running',
-        total: docs.length,
+        total: dedupedDocs.length,
         processed: 0,
         results: [],
         started_at: new Date().toISOString(),
@@ -1609,7 +1623,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(202).send(successEnvelope({
         accepted: true,
         job_id: job.id,
-        docs_considered: docs.length,
+        docs_considered: dedupedDocs.length,
         poll: '/v3/vault/financials/reingest-status',
       }, req.requestId));
     }
@@ -1618,7 +1632,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     const job: ReingestJob = {
       id: `reingest_${Date.now()}`,
       state: 'running',
-      total: docs.length,
+      total: dedupedDocs.length,
       processed: 0,
       results: [],
       started_at: new Date().toISOString(),

@@ -82,13 +82,20 @@ function getAllSheetNames(text: string): string[] {
  * carriage-return marker ExcelJS leaves in multi-line cells, strip parentheses
  * (so "Prior Period(s)" matches "prior period"), and collapse whitespace.
  */
-function normalizeForMatch(s: string): string {
+export function cleanHeaderText(s: string): string {
+  // ExcelJS renders a carriage return inside a header cell as the literal
+  // _x000D_ (and occasionally a raw \r). Replace both with a space — not the
+  // empty string — so a split cell like "Vendor_x000D_Name" normalizes to
+  // "vendor name" (matchable) rather than "vendorname" (a lookup miss).
   return s
-    .toLowerCase()
     .replace(/_x000d_/gi, ' ')
-    .replace(/[()]/g, ' ')
+    .replace(/\r/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeForMatch(s: string): string {
+  return cleanHeaderText(s.replace(/[()]/g, ' ')).toLowerCase();
 }
 
 /**
@@ -224,9 +231,9 @@ export function inferPeriod(filename: string): { period: string; fiscal_year: nu
  * Returns the 0-based index of the header row, or -1 if not found.
  */
 function findHeaderRow(lines: string[], expectedCols: string[], startFrom = 0): number {
-  const lowerCols = expectedCols.map((c) => c.toLowerCase().replace(/_x000d_/gi, ''));
+  const lowerCols = expectedCols.map((c) => cleanHeaderText(c).toLowerCase());
   for (let i = startFrom; i < Math.min(lines.length, 10); i++) {
-    const lower = lines[i].toLowerCase().replace(/_x000d_/gi, '');
+    const lower = cleanHeaderText(lines[i]).toLowerCase();
     const matchCount = lowerCols.filter((c) => lower.includes(c)).length;
     if (matchCount >= Math.ceil(expectedCols.length * 0.5)) {
       return i;
@@ -243,7 +250,7 @@ function buildColumnMap(headerLine: string): Map<string, number> {
   const cols = splitRow(headerLine);
   const map = new Map<string, number>();
   for (let i = 0; i < cols.length; i++) {
-    const normalized = cols[i].replace(/_x000D_/gi, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const normalized = cleanHeaderText(cols[i]).toLowerCase();
     if (normalized) map.set(normalized, i);
   }
   return map;

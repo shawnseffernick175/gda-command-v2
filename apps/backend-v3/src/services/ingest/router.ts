@@ -45,11 +45,15 @@ export async function routeToSurface(
 
   // Fetch job details
   const jobRes = await pool.query(
-    'SELECT filename, file_path, extracted_text, source_surface, doctrine_flag FROM ingest_jobs WHERE id = $1',
+    'SELECT filename, file_path, extracted_text, source_surface, doctrine_flag, email_from FROM ingest_jobs WHERE id = $1',
     [jobId],
   );
   const job = jobRes.rows[0];
   if (!job) return result;
+
+  // owner_email is NOT NULL; prefer the uploader (email ingests carry email_from),
+  // else a system sentinel so the triage INSERT never violates the constraint.
+  const uploaderEmail: string = job.email_from || 'ingest-system@gda.local';
 
   const surfaceLabel = SURFACE_LABELS[classification.surface] ?? classification.surface;
   const isTeamingContext = classification.doctrine_flag === 'OU2' || classification.doctrine_flag === 'OU3';
@@ -93,14 +97,15 @@ export async function routeToSurface(
 
   try {
     const aiRes = await pool.query<{ id: number }>(
-      `INSERT INTO action_items (title, detail, status, priority, source, linked_record_type, linked_record_id, owner, assignee_id)
-       VALUES ($1, $2, 'open', $3, 'ingest', 'ingest_job', $4, 'system', NULL)
+      `INSERT INTO action_items (title, detail, status, priority, source, linked_record_type, linked_record_id, owner, owner_email, assignee_id)
+       VALUES ($1, $2, 'open', $3, 'ingest', 'ingest_job', $4, 'system', $5, NULL)
        RETURNING id`,
       [
         triageTitle,
         detail,
         classification.confidence < 0.7 ? 'high' : 'medium',
         jobId,
+        uploaderEmail,
       ],
     );
     result.action_item_id = aiRes.rows[0]?.id ?? null;

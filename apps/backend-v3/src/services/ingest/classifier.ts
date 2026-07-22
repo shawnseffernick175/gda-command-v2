@@ -141,6 +141,63 @@ const OU_PATTERNS = [
   { pattern: /\b(OU-?III|PD\s+Systems|TBF\s+Group|Training.*Simulation)\b/i, flag: 'OU3' },
 ];
 
+// Operational receivables/payables reports are financial DATA but NOT part of
+// the Financial Bible (P&L). They are ingested into ap/ar tables by the
+// financial reingest path, but must never be routed to the financials surface,
+// so they are matched by filename here and steered away from the Bible.
+const OPERATIONAL_FINANCE_PATTERNS: RegExp[] = [
+  /\baged\s*a\/?r\b/i,
+  /\bopen\s*a\/?p\b/i,
+  /\ba\/?r\s+(report|aging)\b/i,
+  /\ba\/?p\s+(report|aging)\b/i,
+  /accounts?\s+(receivable|payable)\s+(aging|report)/i,
+];
+
+// Financial statement signatures that belong in the Financial Bible. Matched on
+// the filename (fast, unambiguous) or, failing that, on a peek of the extracted
+// text. Kept high-confidence so a single-keyword match never falls through to
+// the LLM upgrade, which previously mis-routed June statements to Inbox.
+const FINANCIAL_STATEMENT_NAME_PATTERNS: RegExp[] = [
+  /\bgl\s+detail\b/i,
+  /\bgeneral\s+ledger\b/i,
+  /\btrended?\s+income\s+statement\b/i,
+  /\bincome\s+statement\b/i,
+  /\btrial\s+balance\b/i,
+  /\bbalance\s+sheet\b/i,
+  /\brevenue\s+summary\b/i,
+  /\bcost\s+pool\b/i,
+  /\btrend\s+sie\b/i,
+  /\bsie\b/i,
+  /\bp&l\b/i,
+  /\bprofit\s+and\s+loss\b/i,
+  /\bstatement\s+of\s+(income|operations|indirect)\b/i,
+];
+
+const FINANCIAL_STATEMENT_CONTENT_PATTERNS: RegExp[] = [
+  /DataSetLandTbl/i,
+  /\bGrand\s+Total\b/i,
+  /\bDirect\s+Labor\b/i,
+  /\bSubcontractor\b/i,
+  /\bODC\b/,
+  /\bcost\s+pool\b/i,
+];
+
+/** True when the filename names an operational A/R or A/P report (not the Bible). */
+function isOperationalFinance(filename: string): boolean {
+  return OPERATIONAL_FINANCE_PATTERNS.some((p) => p.test(filename));
+}
+
+/**
+ * True when the doc is a financial STATEMENT bound for the Financial Bible.
+ * Operational A/R and A/P reports are excluded up front so they never sweep in.
+ */
+function isFinancialStatement(filename: string, text: string): boolean {
+  if (isOperationalFinance(filename)) return false;
+  if (FINANCIAL_STATEMENT_NAME_PATTERNS.some((p) => p.test(filename))) return true;
+  const head = text.slice(0, 5000);
+  return FINANCIAL_STATEMENT_CONTENT_PATTERNS.some((p) => p.test(head));
+}
+
 function keywordClassify(text: string, filename: string): { surface: string; entity_type: string; confidence: number; rationale: string } {
   const input = `${filename} ${text.slice(0, 5000)}`;
   let bestMatch = { surface: 'inbox', entity_type: 'other', confidence: 0, rationale: 'No keyword matches found' };
@@ -191,6 +248,37 @@ export async function classifyDocument(
 ): Promise<ClassificationResult> {
   // Step 1: keyword-based classification
   const kwResult = keywordClassify(text, filename);
+
+  // Operational A/R and A/P reports are financial data but not P&L; keep them
+  // out of the Financial Bible. Route to triage with their entity_type so the
+  // downstream ap/ar reingest still picks them up by filename.
+  if (isOperationalFinance(filename)) {
+    return {
+      surface: 'inbox',
+      entity_type: 'other',
+      confidence: 0.6,
+      rationale: 'Operational receivables/payables report — not the Financial Bible.',
+      doctrine_flag: detectDoctrine(text),
+      evidence_grade: 'B',
+      owner: 'system',
+    };
+  }
+
+  // Financial statements (GL detail, income statement, trial balance, balance
+  // sheet, revenue summary, SIE, P&L) route to the Financial Bible with high
+  // confidence so a single-keyword match never falls through to the LLM upgrade
+  // that previously mis-routed June statements to Inbox.
+  if (isFinancialStatement(filename, text)) {
+    return {
+      surface: 'financials',
+      entity_type: 'financial_doc',
+      confidence: 0.95,
+      rationale: 'Financial statement detected — routed to Financial Bible.',
+      doctrine_flag: detectDoctrine(text),
+      evidence_grade: 'A',
+      owner: 'system',
+    };
+  }
 
   // If source surface hint is provided and is a valid enum value, use it as fallback
   if (sourceSurfaceHint && kwResult.surface === 'inbox' && VALID_SURFACES.has(sourceSurfaceHint)) {
