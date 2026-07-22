@@ -30,7 +30,7 @@ import { registerNIHSource } from '../ingest/nih/index.js';
 import { registerArxivSource } from '../ingest/arxiv/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
 import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
-import { registerFasTracTier1Source } from '../ingest/fastrac/index.js';
+import { registerFasTracTier1Source, registerFastracTechSyncSource } from '../ingest/fastrac/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
 import { batchScoreOpportunities } from '../services/pwin/batch-score.js';
 import { runCaptureStaleActionsJob } from '../jobs/captureStaleActionsJob.js';
@@ -95,6 +95,9 @@ const JOBS: CronJob[] = [
   ...(fasTracEnabled
     ? [{ sourceKey: 'fastrac.tier1', schedule: '0 9 * * *', label: 'FasTrac Tier 1 innovation org signals (daily 05:00 ET)' }]
     : []),
+  ...(researchFeedsEnabled
+    ? [{ sourceKey: 'fastrac.tech-sync', schedule: '30 10 * * *', label: 'FasTrac tech-pipeline sync from research feeds (daily 06:30 ET, after feeds)' }]
+    : []),
 ];
 
 /**
@@ -123,6 +126,9 @@ export function registerIngestSources(): void {
   }
   if (fasTracEnabled) {
     registerFasTracTier1Source();
+  }
+  if (researchFeedsEnabled) {
+    registerFastracTechSyncSource();
   }
 
   const registeredSources = getRegisteredSources();
@@ -407,6 +413,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'arxiv' ? 'arxiv.weekly'
       : job.sourceKey === 'grants.gov' ? 'grants.daily'
       : job.sourceKey === 'fastrac-army' ? 'fastrac-army.daily'
+      : job.sourceKey === 'fastrac.tech-sync' ? 'fastrac.tech-sync.daily'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
