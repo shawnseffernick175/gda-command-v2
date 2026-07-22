@@ -45,7 +45,7 @@
     "cheerio": "^1.2.0",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
-    "fast-xml-parser": "^5.8.0",
+    "fast-xml-parser": "^5.10.1",
     "fastify": "^5.2.1",
     "fuzzball": "^2.2.6",
     "jsonwebtoken": "^9.0.2",
