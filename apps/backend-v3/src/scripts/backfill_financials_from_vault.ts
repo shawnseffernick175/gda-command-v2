@@ -16,7 +16,6 @@ import { llmRouter } from '../lib/llm-router.js';
 import {
   ingestFinancialRows,
   ingestBalanceSheetRows,
-  ingestCostDetailRows,
   ingestSieRows,
 } from '../services/financials/ingest.js';
 
@@ -122,23 +121,11 @@ async function main(): Promise<void> {
         }
       }
 
-      // --- Parser 3: Cost Detail (TGT vs ACT) ---
-      const looksCostDetail = /tgt.?vs.?act/i.test(doc.filename) || /target.?vs.?actual/i.test(doc.filename);
-      if (looksCostDetail) {
-        const cdResult = await llmRouter.route({
-          task: 'cost_detail_extract' as const,
-          input: { filename: doc.filename, extracted_text: doc.extracted_text },
-        });
-
-        if (cdResult.ok && cdResult.output.is_cost_detail && cdResult.output.rows.length > 0) {
-          if (isApply) {
-            result.cost_detail = await ingestCostDetailRows(cdResult.output.rows, doc.id);
-          } else {
-            result.cost_detail = cdResult.output.rows.length;
-          }
-          if (result.cost_detail > 0) anyIngested = true;
-        }
-      }
+      // --- Parser 3: Cost Detail (TGT vs ACT) — DISABLED ---
+      // TGT vs ACT files are year-to-date cumulative; the deterministic Trended
+      // Income Statement (source income_statement) is the single authoritative
+      // monthly source for direct costs, so tgt_vs_act no longer writes
+      // cost_detail_actuals (see reingest-doc.ts Parser 3).
 
       // --- Parser 4: SIE (Statement of Indirect Expenses) ---
       const looksSie = /\bsie\b/i.test(doc.filename) || /statement.?of.?indirect/i.test(doc.filename) || /indirect.?expense/i.test(doc.extracted_text.slice(0, 2000));

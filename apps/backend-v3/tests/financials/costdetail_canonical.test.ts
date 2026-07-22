@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import {
   canonicalDirectCostElement,
   aggregateDirectCostRows,
+  ownedCostDetailMonths,
   CANONICAL_DIRECT_COST_LINES,
 } from '../../src/services/financials/deterministic-parsers.js';
 
@@ -99,5 +100,35 @@ describe('aggregateDirectCostRows — DIRECT-only, deduped, reconciling', () => 
   it('reconciles: the eight lines sum to Total Direct Costs (Jan = 2,373,157.37)', () => {
     const sum = out.reduce((a, r) => a + Number(r.actual_amount), 0);
     expect(sum).toBeCloseTo(2373157.37, 2);
+  });
+});
+
+describe('ownedCostDetailMonths — one authoritative snapshot per period', () => {
+  it('a quarter-end snapshot owns exactly its own quarter', () => {
+    // MAR snapshot (Jan..Mar live) owns Q1; JUN snapshot (Jan..Jun live) owns Q2.
+    expect([...ownedCostDetailMonths([1, 2, 3])].sort((a, b) => a - b)).toEqual([1, 2, 3]);
+    expect([...ownedCostDetailMonths([1, 2, 3, 4, 5, 6])].sort((a, b) => a - b)).toEqual([4, 5, 6]);
+    expect([...ownedCostDetailMonths([7, 8, 9])].sort((a, b) => a - b)).toEqual([7, 8, 9]);
+    expect([...ownedCostDetailMonths([10, 11, 12])].sort((a, b) => a - b)).toEqual([10, 11, 12]);
+  });
+
+  it('a non quarter-end snapshot owns no cost_detail (its quarter is owned by the closing snapshot)', () => {
+    expect([...ownedCostDetailMonths([1])]).toEqual([]); // Jan-only upload
+    expect([...ownedCostDetailMonths([1, 2])]).toEqual([]); // Feb-to-date
+    expect([...ownedCostDetailMonths([1, 2, 3, 4])]).toEqual([]); // Apr-to-date
+    expect([...ownedCostDetailMonths([])]).toEqual([]);
+  });
+
+  it('no month is owned by two overlapping snapshots (multi-source guard)', () => {
+    // The exact FY26 failure: MAR and JUN Trended IS snapshots both restate
+    // Jan/Feb/Mar. If both owned those months, the same figure would be counted
+    // from two source docs. Ownership MUST be disjoint.
+    const mar = ownedCostDetailMonths([1, 2, 3]);
+    const jun = ownedCostDetailMonths([1, 2, 3, 4, 5, 6]);
+    const overlap = [...mar].filter((m) => jun.has(m));
+    expect(overlap).toEqual([]);
+    // Together they cover Jan..Jun exactly once.
+    const union = new Set([...mar, ...jun]);
+    expect([...union].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 });

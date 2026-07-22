@@ -1444,6 +1444,29 @@ export function aggregateDirectCostRows(rows: CostDetailRowT[]): CostDetailRowT[
 }
 
 /**
+ * Quarter-end ownership for cost_detail. A Trended Income Statement restates
+ * every month of the fiscal-year-to-date, so successive snapshots overlap: the
+ * JUN snapshot carries Jan..Jun and the MAR snapshot carries Jan..Mar. If every
+ * snapshot wrote cost_detail for all of its months, the eight canonical direct-
+ * cost lines for a shared month (e.g. Jan) would be written from two docs and any
+ * read that re-buckets raw account labels to the canonical eight would double-
+ * count. To guarantee exactly one authoritative source per period, a snapshot
+ * owns direct-cost rows only for the quarter ending at its latest live month, and
+ * only when that month is a quarter end (Mar/Jun/Sep/Dec). This assigns Q1->MAR
+ * snapshot, Q2->JUN snapshot, ... — non-overlapping and deterministic. A stand-
+ * alone Jan/Feb/Apr upload owns no cost_detail (its quarter is owned by the
+ * quarter-closing snapshot).
+ */
+export function ownedCostDetailMonths(liveMonths: Iterable<number>): Set<number> {
+  const months = [...liveMonths].filter((m) => m >= 1 && m <= 12);
+  const snapshotMonth = months.length ? Math.max(...months) : 0;
+  const ownsCostDetail = snapshotMonth > 0 && snapshotMonth % 3 === 0;
+  return new Set<number>(
+    ownsCostDetail ? [snapshotMonth - 2, snapshotMonth - 1, snapshotMonth] : [],
+  );
+}
+
+/**
  * Parse a Trended Income Statement or Trended Balance Sheet. Returns null when
  * the document is not a recognizable trended grid.
  */
@@ -1616,6 +1639,11 @@ function parseTrendedIncomeStatement(text: string, filename: string): TrendedSta
   const monthOf = (period: string): number =>
     MONTH_LOOKUP.find((m) => period.endsWith(' ' + m.label))?.num ?? -1;
 
+  // Quarter-end ownership for cost_detail (see ownedCostDetailMonths). Indirect
+  // (sie) and P&L (financial) rows are unaffected — they upsert on their own
+  // per-period keys and do not fan out by label.
+  const ownedMonths = ownedCostDetailMonths(liveMonths);
+
   const financial: FinancialRowT[] = [];
   for (const mc of grid.monthCols) {
     if (!keepMonth(mc.num)) continue;
@@ -1638,7 +1666,9 @@ function parseTrendedIncomeStatement(text: string, filename: string): TrendedSta
     });
   }
 
-  const filteredCost = costDetail.filter((r) => keepMonth(monthOf(r.period)));
+  const filteredCost = costDetail.filter(
+    (r) => keepMonth(monthOf(r.period)) && ownedMonths.has(monthOf(r.period)),
+  );
   const filteredSie = sie.filter((r) => keepMonth(monthOf(r.period)));
   const periods = [...liveMonths].sort((a, b) => a - b).map((n) => periodLabel(grid.fiscalYear, MONTH_LOOKUP.find((m) => m.num === n)!.label));
 

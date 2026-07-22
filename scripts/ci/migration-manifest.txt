@@ -146,3 +146,4 @@ v3_137_govwin_enrichment_columns.sql
 v3_138_remove_govtribe.sql
 v3_139_financial_plan_drop_l1_target.sql
 v3_140_action_items_owner_email_default.sql
+v3_141_cost_detail_superseded.sql

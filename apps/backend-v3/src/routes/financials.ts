@@ -420,7 +420,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // Cost element × pool matrix for a specific period
   app.get('/v3/financials/cost-detail', async (req, reply) => {
     const period = (req.query as Record<string, string>).period;
-    const whereClause = period ? 'WHERE period = $1' : '';
+    const whereClause = period
+      ? 'WHERE superseded_at IS NULL AND period = $1'
+      : 'WHERE superseded_at IS NULL';
     const params = period ? [period] : [];
 
     // Per-period source preference: the deterministic Trended Income Statement
@@ -471,6 +473,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
                 target_amount, actual_amount, variance_amount,
                 CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
          FROM cost_detail_actuals
+         WHERE superseded_at IS NULL
        ),
        best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period)
        SELECT r.period, r.fiscal_year, r.quarter, r.cost_element, r.pool,
@@ -1046,7 +1049,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
           FROM (
             SELECT source_doc_id FROM balance_sheet_actuals WHERE source_doc_id IS NOT NULL
             UNION
-            SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL
+            SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL AND superseded_at IS NULL
             UNION
             SELECT source_doc_id FROM indirect_expense_actuals WHERE source_doc_id IS NOT NULL
             UNION
@@ -1097,7 +1100,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
          AND vd.id IN (
            SELECT source_doc_id FROM balance_sheet_actuals WHERE source_doc_id IS NOT NULL
            UNION
-           SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL
+           SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL AND superseded_at IS NULL
            UNION
            SELECT source_doc_id FROM indirect_expense_actuals WHERE source_doc_id IS NOT NULL
            UNION
@@ -1487,7 +1490,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
          SELECT period, cost_element, pool, target_amount, actual_amount, variance_amount,
                 CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
          FROM cost_detail_actuals
-         WHERE fiscal_year = $1
+         WHERE fiscal_year = $1 AND superseded_at IS NULL
        ),
        best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
        preferred AS (
@@ -1514,7 +1517,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }));
 
     const { rows: periodRows } = await pool.query(
-      `SELECT DISTINCT period FROM cost_detail_actuals WHERE fiscal_year = $1 ORDER BY period`,
+      `SELECT DISTINCT period FROM cost_detail_actuals WHERE fiscal_year = $1 AND superseded_at IS NULL ORDER BY period`,
       [fiscalYear],
     );
 
@@ -1522,7 +1525,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       `SELECT DISTINCT vd.id AS vault_doc_id, vd.filename, vd.uploaded_at AS ingested_at
        FROM cost_detail_actuals cd
        JOIN vault_documents vd ON vd.id = cd.source_doc_id
-       WHERE cd.fiscal_year = $1 AND cd.source_doc_id IS NOT NULL`,
+       WHERE cd.fiscal_year = $1 AND cd.source_doc_id IS NOT NULL AND cd.superseded_at IS NULL`,
       [fiscalYear],
     );
 
@@ -1998,6 +2001,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
                 target_amount, actual_amount, variance_amount,
                 CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
          FROM cost_detail_actuals
+         WHERE superseded_at IS NULL
        ),
        best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
        preferred AS (
@@ -2026,6 +2030,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
          SELECT period, cost_element, actual_amount, LOWER(pool) AS lpool,
                 CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
          FROM cost_detail_actuals
+         WHERE superseded_at IS NULL
        ),
        best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
        preferred AS (
@@ -2067,7 +2072,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        FROM vault_documents vd
        WHERE vd.deleted_at IS NULL
          AND vd.id IN (
-           SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL
+           SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL AND superseded_at IS NULL
            UNION
            SELECT source_doc_id FROM balance_sheet_actuals WHERE source_doc_id IS NOT NULL
            UNION
