@@ -94,7 +94,15 @@ const JOBS: CronJob[] = [
     : []),
 ];
 
-export function startCronScheduler(): void {
+/**
+ * Populate the in-memory ingest source/adapter registry.
+ *
+ * Must run in BOTH processes: the worker needs it to schedule + execute cron
+ * jobs, and the API needs it so the /v3/ingest status/health/trigger routes can
+ * enumerate sources. It only registers adapters (cheap, no I/O); it does not
+ * schedule any cron jobs — that stays worker-only in startCronScheduler().
+ */
+export function registerIngestSources(): void {
   registerSAMSource();
   registerUSASpendingSource();
   registerFederalRegisterSource();
@@ -117,6 +125,11 @@ export function startCronScheduler(): void {
   const registeredSources = getRegisteredSources();
   const registeredAdapters = listAdapters();
   logger.info({ sources: registeredSources, adapters: registeredAdapters }, '[ingest] framework ready');
+}
+
+export function startCronScheduler(): void {
+  registerIngestSources();
+  const registeredSources = getRegisteredSources();
 
   if (!sbirEnabled) {
     logger.info({ flag: 'ENABLE_SBIR_INGEST' }, '[cron] sbir.daily skipped — gated behind env flag (default off)');
