@@ -523,7 +523,7 @@ export async function fetchOpportunityCompanies(
     : await apiGet<DeltekCompaniesResponse | DeltekCompany[]>(
         href ? hrefToPath(href) : `/opportunities/${encodeURIComponent(govwinId)}/companies`,
       );
-  const list = Array.isArray(data)
+  const resolved = Array.isArray(data)
     ? data
     : data.companies ??
       data.relatedCompanies ??
@@ -532,6 +532,9 @@ export async function fetchOpportunityCompanies(
       data.items ??
       data.content ??
       [];
+  // GovWin returns an empty OBJECT ({}) — not [] — for opportunities with no
+  // related companies (e.g. FBO-namespace notices). Coerce any non-array to [].
+  const list = Array.isArray(resolved) ? resolved : [];
 
   let incumbent: string | null = null;
   const competitors: string[] = [];
@@ -565,9 +568,12 @@ export async function fetchOpportunityContracts(
     : await apiGet<DeltekContractsResponse | DeltekContract[]>(
         href ? hrefToPath(href) : `/opportunities/${encodeURIComponent(govwinId)}/contracts`,
       );
-  const list = Array.isArray(data)
+  const resolvedContracts = Array.isArray(data)
     ? data
     : data.contracts ?? data.data ?? data.results ?? data.items ?? data.content ?? [];
+  // GovWin serves {} (empty object) rather than [] when there are no contracts;
+  // coerce any non-array shape to [] so iteration never throws.
+  const list = Array.isArray(resolvedContracts) ? resolvedContracts : [];
 
   let incumbent: string | null = null;
   const competitors: string[] = [];
