@@ -79,7 +79,7 @@ services:
     depends_on:
       postgres-staging:
         condition: service_healthy
-    environment:
+    environment: &backend_env
       NODE_ENV: production
       PORT: 4000
       HOST: 0.0.0.0
@@ -129,6 +129,35 @@ services:
     networks:
       - gda
       - edge
+
+  # Background worker: pg-boss queue consumers + node-cron scheduler. Runs the
+  # same image as backend-v3 but starts dist/worker.js instead of the API, so a
+  # stuck ingest/enrichment job can't starve HTTP request handling. Shares the
+  # backend environment via the *backend_env anchor to avoid config drift.
+  worker-v3:
+    build:
+      context: .
+      dockerfile: apps/backend-v3/Dockerfile
+      args:
+        DEPLOY_COMMIT_SHA: ${DEPLOY_COMMIT_SHA:-unknown}
+    container_name: gda-worker-v3
+    restart: unless-stopped
+    volumes:
+      - vaultdata:/app/data
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+    environment:
+      <<: *backend_env
+      APP_ENTRYPOINT: worker.js
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f dist/worker.js || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - gda
 
   gda-agent-v3:
     build:

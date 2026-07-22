@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "start:worker": "node dist/workers/analysis.js",
+    "start:worker": "node dist/worker.js",
     "lint": "eslint src/ tests/ --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
