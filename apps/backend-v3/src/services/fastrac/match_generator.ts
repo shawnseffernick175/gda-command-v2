@@ -117,8 +117,11 @@ export async function runFastracMatchGeneration(): Promise<MatchGenerationResult
   let errors = 0;
 
   for (const solution of solutions) {
-    // Rank needs for this solution; rankCandidates sorts by overall_score desc.
-    const ranked = rankCandidates(solution, needs, false, MAX_MATCHES_PER_SOLUTION * 3);
+    // Rank the full need pool (no pre-truncation) so the overlap + threshold
+    // filter sees every candidate; otherwise non-overlapping needs that clear
+    // the score floor could fill a small shortlist and push out genuinely
+    // overlapping matches. Cap only after filtering.
+    const ranked = rankCandidates(solution, needs, false, needs.length);
     const qualifying = ranked
       .filter((m) => m.overall_score >= MIN_OVERALL_SCORE && m.evidence.mission_tag_overlap.length > 0)
       .slice(0, MAX_MATCHES_PER_SOLUTION);

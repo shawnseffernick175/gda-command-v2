@@ -46,6 +46,25 @@ describe('runFastracMatchGeneration', () => {
     expect(insertCall?.[1]?.[1]).toBe('20');
   });
 
+  it('does not let non-overlapping candidates crowd out a genuine match', async () => {
+    // One overlapping need + many non-overlapping needs that still clear the
+    // score floor (same horizon). The overlapping match must survive.
+    const overlapping = signal({ id: '20', pipeline: 'requirement', mission_tags: ['cyber'], horizon: '6-12mo', source_url: 'https://sam/hit' });
+    const noise = Array.from({ length: 30 }, (_, i) =>
+      signal({ id: `9${i}`, pipeline: 'requirement', mission_tags: ['general'], horizon: '6-12mo', source_url: `https://sam/n${i}` }),
+    );
+    wire(
+      [signal({ id: '10', pipeline: 'tech', mission_tags: ['cyber'], horizon: '6-12mo', source_url: 'https://arxiv/1' })],
+      [...noise, overlapping],
+    );
+
+    const result = await runFastracMatchGeneration();
+
+    expect(result.matchesPersisted).toBe(1);
+    const insertCall = query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO fast_track_matches'));
+    expect(insertCall?.[1]?.[1]).toBe('20');
+  });
+
   it('persists nothing when there is no shared mission tag', async () => {
     wire(
       [signal({ id: '10', pipeline: 'tech', mission_tags: ['space'], source_url: 'https://arxiv/1' })],
