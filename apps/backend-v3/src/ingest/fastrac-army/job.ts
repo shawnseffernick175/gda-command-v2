@@ -28,7 +28,7 @@ import type { IngestResult } from '../framework/registry.js';
 
 const SAM_SEARCH_URL = 'https://api.sam.gov/opportunities/v2/search';
 const PAGE_SIZE = 100;
-const REQUEST_TIMEOUT_MS = envInt('SAM_REQUEST_TIMEOUT_MS', 60000);
+const REQUEST_TIMEOUT_MS = envInt('SAM_REQUEST_TIMEOUT_MS', 120000);
 const REQUEST_DELAY_MS = 600;
 const LOOKBACK_HOURS = 48;
 
