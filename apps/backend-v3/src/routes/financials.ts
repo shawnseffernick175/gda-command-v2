@@ -974,26 +974,34 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    // Build the per-doc facts the coverage classifier needs.
-    const docInputs: CoverageDocInput[] = docs.map((doc) => {
+    // Build the per-doc facts the coverage classifier needs. A doc_type='other'
+    // file that no financial handler recognizes (e.g. a supplier list) is not a
+    // financial-ingestion target at all — it is excluded from the financial
+    // coverage report rather than surfaced as a bogus no_handler miss. The
+    // content-based classifier still recognizes genuinely financial content
+    // regardless of filename, so a real financial doc is never dropped here.
+    const docInputs: CoverageDocInput[] = docs.flatMap((doc) => {
       const docId = Number(doc.id);
       const filename = doc.filename as string;
       const destinations = destinationsByDoc.get(docId) ?? [];
       const rowCount = destinations.reduce((s, d) => s + d.row_count, 0);
+      const docType = (doc.doc_type as string | null) ?? null;
       const cls = classifyFinancialDoc(
         filename,
         (doc.extracted_text as string | null) ?? '',
-        (doc.doc_type as string | null) ?? null,
+        docType,
       );
-      return {
+      const matched = handlerMatched(cls);
+      if (docType === 'other' && !matched && rowCount === 0) return [];
+      return [{
         doc_id: docId,
         filename,
         extraction_status: doc.extraction_status as string,
         row_count: rowCount,
         primary_type: primaryTypeOf(cls),
         period: inferDocPeriod(filename),
-        handler_matched: handlerMatched(cls),
-      };
+        handler_matched: matched,
+      }];
     });
 
     const verdicts = classifyCoverage(docInputs);
