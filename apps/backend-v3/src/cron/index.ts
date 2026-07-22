@@ -48,6 +48,7 @@ import { runAutoPassDeadline } from './auto-pass-deadline.js';
 import { runLaunchpadPreWarmCron } from './launchpad-pre-warm.js';
 import { runIntakeAssessment } from '../services/assessment/index.js';
 import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
+import { runFastracMatchGeneration } from '../services/fastrac/match_generator.js';
 import { pool } from '../lib/db.js';
 import { isResearchFeedsEnabled } from '../ingest/framework/research-feeds.js';
 
@@ -419,6 +420,23 @@ export function startCronScheduler(): void {
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
       `[cron] registered: ${cronLabel} (${job.schedule})`,
     );
+  }
+
+  // FasTrac automated match generation — daily at 11:00 UTC (after tech-sync
+  // at 10:30). Scores live signals and persists high-confidence pairings for
+  // human review. No-op when FasTrac ingest is disabled.
+  if (fasTracEnabled) {
+    const fastracMatchTask = cron.schedule('0 11 * * *', async () => {
+      try {
+        logger.info('[cron] fastrac.match-gen starting');
+        const result = await runFastracMatchGeneration();
+        logger.info(result, '[cron] fastrac.match-gen completed');
+      } catch (err) {
+        logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_fastrac_match_gen_error');
+      }
+    });
+    tasks.push(fastracMatchTask);
+    logger.info({ schedule: '0 11 * * *' }, '[cron] registered: fastrac.match-gen (0 11 * * *)');
   }
 
   // Refresh token pruning — daily at 03:30 UTC
