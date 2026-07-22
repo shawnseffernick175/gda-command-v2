@@ -10,6 +10,7 @@ import { logger } from '../../lib/logger.js';
 import { envFirst } from '../../lib/env.js';
 import { inferHorizon, inferSignalType, extractMissionTags } from './normalize.js';
 import { isCommoditySignal } from './commodity-filter.js';
+import { classifyNoticeType } from './notice-type-filter.js';
 import type { FasTracSignal, SourceConfig } from './types.js';
 
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2/search';
@@ -111,8 +112,21 @@ export async function fetchSAMSignals(source: SourceConfig): Promise<FasTracSign
       );
 
       let commodityRejected = 0;
+      let formalRejected = 0;
       for (const opp of opps) {
         if (!opp.title || !opp.uiLink) continue;
+
+        // Pre-SAM boundary: drop formal/post-solicitation notice types so
+        // FasTrac stays a pre-solicitation sensing tool, not a SAM watchlist.
+        const noticeFilter = classifyNoticeType(opp.type);
+        if (noticeFilter.rejected) {
+          formalRejected++;
+          logger.debug(
+            { source: source.name, title: opp.title, type: opp.type, reason: noticeFilter.reason },
+            'fastrac_formal_notice_rejected',
+          );
+          continue;
+        }
 
         const filter = isCommoditySignal(
           opp.title,
@@ -156,6 +170,12 @@ export async function fetchSAMSignals(source: SourceConfig): Promise<FasTracSign
         logger.info(
           { source: source.name, keyword, commodityRejected },
           'fastrac_commodity_filter_applied',
+        );
+      }
+      if (formalRejected > 0) {
+        logger.info(
+          { source: source.name, keyword, formalRejected },
+          'fastrac_presam_boundary_applied',
         );
       }
 
