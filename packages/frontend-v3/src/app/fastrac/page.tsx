@@ -25,6 +25,7 @@ import { MatchCardV2 } from "@/components/fastrac/MatchCardV2";
 import { SignalFeedCard } from "@/components/fastrac/SignalFeedCard";
 import { CandidatePanel } from "@/components/fastrac/CandidatePanel";
 import { MonitoredSources } from "@/components/fastrac/MonitoredSources";
+import { HealthTile } from "@/components/fastrac/HealthTile";
 import { cn } from "@/lib/utils";
 
 const SIGNAL_SORT_COLS: ColumnSortConfig[] = [
@@ -370,6 +371,15 @@ function FasTracContent() {
       )}
       {activeView === "need-feed" && <NeedFeedView />}
       {activeView === "solution-feed" && <SolutionFeedView />}
+
+      {/* ── PIPELINE HEALTH ───────────────────────────────────── */}
+      <CollapseSection
+        id="ft-health"
+        title="Pipeline Health"
+        defaultOpen={false}
+      >
+        <HealthTile />
+      </CollapseSection>
 
       {/* ── MONITORED SOURCES ─────────────────────────────────── */}
       <CollapseSection

@@ -90,6 +90,37 @@ export function useFTMatches(tab?: FasTracTab) {
   });
 }
 
+export interface FTPipelineStat {
+  total: number;
+  last_7d: number;
+  with_source: number;
+  null_source: number;
+}
+
+export interface FTSourceStat {
+  source: string;
+  pipeline: "tech" | "requirement";
+  total: number;
+  last_7d: number;
+  newest_ingested_at: string | null;
+  status: "producing" | "quiet" | "stale";
+}
+
+export interface FTHealth {
+  pipelines: { tech: FTPipelineStat; requirement: FTPipelineStat };
+  sources: FTSourceStat[];
+  matches: { total: number; last_7d: number; newest_computed_at: string | null };
+  generated_at: string;
+}
+
+export function useFTHealth() {
+  return useQuery({
+    queryKey: ["ft-health"],
+    queryFn: () => apiGet<FTHealth>("/v3/fastrac/health"),
+    staleTime: 60_000,
+  });
+}
+
 export function useFTMatchAnalysis(matchId: string | null) {
   return useQuery({
     queryKey: ["ft-match-analysis", matchId],
