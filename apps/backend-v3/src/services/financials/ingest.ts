@@ -507,6 +507,7 @@ type CostDetailRow = CostDetailExtractOutput['rows'][number];
 export async function ingestCostDetailRows(
   rows: CostDetailRow[],
   sourceDocId?: number | null,
+  source = 'tgt_vs_act',
 ): Promise<number> {
   let count = 0;
   for (const row of rows) {
@@ -516,7 +517,7 @@ export async function ingestCostDetailRows(
         `INSERT INTO cost_detail_actuals
            (period, fiscal_year, quarter, cost_element, pool,
             target_amount, actual_amount, source, source_doc_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'tgt_vs_act', $8)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $9, $8)
          ON CONFLICT (source, period, cost_element, pool)
          DO UPDATE SET
            target_amount = EXCLUDED.target_amount,
@@ -527,6 +528,7 @@ export async function ingestCostDetailRows(
           row.cost_element, row.pool,
           row.target_amount, row.actual_amount,
           sourceDocId ?? null,
+          source,
         ],
       );
       count++;
@@ -546,6 +548,7 @@ type SieRow = SieExtractOutput['rows'][number];
 export async function ingestSieRows(
   rows: SieRow[],
   sourceDocId?: number | null,
+  source = 'sie',
 ): Promise<number> {
   let count = 0;
   for (const row of rows) {
@@ -556,7 +559,7 @@ export async function ingestSieRows(
            (period, fiscal_year, quarter, pool, account_code, account_name,
             current_period_actual, current_period_budget, ytd_actual, ytd_budget,
             source, source_doc_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'sie', $11)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12, $11)
          ON CONFLICT (source, period, pool, COALESCE(account_code, ''), account_name)
          DO UPDATE SET
            current_period_actual = EXCLUDED.current_period_actual,
@@ -570,6 +573,7 @@ export async function ingestSieRows(
           row.current_period_actual, row.current_period_budget,
           row.ytd_actual, row.ytd_budget,
           sourceDocId ?? null,
+          source,
         ],
       );
       count++;

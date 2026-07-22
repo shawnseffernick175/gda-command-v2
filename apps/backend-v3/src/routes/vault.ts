@@ -25,7 +25,7 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { logger } from '../lib/logger.js';
 import { ingestFinancialRows } from '../services/financials/ingest.js';
-import { reingestFinancialDoc } from '../services/financials/reingest-doc.js';
+import { reingestFinancialDoc, computeVerdict } from '../services/financials/reingest-doc.js';
 import { extractVehicleFromVaultDoc } from '../services/vehicles/vault-extract.js';
 
 const UPLOAD_DIR = join(process.cwd(), 'data', 'vault');
@@ -42,6 +42,12 @@ interface ReingestDocResult {
   doc_id: number;
   filename: string;
   status: 'ingested' | 'no_rows' | 'error';
+  // Explicit, human-facing outcome (F-1142 Pillar 4). Never silently absent:
+  // INGESTED / NEEDS_REVIEW / SKIPPED come from computeVerdict; FAILED is set
+  // when the parser threw. This is the per-file verdict the brief requires the
+  // reingest response to carry alongside the coverage endpoint.
+  verdict: 'INGESTED' | 'NEEDS_REVIEW' | 'SKIPPED' | 'FAILED';
+  verdict_detail: string;
   plan: number;
   actual: number;
   balance_sheet: number;
@@ -73,6 +79,10 @@ function summarizeJob(job: ReingestJob): Record<string, number> {
     docs_considered: job.total,
     docs_ingested: job.results.filter((r) => r.status === 'ingested').length,
     docs_errored: job.results.filter((r) => r.status === 'error').length,
+    verdict_ingested: job.results.filter((r) => r.verdict === 'INGESTED').length,
+    verdict_needs_review: job.results.filter((r) => r.verdict === 'NEEDS_REVIEW').length,
+    verdict_skipped: job.results.filter((r) => r.verdict === 'SKIPPED').length,
+    verdict_failed: job.results.filter((r) => r.verdict === 'FAILED').length,
     total_plan: job.results.reduce((s, r) => s + r.plan, 0),
     total_actual: job.results.reduce((s, r) => s + r.actual, 0),
     total_balance_sheet: job.results.reduce((s, r) => s + r.balance_sheet, 0),
@@ -970,21 +980,25 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
         docType: docTypeConfirmed,
         skipParsers: ['financial_statement_extract'],
       }).then((r) => {
-        if (r.any_ingested) {
-          const parts: string[] = [];
-          if (r.balance_sheet > 0) parts.push(`bs=${r.balance_sheet}`);
-          if (r.cost_detail > 0) parts.push(`cd=${r.cost_detail}`);
-          if (r.sie > 0) parts.push(`sie=${r.sie}`);
-          if (r.ap > 0) parts.push(`ap=${r.ap}`);
-          if (r.ar > 0) parts.push(`ar=${r.ar}`);
-          if (r.trial_balance > 0) parts.push(`tb=${r.trial_balance}`);
-          if (r.project_revenue > 0) parts.push(`pr=${r.project_revenue}`);
-          if (parts.length > 0) {
-            insertAudit(docId, 'financials_ingested', 'system', `upload multi-parse: ${parts.join(', ')}`).catch(() => {});
-          }
-        }
+        // Always record an explicit verdict (F-1142 Pillar 4): INGESTED lists
+        // what landed, NEEDS_REVIEW/SKIPPED explain why nothing did. No upload
+        // silently drops its financial outcome anymore.
+        const v = computeVerdict(r);
+        insertAudit(
+          docId,
+          'financials_ingested',
+          'system',
+          `upload verdict: ${v.verdict}${v.detail ? ` — ${v.detail}` : ''}`,
+        ).catch(() => {});
       }).catch((err) => {
-        logger.warn({ err, docId, filename }, 'Upload multi-parser reingest failed — non-blocking');
+        // A thrown parser is FAILED — surface it as a verdict, do not swallow.
+        logger.warn({ err, docId, filename }, 'Upload multi-parser reingest threw — recorded FAILED');
+        insertAudit(
+          docId,
+          'financials_ingested',
+          'system',
+          `upload verdict: FAILED — ${err instanceof Error ? err.message : String(err)}`,
+        ).catch(() => {});
       });
     }
 
@@ -1559,10 +1573,13 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
               auditMsg,
             );
           }
+          const v = computeVerdict(r);
           job.results.push({
             doc_id: doc.id,
             filename: doc.filename,
             status: r.any_ingested ? 'ingested' : 'no_rows',
+            verdict: v.verdict,
+            verdict_detail: v.detail,
             plan: r.plan,
             actual: r.actual,
             balance_sheet: r.balance_sheet,
@@ -1583,6 +1600,8 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             doc_id: doc.id,
             filename: doc.filename,
             status: 'error',
+            verdict: 'FAILED',
+            verdict_detail: err instanceof Error ? err.message : String(err),
             plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, ap: 0, ar: 0, trial_balance: 0, project_revenue: 0, rejected: 0,
             parsers_run: [],
             parsers_skipped: [],

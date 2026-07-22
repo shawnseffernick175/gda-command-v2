@@ -188,6 +188,170 @@ function isOperationalFinance(filename: string): boolean {
 }
 
 /**
+ * Explainable, CONTENT-FIRST financial classifier (Pillar 1).
+ *
+ * WHY THIS EXISTS: routing financial docs by filename alone is fragile — a
+ * renamed income statement, or an operational A/R export saved under a generic
+ * name, would land in the wrong place (or the Financial Bible). This classifier
+ * reads the extracted text's structural fingerprints and decides a `doc_kind`,
+ * recording every signal it matched so the verdict is auditable. The filename is
+ * only a WEAK tiebreaker applied after content, never the primary signal.
+ *
+ * `entity_type` is the coarse surface bucket:
+ *   - 'operational_finance' → Aged A/R or Open A/P. Financial DATA, but NEVER the
+ *     Bible; it has its own surface.
+ *   - 'financial_statement' → belongs in the Financial Bible (P&L / IS / BS / TB
+ *     / GL / cost-pool revenue).
+ *   - 'not_financial' → e.g. a supplier list that merely mentions dollars.
+ */
+export type FinancialDocKind =
+  | 'gl_detail'
+  | 'trended_income_statement'
+  | 'income_statement'
+  | 'l1_l2_pnl'
+  | 'trial_balance'
+  | 'trended_balance_sheet'
+  | 'balance_sheet'
+  | 'revenue_summary_cost_pool'
+  | 'aged_ar'
+  | 'open_ap'
+  | 'unknown_financial'
+  | 'not_financial';
+
+export interface FinancialContentClass {
+  entity_type: 'financial_statement' | 'operational_finance' | 'not_financial';
+  doc_kind: FinancialDocKind;
+  confidence: number;
+  rationale: string;
+  signals: string[];
+}
+
+export function classifyFinancialContent(filename: string, text: string): FinancialContentClass {
+  const fn = filename || '';
+  const head = (text || '').slice(0, 8000);
+  const norm = head
+    .toLowerCase()
+    .replace(/_x000d_/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const signals: string[] = [];
+  const sig = (label: string, hit: boolean): boolean => {
+    if (hit) signals.push(label);
+    return hit;
+  };
+
+  const hasMonthGrid = sig(
+    'month-grid(jan..mar)',
+    /account name.*\bjan\b.*\bfeb\b.*\bmar\b/.test(norm) ||
+      /\bjan\b.{0,6}\bfeb\b.{0,6}\bmar\b.{0,6}\bapr\b/.test(norm),
+  );
+  const hasIsTotals = sig(
+    'is-totals(direct-costs/cost-of-ops)',
+    /total direct costs/.test(norm) || /total cost of operations/.test(norm),
+  );
+  const hasBsTotals = sig(
+    'bs-totals(current-assets+liabilities|liab&equity)',
+    (/total current assets/.test(norm) && /total current liabilities/.test(norm)) ||
+      /liabilities & equity/.test(norm) ||
+      /trended balance sheet/.test(norm),
+  );
+  const hasArCols = sig(
+    'ar-cols(customer+invoice+aging)',
+    /customer/.test(norm) &&
+      /invoice/.test(norm) &&
+      /(due date|31 to 60|61 to 90|over 90|1 to 30|current)/.test(norm),
+  );
+  const hasApCols = sig(
+    'ap-cols(vendor+voucher/invoice)',
+    (/vendor/.test(norm) && (/voucher/.test(norm) || /invoice/.test(norm))) ||
+      /accounts payable aging|open a\/?p/.test(norm),
+  );
+  const hasTbCols = sig(
+    'tb-cols(beginning+ending-balance)',
+    /beginning balance/.test(norm) && /ending balance/.test(norm),
+  );
+  // GL Detail transaction ledger — detected by its column signature, not the
+  // filename. The export carries FY + PD + Proj Classification + Account Name +
+  // Amount columns; that structure identifies it even when the file is renamed.
+  const hasGlColumns = sig(
+    'gl-columns(fy+pd+proj-classification+account-name+amount)',
+    /\bfy\b/.test(norm) &&
+      /\bpd\b/.test(norm) &&
+      /proj(ect)? classification/.test(norm) &&
+      /account name/.test(norm) &&
+      /\bamount\b/.test(norm),
+  );
+  const hasGlDetail = sig(
+    'gl-detail-signature',
+    /\bgl detail\b|general ledger|journal entr/.test(norm) || hasGlColumns,
+  );
+  const hasCostPoolRev = sig(
+    'cost-pool-revenue',
+    /revenue/.test(norm) && /cost pool/.test(norm),
+  );
+  const hasDataSet = sig('DataSetLandTbl', /datasetlandtbl/.test(norm));
+  // Weak filename tiebreakers (applied only after content is inconclusive).
+  const fnAr = /aged\s*a\/?r|accounts?\s*receivable/i.test(fn);
+  const fnAp = /open\s*a\/?p|accounts?\s*payable/i.test(fn);
+  const fnL = /\bl[12]\b[\s-]*(actual|target)/i.test(fn);
+  if (fnAr) signals.push('fn:aged-ar');
+  if (fnAp) signals.push('fn:open-ap');
+  if (fnL) signals.push('fn:L1/L2');
+
+  // Operational A/R and A/P first — they must NEVER reach the Bible.
+  if (hasArCols || (fnAr && !hasIsTotals && !hasBsTotals)) {
+    return {
+      entity_type: 'operational_finance',
+      doc_kind: 'aged_ar',
+      confidence: hasArCols ? 0.92 : 0.7,
+      rationale: 'Aged A/R report (operational receivables) — routed to operational surface, not the Financial Bible.',
+      signals,
+    };
+  }
+  if (hasApCols || (fnAp && !hasIsTotals && !hasBsTotals)) {
+    return {
+      entity_type: 'operational_finance',
+      doc_kind: 'open_ap',
+      confidence: hasApCols ? 0.92 : 0.7,
+      rationale: 'Open A/P report (operational payables) — routed to operational surface, not the Financial Bible.',
+      signals,
+    };
+  }
+
+  // Financial-statement kinds (Financial Bible).
+  if (hasMonthGrid && hasBsTotals) {
+    return { entity_type: 'financial_statement', doc_kind: 'trended_balance_sheet', confidence: 0.95, rationale: 'Trended Balance Sheet: month grid + balance-sheet subtotals.', signals };
+  }
+  if (hasMonthGrid && hasIsTotals) {
+    return { entity_type: 'financial_statement', doc_kind: 'trended_income_statement', confidence: 0.95, rationale: 'Trended Income Statement: month grid + Total Direct Costs / Total Cost of Operations.', signals };
+  }
+  if (hasTbCols) {
+    return { entity_type: 'financial_statement', doc_kind: 'trial_balance', confidence: 0.9, rationale: 'Trial Balance: Beginning/Ending Balance columns.', signals };
+  }
+  if (hasBsTotals) {
+    return { entity_type: 'financial_statement', doc_kind: 'balance_sheet', confidence: 0.85, rationale: 'Balance Sheet subtotals present.', signals };
+  }
+  if (hasIsTotals) {
+    return { entity_type: 'financial_statement', doc_kind: 'income_statement', confidence: 0.85, rationale: 'Income Statement subtotals present.', signals };
+  }
+  if (hasCostPoolRev) {
+    return { entity_type: 'financial_statement', doc_kind: 'revenue_summary_cost_pool', confidence: 0.8, rationale: 'Revenue Summary by cost pool.', signals };
+  }
+  if (hasDataSet || fnL) {
+    return { entity_type: 'financial_statement', doc_kind: 'l1_l2_pnl', confidence: fnL ? 0.85 : 0.75, rationale: 'L1/L2 company P&L (DataSetLandTbl / L-level filename).', signals };
+  }
+  if (hasGlDetail) {
+    return { entity_type: 'financial_statement', doc_kind: 'gl_detail', confidence: 0.8, rationale: 'GL Detail signature.', signals };
+  }
+
+  // Filename-only financial statement (weak) or nothing → not financial.
+  if (FINANCIAL_STATEMENT_NAME_PATTERNS.some((p) => p.test(fn))) {
+    return { entity_type: 'financial_statement', doc_kind: 'unknown_financial', confidence: 0.55, rationale: 'Financial-statement filename token but no strong content signal — needs review.', signals };
+  }
+  return { entity_type: 'not_financial', doc_kind: 'not_financial', confidence: 0.4, rationale: 'No financial-statement content or operational A/R-A/P signals detected.', signals };
+}
+
+/**
  * True when the doc is a financial STATEMENT bound for the Financial Bible.
  * Operational A/R and A/P reports are excluded up front so they never sweep in.
  */
@@ -249,17 +413,28 @@ export async function classifyDocument(
   // Step 1: keyword-based classification
   const kwResult = keywordClassify(text, filename);
 
-  // Operational A/R and A/P reports are financial data but not P&L; keep them
-  // out of the Financial Bible. Route to triage with their entity_type so the
-  // downstream ap/ar reingest still picks them up by filename.
-  if (isOperationalFinance(filename)) {
+  // Content-first financial classification (Pillar 1). Reads structural
+  // fingerprints of the extracted text and decides a doc_kind + signals, with
+  // the filename as a weak tiebreaker only. Both branches below key off the
+  // returned entity_type so a renamed statement still reaches the Bible and an
+  // operational A/R-A/P export never does.
+  const finContent = classifyFinancialContent(filename, text);
+
+  // Operational A/R and A/P reports are financial data but not statements. They
+  // live on the financials surface like every other financial doc, but the
+  // "never the Bible" guarantee is enforced downstream: classifyFinancialDoc
+  // routes them to the ap_actuals / ar_actuals OPERATIONAL tables, never the
+  // reconcilable statement tables. Grade tracks confidence like the rest.
+  if (finContent.entity_type === 'operational_finance' || isOperationalFinance(filename)) {
+    const conf = finContent.entity_type === 'operational_finance' ? finContent.confidence : 0.6;
+    const surface = finContent.doc_kind === 'open_ap' ? 'A/P' : 'A/R';
     return {
-      surface: 'inbox',
-      entity_type: 'other',
-      confidence: 0.6,
-      rationale: 'Operational receivables/payables report — not the Financial Bible.',
+      surface: 'financials',
+      entity_type: 'financial_doc',
+      confidence: conf,
+      rationale: `Operational finance (${finContent.doc_kind}) — ingested to the ${surface} operational tables, NOT the Financial Bible statements. [signals: ${finContent.signals.join(', ') || 'filename'}]`,
       doctrine_flag: detectDoctrine(text),
-      evidence_grade: 'B',
+      evidence_grade: conf >= 0.8 ? 'A' : conf >= 0.6 ? 'B' : 'C',
       owner: 'system',
     };
   }
@@ -268,12 +443,12 @@ export async function classifyDocument(
   // sheet, revenue summary, SIE, P&L) route to the Financial Bible with high
   // confidence so a single-keyword match never falls through to the LLM upgrade
   // that previously mis-routed June statements to Inbox.
-  if (isFinancialStatement(filename, text)) {
+  if (finContent.entity_type === 'financial_statement' || isFinancialStatement(filename, text)) {
     return {
       surface: 'financials',
       entity_type: 'financial_doc',
-      confidence: 0.95,
-      rationale: 'Financial statement detected — routed to Financial Bible.',
+      confidence: Math.max(finContent.confidence, 0.9),
+      rationale: `Financial statement (${finContent.doc_kind}) — routed to Financial Bible. [signals: ${finContent.signals.join(', ') || 'filename'}]`,
       doctrine_flag: detectDoctrine(text),
       evidence_grade: 'A',
       owner: 'system',

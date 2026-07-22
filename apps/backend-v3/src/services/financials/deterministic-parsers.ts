@@ -20,6 +20,7 @@ import type { SieExtractOutput } from '../../lib/llm-router.types.js';
 import type { CostDetailExtractOutput } from '../../lib/llm-router.types.js';
 import type { ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js';
 import type { FinancialStatementExtractOutput } from '../../lib/llm-router.types.js';
+import type { BalanceSheetExtractOutput } from '../../lib/llm-router.types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -956,11 +957,20 @@ export function parseYtdGlDetail(
   );
   if (!lines || lines.length < 3) return null;
 
+  // Period is derived PER ROW from the FY + PD columns below, so the filename is
+  // NOT required to parse — a renamed GL export still yields identical rows. The
+  // filename period only supplies a fallback fiscal year for the rare row whose
+  // FY cell is blank; when it can't be inferred we fall back to the first FY seen
+  // in the data (computed just below).
   const periodInfo = inferPeriod(filename);
-  if (!periodInfo) {
-    logger.warn({ filename }, 'GL deterministic: cannot infer period from filename');
+  const dataFallbackFy = (() => {
+    for (const ln of lines) {
+      const first = splitRow(ln)[0]?.trim() ?? '';
+      if (/^\d{4}$/.test(first)) return parseInt(first, 10);
+    }
     return null;
-  }
+  })();
+  const fallbackFy = periodInfo?.fiscal_year ?? dataFallbackFy;
 
   // Find header row: FY | PD | SP | Jrnl | Seq | Proj Classification | Project ID | ...
   let effectiveHeaderIdx = findHeaderRow(lines, ['fy', 'pd', 'proj classification', 'project id']);
@@ -1049,7 +1059,8 @@ export function parseYtdGlDetail(
     if (!projClass && !account && !projectId) continue;
     if (amount === 0) continue;
 
-    const fyNum = fyRaw ? parseInt(fyRaw, 10) : periodInfo.fiscal_year;
+    const fyNum = fyRaw ? parseInt(fyRaw, 10) : fallbackFy;
+    if (!fyNum || Number.isNaN(fyNum)) continue;
     const period = `FY${String(fyNum).slice(2)} ${MONTHS[pdNum - 1]}`;
     const quarter = Math.ceil(pdNum / 3);
 
@@ -1181,5 +1192,455 @@ export function parseProjectActualsTargets(
     ],
     notes: `Deterministic parser: aggregated ${count} project rows into one ${kind}/${source} company row for ${periodInfo.period} from ${filename}`,
     model_used: 'deterministic',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pillar 3: universal input sanitizer
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize raw extracted text once, at the ingest entry point, before any
+ * parser or the LLM sees it. This is the single place the whole pipeline relies
+ * on for clean input:
+ *   - strip the ExcelJS carriage-return marker (_x000D_) that splits header
+ *     cells like "Vendor_x000D_Name",
+ *   - fold \r\n and bare \r to \n so line splitting is consistent,
+ *   - trim each cell and collapse internal runs of whitespace to one space
+ *     (so " Total   Direct  Costs " keys the same as "Total Direct Costs"),
+ *   - drop rows whose every cell is blank.
+ * Sheet markers and the pipe delimiter are preserved so downstream sheet
+ * selection and splitRow keep working unchanged.
+ */
+export function sanitizeExtractedText(text: string): string {
+  if (!text) return '';
+  const unified = text
+    .replace(/_x000d_/gi, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+  const out: string[] = [];
+  for (const line of unified.split('\n')) {
+    if (line.includes('|')) {
+      const cells = line.split('|').map((c) => c.replace(/\s+/g, ' ').trim());
+      if (cells.every((c) => c.length === 0)) continue;
+      out.push(cells.join(' | '));
+    } else {
+      const collapsed = line.replace(/[ \t]+/g, ' ').trim();
+      // Keep sheet markers and non-empty label lines; drop fully blank lines.
+      if (collapsed.length === 0) continue;
+      out.push(collapsed);
+    }
+  }
+  return out.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Parser: Trended Income Statement / Trended Balance Sheet
+//
+// WHY THIS EXISTS: the Trended Income Statement is the ONLY uploaded artifact
+// that carries clean, reconcilable, per-MONTH Total Direct Costs and Total Cost
+// of Operations. The YTD GL Detail is double-entry and its raw Amount column
+// nets to zero, so it cannot yield Total Direct Costs without a brittle
+// cost-account filter; the SIE trend carries RATES, not dollars. Both prior
+// sources produced the ~$0 / cents figures the cure brief calls out. This
+// parser reads the trended statement's month columns directly and emits:
+//   - cost_detail rows (pool DIRECT), one per Direct-Cost line item per month,
+//     summing to Total Direct Costs for that month;
+//   - indirect rows (pool Fringe Benefits / Overhead / G&A), one per account per
+//     month, summing to Total Cost of Operations for that month;
+//   - one income_statement financial_actuals row per month carrying the F/S
+//     subtotals so KPI/GM/EBIT recompute exactly.
+// It also handles the Trended Balance Sheet (same Account Name | Jan..Jun grid)
+// by matching the aggregate balance-sheet line labels per month.
+//
+// Columns are auto-detected by scanning the header for month tokens (Pillar 2):
+// no fixed indices, tolerant of a leading Account ID column (DETAIL sheet) or
+// not (SUMMARY sheet). A month column is only emitted when it carries at least
+// one non-zero value, so a single-month upload never fabricates phantom future
+// months of zeros.
+// ---------------------------------------------------------------------------
+
+const MONTH_LOOKUP: Array<{ re: RegExp; num: number; label: string }> = [
+  { re: /^jan/, num: 1, label: 'Jan' },
+  { re: /^feb/, num: 2, label: 'Feb' },
+  { re: /^mar/, num: 3, label: 'Mar' },
+  { re: /^apr/, num: 4, label: 'Apr' },
+  { re: /^may/, num: 5, label: 'May' },
+  { re: /^jun/, num: 6, label: 'Jun' },
+  { re: /^jul/, num: 7, label: 'Jul' },
+  { re: /^aug/, num: 8, label: 'Aug' },
+  { re: /^sep/, num: 9, label: 'Sep' },
+  { re: /^oct/, num: 10, label: 'Oct' },
+  { re: /^nov/, num: 11, label: 'Nov' },
+  { re: /^dec/, num: 12, label: 'Dec' },
+];
+
+interface MonthCol {
+  col: number;
+  num: number;
+  label: string;
+}
+
+interface TrendGrid {
+  monthCols: MonthCol[];
+  labelCol: number;
+  codeCol: number;
+  headerIdx: number;
+  fiscalYear: number;
+}
+
+/** True when a cell holds a parseable number (not merely blank, which parseNum maps to 0). */
+function isNumericCell(s: string): boolean {
+  if (!s) return false;
+  const cleaned = s.replace(/[$,\s]/g, '').replace(/[()]/g, '');
+  return cleaned.length > 0 && /^-?\d+(\.\d+)?$/.test(cleaned);
+}
+
+/** Locate the month-column header in a trended sheet and derive the label/code columns. */
+function detectTrendGrid(lines: string[], filename: string): TrendGrid | null {
+  const scan = Math.min(lines.length, 15);
+  for (let i = 0; i < scan; i++) {
+    const cols = splitRow(lines[i]);
+    const monthCols: MonthCol[] = [];
+    for (let c = 0; c < cols.length; c++) {
+      const norm = cleanHeaderText(cols[c]).toLowerCase();
+      const hit = MONTH_LOOKUP.find((m) => m.re.test(norm) && norm.length <= 12);
+      if (hit && !monthCols.some((mc) => mc.num === hit.num)) {
+        monthCols.push({ col: c, num: hit.num, label: hit.label });
+      }
+    }
+    if (monthCols.length >= 3) {
+      // Header row found. Derive label + optional code columns from the cells
+      // that precede the first month column.
+      let codeCol = -1;
+      let labelCol = 0;
+      for (let c = 0; c < monthCols[0].col; c++) {
+        const norm = cleanHeaderText(cols[c]).toLowerCase();
+        if (/account\s*id|account\s*code|^id$/.test(norm)) codeCol = c;
+        else if (/account\s*name|description|^name$/.test(norm)) labelCol = c;
+      }
+      // Fallback: if a code column was found but no explicit name column, the
+      // label is the cell right after the code (DETAIL: "Account ID | Account Name").
+      if (codeCol >= 0 && labelCol === 0 && codeCol === 0 && monthCols[0].col >= 2) labelCol = 1;
+
+      // Fiscal year: a bare 20xx line just above the header, else from filename.
+      let fiscalYear = 0;
+      for (let j = Math.max(0, i - 3); j < i; j++) {
+        const ym = splitRow(lines[j]).map((s) => s.trim()).find((s) => /^20\d{2}$/.test(s));
+        if (ym) fiscalYear = parseInt(ym, 10);
+      }
+      if (!fiscalYear) fiscalYear = inferPeriod(filename)?.fiscal_year ?? new Date().getUTCFullYear();
+
+      return { monthCols, labelCol, codeCol, headerIdx: i, fiscalYear };
+    }
+  }
+  return null;
+}
+
+function periodLabel(fiscalYear: number, label: string): string {
+  return `FY${String(fiscalYear).slice(-2)} ${label}`;
+}
+
+type CostDetailRowT = CostDetailExtractOutput['rows'][number];
+type SieRowT = SieExtractOutput['rows'][number];
+type FinancialRowT = FinancialStatementExtractOutput['rows'][number];
+type BalanceSheetRowT = BalanceSheetExtractOutput['rows'][number];
+
+export interface TrendedStatementResult {
+  kind: 'income_statement' | 'balance_sheet';
+  periods: string[];
+  costDetail: CostDetailRowT[];
+  sie: SieRowT[];
+  financial: FinancialRowT[];
+  balanceSheet: BalanceSheetRowT[];
+  notes: string;
+}
+
+const IS_SECTION_LABELS = new Set([
+  'revenue', 'direct costs', 'gross profit', 'cost of operations',
+  'operating income', 'other income', 'other expenses',
+  'net income before taxes', 'net income',
+]);
+
+/** Normalized label -> financial_actuals subtotal key. */
+function isTotalLabel(norm: string): 'total_revenue' | 'total_direct_costs' | 'cost_of_operations' | null {
+  if (norm === 'total revenue') return 'total_revenue';
+  if (norm === 'total direct costs') return 'total_direct_costs';
+  if (norm === 'total cost of operations') return 'cost_of_operations';
+  return null;
+}
+
+/**
+ * Parse a Trended Income Statement or Trended Balance Sheet. Returns null when
+ * the document is not a recognizable trended grid.
+ */
+export function parseTrendedStatement(
+  extractedText: string,
+  filename: string,
+): TrendedStatementResult | null {
+  const text = sanitizeExtractedText(extractedText);
+  const lower = text.toLowerCase();
+  const looksBalanceSheet =
+    /trended\s+balance\s+sheet/.test(lower) ||
+    (/total\s+assets/.test(lower) && /total\s+(equity|liabilities)/.test(lower)) ||
+    (/total\s+current\s+assets/.test(lower) && /total\s+current\s+liabilities/.test(lower)) ||
+    /liabilities\s*&\s*equity/.test(lower);
+  const looksIncomeStatement =
+    /total\s+direct\s+costs/.test(lower) || /total\s+cost\s+of\s+operations/.test(lower) ||
+    (/total\s+revenue/.test(lower) && /gross\s+profit/.test(lower));
+
+  if (!looksBalanceSheet && !looksIncomeStatement) return null;
+
+  if (looksIncomeStatement) {
+    return parseTrendedIncomeStatement(text, filename);
+  }
+  return parseTrendedBalanceSheet(text, filename);
+}
+
+function parseTrendedIncomeStatement(text: string, filename: string): TrendedStatementResult | null {
+  // Direct costs + F/S subtotals: prefer the SUMMARY sheet (one row per line
+  // item); fall back to DETAIL subsection totals when SUMMARY is absent.
+  const summaryLines =
+    getSheetLines(text, 'SUMMARY') ??
+    getSheetLinesByContent(text, ['account name', 'jan', 'feb', 'mar'], ['SUMMARY', 'Sheet1']);
+  const detailLines = getSheetLines(text, 'DETAIL') ?? summaryLines;
+  if (!summaryLines && !detailLines) return null;
+
+  const dcSource = summaryLines ?? detailLines!;
+  const grid = detectTrendGrid(dcSource, filename);
+  if (!grid) return null;
+
+  // Track which month columns carry any non-zero value so we never emit phantom
+  // all-zero future months from a single-month upload.
+  const monthHasData = new Map<number, boolean>();
+  const costDetail: CostDetailRowT[] = [];
+  const totals: Map<number, { total_revenue?: number; total_direct_costs?: number; cost_of_operations?: number }> =
+    new Map();
+
+  let section = '';
+  for (let i = grid.headerIdx + 1; i < dcSource.length; i++) {
+    const cols = splitRow(dcSource[i]);
+    const label = (cols[grid.labelCol] ?? cols[0] ?? '').trim();
+    if (!label) continue;
+    const norm = cleanHeaderText(label).toLowerCase();
+
+    // Section boundary — evaluated FIRST so number-bearing terminators like
+    // "Gross Profit" / "Operating Income" switch section instead of being
+    // captured as Direct-Cost line items.
+    if (IS_SECTION_LABELS.has(norm)) {
+      section = norm;
+      continue;
+    }
+
+    const hasNumbers = grid.monthCols.some((mc) => isNumericCell(cols[mc.col] ?? ''));
+    if (!hasNumbers) continue; // subsection header line
+
+    const totalKey = isTotalLabel(norm);
+    if (totalKey) {
+      for (const mc of grid.monthCols) {
+        const v = parseNum(cols[mc.col] ?? '');
+        if (isNumericCell(cols[mc.col] ?? '') && v !== 0) monthHasData.set(mc.num, true);
+        const t = totals.get(mc.num) ?? {};
+        // First occurrence wins (SUMMARY lists Total Revenue twice).
+        if (t[totalKey] === undefined) t[totalKey] = v;
+        totals.set(mc.num, t);
+      }
+      continue;
+    }
+    // Line-item rows inside Direct Costs become cost_detail rows (pool DIRECT).
+    if (section === 'direct costs') {
+      for (const mc of grid.monthCols) {
+        const cell = cols[mc.col] ?? '';
+        if (!isNumericCell(cell)) continue;
+        const v = parseNum(cell);
+        if (v !== 0) monthHasData.set(mc.num, true);
+        costDetail.push({
+          period: periodLabel(grid.fiscalYear, mc.label),
+          fiscal_year: grid.fiscalYear,
+          quarter: Math.ceil(mc.num / 3),
+          cost_element: label,
+          pool: 'DIRECT',
+          target_amount: 0,
+          actual_amount: v,
+        });
+      }
+    }
+  }
+
+  // Indirect (Cost of Operations) account-level rows from the DETAIL sheet.
+  const sie: SieRowT[] = [];
+  const detGrid = detailLines ? detectTrendGrid(detailLines, filename) : null;
+  if (detailLines && detGrid) {
+    let sec = '';
+    let pool = '';
+    for (let i = detGrid.headerIdx + 1; i < detailLines.length; i++) {
+      const cols = splitRow(detailLines[i]);
+      const label = (cols[detGrid.labelCol] ?? '').trim();
+      const code = detGrid.codeCol >= 0 ? (cols[detGrid.codeCol] ?? '').trim() : '';
+      const first = (cols[0] ?? '').trim();
+      const norm = cleanHeaderText(label || first).toLowerCase();
+
+      // Section boundary first (handles number-bearing terminators like
+      // "Operating Income" / "Gross Profit" that end the Cost of Operations block).
+      if (IS_SECTION_LABELS.has(norm)) {
+        sec = norm;
+        pool = '';
+        continue;
+      }
+
+      const hasNumbers = detGrid.monthCols.some((mc) => isNumericCell(cols[mc.col] ?? ''));
+      if (!hasNumbers) {
+        if (sec === 'cost of operations' && norm) pool = label || first;
+        continue;
+      }
+      if (sec !== 'cost of operations') continue;
+      // Skip subtotal rows ("Total", "Total Cost of Operations").
+      if (/^total\b/i.test(first) || /^total\b/i.test(label)) continue;
+      if (!pool) continue;
+      const accountName = label || first;
+      const accountCode = /^[0-9]{3}-[0-9]{3}$/.test(code) || /^[A-Za-z]{2,3}-[A-Za-z]{2,3}$/.test(code) ? code : (code || null);
+      for (const mc of detGrid.monthCols) {
+        const cell = cols[mc.col] ?? '';
+        if (!isNumericCell(cell)) continue;
+        const v = parseNum(cell);
+        if (v !== 0) monthHasData.set(mc.num, true);
+        sie.push({
+          period: periodLabel(detGrid.fiscalYear, mc.label),
+          fiscal_year: detGrid.fiscalYear,
+          quarter: Math.ceil(mc.num / 3),
+          pool,
+          account_code: accountCode,
+          account_name: accountName,
+          current_period_actual: v,
+          current_period_budget: 0,
+          ytd_actual: 0,
+          ytd_budget: 0,
+        });
+      }
+    }
+  }
+
+  // Keep only months that carry real data.
+  const liveMonths = new Set([...monthHasData.entries()].filter(([, v]) => v).map(([k]) => k));
+  const keepMonth = (num: number): boolean => liveMonths.has(num);
+  const monthOf = (period: string): number =>
+    MONTH_LOOKUP.find((m) => period.endsWith(' ' + m.label))?.num ?? -1;
+
+  const financial: FinancialRowT[] = [];
+  for (const mc of grid.monthCols) {
+    if (!keepMonth(mc.num)) continue;
+    const t = totals.get(mc.num);
+    if (!t || t.total_revenue === undefined) continue;
+    financial.push({
+      period: periodLabel(grid.fiscalYear, mc.label),
+      fiscal_year: grid.fiscalYear,
+      quarter: Math.ceil(mc.num / 3),
+      kind: 'actual',
+      source: 'income_statement',
+      orders: null,
+      sales: t.total_revenue ?? null,
+      ebit: null,
+      gross_margin: null,
+      ros: null,
+      total_revenue: t.total_revenue ?? null,
+      total_direct_costs: t.total_direct_costs ?? null,
+      cost_of_operations: t.cost_of_operations ?? null,
+    });
+  }
+
+  const filteredCost = costDetail.filter((r) => keepMonth(monthOf(r.period)));
+  const filteredSie = sie.filter((r) => keepMonth(monthOf(r.period)));
+  const periods = [...liveMonths].sort((a, b) => a - b).map((n) => periodLabel(grid.fiscalYear, MONTH_LOOKUP.find((m) => m.num === n)!.label));
+
+  if (filteredCost.length === 0 && filteredSie.length === 0 && financial.length === 0) return null;
+
+  return {
+    kind: 'income_statement',
+    periods,
+    costDetail: filteredCost,
+    sie: filteredSie,
+    financial,
+    balanceSheet: [],
+    notes: `Deterministic Trended Income Statement: ${filteredCost.length} direct-cost rows, ${filteredSie.length} indirect rows, ${financial.length} P&L month rows across ${periods.join(', ')} from ${filename}`,
+  };
+}
+
+const BS_LABEL_MAP: Array<{ re: RegExp; key: keyof BalanceSheetRowT }> = [
+  { re: /^cash$/, key: 'cash' },
+  { re: /^accounts\s+receivable/, key: 'accounts_receivable' },
+  { re: /^billed\s+receivable/, key: 'accounts_receivable' },
+  { re: /^total\s+current\s+assets/, key: 'total_current_assets' },
+  { re: /^total\s+assets/, key: 'total_assets' },
+  // Grand-total assets row on statements that label it just "Assets" (the
+  // section header "Assets" carries no numbers, so only the numbered total hits).
+  { re: /^assets$/, key: 'total_assets' },
+  { re: /^accounts\s+payable/, key: 'accounts_payable' },
+  { re: /^total\s+current\s+liabilities/, key: 'total_current_liabilities' },
+  { re: /^total\s+liabilities$/, key: 'total_liabilities' },
+  { re: /^total\s+(equity|stockholders.?\s*equity|net\s+worth)/, key: 'total_equity' },
+];
+
+function parseTrendedBalanceSheet(text: string, filename: string): TrendedStatementResult | null {
+  const lines =
+    getSheetLines(text, 'SUMMARY') ??
+    getSheetLines(text, 'DETAIL') ??
+    getSheetLinesByContent(text, ['account name', 'jan', 'feb', 'mar'], ['SUMMARY', 'Sheet1']);
+  if (!lines) return null;
+  const grid = detectTrendGrid(lines, filename);
+  if (!grid) return null;
+
+  const perMonth = new Map<number, Partial<Record<keyof BalanceSheetRowT, number>>>();
+  const monthHasData = new Map<number, boolean>();
+
+  for (let i = grid.headerIdx + 1; i < lines.length; i++) {
+    const cols = splitRow(lines[i]);
+    const label = (cols[grid.labelCol] ?? cols[0] ?? '').trim();
+    if (!label) continue;
+    const norm = cleanHeaderText(label).toLowerCase();
+    const mapping = BS_LABEL_MAP.find((m) => m.re.test(norm));
+    if (!mapping) continue;
+    for (const mc of grid.monthCols) {
+      const cell = cols[mc.col] ?? '';
+      if (!isNumericCell(cell)) continue;
+      const v = parseNum(cell);
+      if (v !== 0) monthHasData.set(mc.num, true);
+      const rec = perMonth.get(mc.num) ?? {};
+      // First match per key wins so "total liabilities" is not overwritten by a
+      // later "total liabilities and equity" style line.
+      if (rec[mapping.key] === undefined) rec[mapping.key] = v;
+      perMonth.set(mc.num, rec);
+    }
+  }
+
+  const balanceSheet: BalanceSheetRowT[] = [];
+  for (const mc of grid.monthCols) {
+    if (!monthHasData.get(mc.num)) continue;
+    const rec = perMonth.get(mc.num);
+    if (!rec) continue;
+    balanceSheet.push({
+      period: periodLabel(grid.fiscalYear, mc.label),
+      fiscal_year: grid.fiscalYear,
+      quarter: Math.ceil(mc.num / 3),
+      cash: rec.cash ?? 0,
+      accounts_receivable: rec.accounts_receivable ?? 0,
+      total_current_assets: rec.total_current_assets ?? 0,
+      total_assets: rec.total_assets ?? 0,
+      accounts_payable: rec.accounts_payable ?? 0,
+      total_current_liabilities: rec.total_current_liabilities ?? 0,
+      total_liabilities: rec.total_liabilities ?? 0,
+      total_equity: rec.total_equity ?? 0,
+    });
+  }
+
+  if (balanceSheet.length === 0) return null;
+
+  return {
+    kind: 'balance_sheet',
+    periods: balanceSheet.map((r) => r.period),
+    costDetail: [],
+    sie: [],
+    financial: [],
+    balanceSheet,
+    notes: `Deterministic Trended Balance Sheet: ${balanceSheet.length} month rows from ${filename}`,
   };
 }
