@@ -271,7 +271,6 @@ jobs:
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -279,7 +278,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm audit --audit-level=high
+      # Hard-blocking gate on CRITICAL advisories (previously this whole job was
+      # continue-on-error, so its result was ignored). We do NOT gate on `high`
+      # because the only remaining high-severity advisories are transitive
+      # through next@16 (sharp/postcss); npm's only "fix" is a downgrade to
+      # next@9, which is not acceptable. Highs are still surfaced (non-blocking)
+      # for visibility until Next ships patched transitive deps.
+      - name: Fail on critical advisories
+        run: npm audit --audit-level=critical
+      - name: Report high/moderate advisories (non-blocking)
+        if: always()
+        run: npm audit --audit-level=high || true
 
   schema-drift:
     name: Schema Drift Check
