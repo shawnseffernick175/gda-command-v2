@@ -149,7 +149,7 @@ class DoctrineEvaluation(BaseModel):
     exclusion_triggers: list[str]
     margin_check: str | None = None
     rationale: str
-    source_url: str = Field(default="https://docs.gda-command.internal/doctrine")
+    source_url: str | None = None
 
 
 class DoctrineCheckOutput(BaseModel):
@@ -201,14 +201,15 @@ class PwinScoreInput(BaseModel):
 
 class PwinResult(BaseModel):
     score: int = Field(ge=0, le=100)
-    feature_weights: dict[str, float]
+    feature_weights: dict[str, float] = Field(default_factory=dict)
     model_version: str
-    confidence: float
+    confidence: float | None = None
     source_url: str
 
 
 class PwinScoreOutput(BaseModel):
-    result: PwinResult
+    result: PwinResult | None = None
+    warning: str | None = None
 
 
 # ---------------------------------------------------------------------------

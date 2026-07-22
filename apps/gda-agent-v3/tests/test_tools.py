@@ -200,11 +200,66 @@ class TestDbQuery:
 
 @pytest.mark.anyio
 class TestRagSearch:
-    async def test_rag_stub_returns_pending(self):
-        result = await rag_search(RagSearchInput(query="test"))
+    @respx.mock
+    async def test_rag_maps_backend_results(self):
+        respx.post("http://localhost:4000/v3/rag/search").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {
+                        "results": [
+                            {
+                                "chunk_text": "Envision won the X contract.",
+                                "document_id": "doc-1",
+                                "source_filename": "past_perf.pdf",
+                                "source_url": "https://files.gda/doc-1",
+                                "evidence_grade": "A",
+                            }
+                        ]
+                    },
+                },
+            )
+        )
+        result = await rag_search(RagSearchInput(query="contract wins"))
         assert len(result.results) == 1
-        assert "F-301" in result.results[0].chunk
-        assert result.results[0].source_url
+        assert result.results[0].chunk == "Envision won the X contract."
+        assert result.results[0].grade == "A"
+        assert result.results[0].source_url == "https://files.gda/doc-1"
+
+    @respx.mock
+    async def test_rag_falls_back_to_document_url_when_no_source(self):
+        respx.post("http://localhost:4000/v3/rag/search").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {
+                        "results": [
+                            {
+                                "chunk_text": "text",
+                                "document_id": "doc-9",
+                                "source_filename": "f.pdf",
+                                "source_url": None,
+                                "evidence_grade": None,
+                            }
+                        ]
+                    },
+                },
+            )
+        )
+        result = await rag_search(RagSearchInput(query="x"))
+        assert len(result.results) == 1
+        assert result.results[0].source_url == "http://localhost:4000/v3/rag/documents/doc-9"
+        assert result.results[0].grade == "C"
+
+    @respx.mock
+    async def test_rag_empty_when_no_results(self):
+        respx.post("http://localhost:4000/v3/rag/search").mock(
+            return_value=httpx.Response(200, json={"success": True, "data": {"results": []}})
+        )
+        result = await rag_search(RagSearchInput(query="nothing"))
+        assert result.results == []
 
 
 @pytest.mark.anyio
@@ -246,7 +301,8 @@ class TestDoctrineCheck:
             DoctrineCheckInput(claim_text="We should pursue this Army contract")
         )
         assert len(result.evaluation.alignment_score_by_principle) == 7
-        assert result.evaluation.source_url
+        # Honest stub: no fabricated source URL (R1).
+        assert result.evaluation.source_url is None
 
 
 @pytest.mark.anyio
@@ -286,20 +342,70 @@ class TestFileRead:
 
 @pytest.mark.anyio
 class TestPwinScore:
-    async def test_pwin_stub(self):
+    async def test_pwin_reads_cached_analysis(self, monkeypatch):
+        import src.tools.pwin_score as ps
+
+        monkeypatch.setattr(
+            ps,
+            "fetch_readonly",
+            AsyncMock(
+                return_value=[
+                    {
+                        "pwin": 0.72,
+                        "version": "v1",
+                        "opp_pk": "5",
+                        "sam_notice_id": "abc",
+                        "source_url": "https://sam.gov/opp/abc/view",
+                    }
+                ]
+            ),
+        )
+        result = await pwin_score(PwinScoreInput(opp_id="5"))
+        assert result.result is not None
+        assert result.result.score == 72
+        assert result.result.model_version == "analysis-cache:v1"
+        assert result.result.source_url == "https://sam.gov/opp/abc/view"
+
+    async def test_pwin_warns_when_not_analyzed(self, monkeypatch):
+        import src.tools.pwin_score as ps
+
+        monkeypatch.setattr(ps, "fetch_readonly", AsyncMock(return_value=[]))
         result = await pwin_score(PwinScoreInput(opp_id="opp-123"))
-        assert result.result.score == 50
-        assert result.result.model_version == "v0.0.1-stub"
-        assert result.result.source_url
+        assert result.result is None
+        assert result.warning is not None
 
 
 @pytest.mark.anyio
 class TestGovwinSearch:
-    async def test_govwin_stub_returns_empty_with_warning(self):
+    async def test_govwin_returns_ingested_rows(self, monkeypatch):
+        import src.tools.govwin_search as gs
+
+        monkeypatch.setattr(
+            gs,
+            "fetch_readonly",
+            AsyncMock(
+                return_value=[
+                    {
+                        "title": "Army ISR services",
+                        "agency": "Department of the Army",
+                        "status": "tracking",
+                        "source_url": "https://iq.govwin.com/opp/123",
+                    }
+                ]
+            ),
+        )
         result = await govwin_search(GovwinSearchInput(query="Army"))
+        assert len(result.results) == 1
+        assert result.results[0].source_url == "https://iq.govwin.com/opp/123"
+        assert result.warning is None
+
+    async def test_govwin_warns_when_no_match(self, monkeypatch):
+        import src.tools.govwin_search as gs
+
+        monkeypatch.setattr(gs, "fetch_readonly", AsyncMock(return_value=[]))
+        result = await govwin_search(GovwinSearchInput(query="nonexistent"))
         assert result.results == []
         assert result.warning is not None
-        assert "not configured" in result.warning
 
 
 # ---------------------------------------------------------------------------

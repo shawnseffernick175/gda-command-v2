@@ -35,13 +35,13 @@ Sandboxed agent runtime service for GDA Command V3 — the "brain" that every ag
 | `usaspending_search` | USAspending API | Live |
 | `federal_register_search` | Federal Register API | Live |
 | `db_query` | gda_command_staging (read-only) | Live |
-| `rag_search` | pgvector (F-301) | Stub |
+| `rag_search` | backend-v3 `/v3/rag/search` (pgvector) | Live |
 | `web_search` | Perplexity / Tavily | Live (when configured) |
 | `doctrine_check` | F-303 rules engine | Stub |
 | `decision_memory_lookup` | F-302 decision memory | Stub |
 | `file_read` | gda-backend-v3 file store | Live |
-| `pwin_score` | F-302 PWin model | Stub |
-| `govwin_search` | GovWin IQ | Stub (no crash) |
+| `pwin_score` | backend-v3 analysis cache (read-only) | Live |
+| `govwin_search` | ingested GovWin opportunities (read-only) | Live |
 
 ## Environment Variables
 
