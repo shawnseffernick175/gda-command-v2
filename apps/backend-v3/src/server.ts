@@ -5,6 +5,7 @@ import { initBoss, stopBoss } from './lib/queue.js';
 import { pool } from './lib/db.js';
 import { initRouter, validateKeys } from './lib/llm-router.js';
 import { assertAnalysisConfig } from './lib/config-guard.js';
+import { registerIngestSources } from './cron/index.js';
 
 /**
  * HTTP API entrypoint.
@@ -13,6 +14,10 @@ import { assertAnalysisConfig } from './lib/config-guard.js';
  * handlers can *enqueue* jobs (e.g. analysis on opportunity open, R2), but the
  * queue consumers and the node-cron scheduler run in the separate worker
  * process (worker.ts) so background work can't starve request handling.
+ *
+ * We still register the ingest sources here (registry only, no scheduling) so
+ * the /v3/ingest status/health/trigger routes can enumerate sources — the
+ * scheduler lives in the worker.
  */
 async function main(): Promise<void> {
   logger.info(
@@ -23,6 +28,7 @@ async function main(): Promise<void> {
   validateKeys();
   assertAnalysisConfig();
   initRouter(pool);
+  registerIngestSources();
 
   await initBoss();
 
