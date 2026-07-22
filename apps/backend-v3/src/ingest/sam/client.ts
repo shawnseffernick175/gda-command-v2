@@ -4,7 +4,9 @@
  *
  * Resilience: each page fetch is retried with exponential backoff on
  * timeout / 5xx / 429 so a single slow page does not abort the whole
- * run. Per-request timeout is configurable via SAM_REQUEST_TIMEOUT_MS.
+ * run. Per-request timeout is configurable via SAM_REQUEST_TIMEOUT_MS
+ * (default 120s — production peak-hour runs consistently had single pages
+ * exceed the old 60s wall, failing all retries; observed run duration ~254s).
  */
 
 import { logger } from '../../lib/logger.js';
@@ -16,7 +18,7 @@ export type { SAMOpportunityRaw };
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2/search';
 const PAGE_SIZE = 1000;
 const REQUEST_DELAY_MS = 500;
-const REQUEST_TIMEOUT_MS = envInt('SAM_REQUEST_TIMEOUT_MS', 60000);
+const REQUEST_TIMEOUT_MS = envInt('SAM_REQUEST_TIMEOUT_MS', 120000);
 const MAX_PAGES = 20;
 const MAX_RETRIES = envInt('SAM_MAX_RETRIES', 3);
 const INITIAL_BACKOFF_MS = 2_000;
