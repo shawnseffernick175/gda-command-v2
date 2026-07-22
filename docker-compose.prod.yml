@@ -31,6 +31,19 @@ services:
     image: pgvector/pgvector:pg16
     container_name: gda-postgres-staging
     restart: unless-stopped
+    # Postgres runtime tuning. Defaults are sized for the current 16 GB VPS
+    # (Postgres gets a 2 GB ceiling; the other services use ~2 GB combined).
+    # All values are env-overridable in .env if the host is resized.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=${POSTGRES_SHARED_BUFFERS:-512MB}"
+      - "-c"
+      - "effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-1536MB}"
+      - "-c"
+      - "maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-256MB}"
+      - "-c"
+      - "work_mem=${POSTGRES_WORK_MEM:-16MB}"
     environment:
       POSTGRES_USER: ${STAGING_POSTGRES_USER:-gda_staging}
       POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:?Set STAGING_POSTGRES_PASSWORD in .env}
@@ -47,8 +60,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
-          cpus: "0.5"
+          memory: ${POSTGRES_MEM_LIMIT:-2g}
+          cpus: "${POSTGRES_CPUS:-2.0}"
     networks:
       - gda
       - edge
