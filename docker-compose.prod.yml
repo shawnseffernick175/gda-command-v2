@@ -31,6 +31,20 @@ services:
     image: pgvector/pgvector:pg16
     container_name: gda-postgres-staging
     restart: unless-stopped
+    # Postgres runtime tuning. The container memory ceiling (POSTGRES_MEM_LIMIT)
+    # and shared_buffers (POSTGRES_SHARED_BUFFERS) default to values that are
+    # safe on a ~2 GB VPS. On a larger box, raise them in .env — e.g. for 4 GB:
+    # POSTGRES_MEM_LIMIT=1g, POSTGRES_SHARED_BUFFERS=256MB.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=${POSTGRES_SHARED_BUFFERS:-128MB}"
+      - "-c"
+      - "effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-384MB}"
+      - "-c"
+      - "maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-96MB}"
+      - "-c"
+      - "work_mem=${POSTGRES_WORK_MEM:-8MB}"
     environment:
       POSTGRES_USER: ${STAGING_POSTGRES_USER:-gda_staging}
       POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:?Set STAGING_POSTGRES_PASSWORD in .env}
@@ -47,8 +61,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
-          cpus: "0.5"
+          memory: ${POSTGRES_MEM_LIMIT:-512M}
+          cpus: "${POSTGRES_CPUS:-1.0}"
     networks:
       - gda
       - edge
