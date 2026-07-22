@@ -5,7 +5,15 @@ import { llmRouter } from '../lib/llm-router.js';
 import type { FinancialAnalyzeInput } from '../lib/llm-router.types.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
 import { parseCalendarMode, getMonthsForMode, fiscalMonthIndex, type CalendarMode } from '../lib/fiscal-calendar.js';
+import { classifyFinancialDoc } from '../services/financials/reingest-doc.js';
 import { CANONICAL_DIRECT_COST_LINES } from '../services/financials/deterministic-parsers.js';
+import {
+  classifyCoverage,
+  primaryTypeOf,
+  handlerMatched,
+  inferDocPeriod,
+  type CoverageDocInput,
+} from '../services/financials/coverage.js';
 
 // Live, user-specific financials read from the DB on every request. They must
 // never be served from an HTTP cache (browser/proxy) or a 304 revalidation,
@@ -87,6 +95,14 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
              AND source IN ('income_statement', 'l1_actual')
              AND is_seed = false
              AND period NOT LIKE '%Q%'
+             -- Exclude phantom periods that carry no P&L signal (e.g. an
+             -- orders-only row for a month with no ingested actuals), so a
+             -- backlog/orders figure can never surface as Orders in the header.
+             AND (
+               COALESCE(actual_sales, 0) <> 0
+               OR COALESCE(actual_ebit, 0) <> 0
+               OR COALESCE(actual_gross_margin, 0) <> 0
+             )
            ORDER BY period,
              CASE source WHEN 'income_statement' THEN 1 ELSE 2 END
          ) ranked`,
@@ -144,24 +160,26 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /v3/financials/forecast
-  // Quarter-level plan vs actuals. Use the l1_target plan quarter rows against
-  // the income_statement actuals quarter rows (period LIKE '%Q%') so the join
-  // stays 1:1 per quarter now that several source-series coexist.
+  // Quarter-level target vs actuals. BUG 5: l1_target now lives in
+  // financial_actuals (company-P&L target series), not financial_plan, so read
+  // the target quarter rows (actual_* columns under source l1_target) and join
+  // them against the income_statement actuals quarter rows (period LIKE '%Q%')
+  // so the join stays 1:1 per quarter.
   app.get('/v3/financials/forecast', async (req, reply) => {
     const { rows } = await pool.query(
       `SELECT
-         p.period,
-         p.plan_orders,
-         p.plan_sales,
+         t.period,
+         t.actual_orders AS plan_orders,
+         t.actual_sales  AS plan_sales,
          COALESCE(a.actual_orders, 0) AS actual_orders,
          COALESCE(a.actual_sales, 0)  AS actual_sales,
          (a.id IS NOT NULL) AS has_actuals
-       FROM financial_plan p
+       FROM financial_actuals t
        LEFT JOIN financial_actuals a
-         ON a.fiscal_year = p.fiscal_year AND a.quarter = p.quarter
+         ON a.fiscal_year = t.fiscal_year AND a.quarter = t.quarter
         AND a.source = 'income_statement' AND a.period LIKE '%Q%'
-       WHERE p.source = 'l1_target' AND p.period LIKE '%Q%'
-       ORDER BY p.fiscal_year, p.quarter`,
+       WHERE t.source = 'l1_target' AND t.period LIKE '%Q%'
+       ORDER BY t.fiscal_year, t.quarter`,
     );
 
     const items = rows.map((r) => ({
@@ -182,6 +200,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // exposed so the Financials tab can label the series and visually separate the
   // quarter total from its months.
   app.get('/v3/financials/trend', async (req, reply) => {
+    // Trend rule: quarter rows (period LIKE '%Q%') are recomputed aggregates and
+    // always kept; monthly rows must carry a real sales/ebit/gross-margin signal,
+    // so an orders-only period (the June phantom bug) is excluded from the series.
     // IS#2: DISTINCT ON dedup — income_statement > l1_actual per period.
     // IS#3: Normalize gross-margin units (l1_actual stores fraction, IS stores %).
     const { rows } = await pool.query(
@@ -195,6 +216,12 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
               actual_ros AS ros
        FROM financial_actuals
        WHERE source IN ('income_statement', 'l1_actual')
+         AND (
+           period LIKE '%Q%'
+           OR COALESCE(actual_sales, 0) <> 0
+           OR COALESCE(actual_ebit, 0) <> 0
+           OR COALESCE(actual_gross_margin, 0) <> 0
+         )
        ORDER BY period,
                 CASE source WHEN 'income_statement' THEN 0 WHEN 'l1_actual' THEN 1 ELSE 2 END`,
     );
@@ -220,7 +247,66 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       return fiscalMonthIndex(aMonth) - fiscalMonthIndex(bMonth);
     });
 
-    return reply.send(successEnvelope({ items }, req.requestId));
+    // BUG 5: per-period actual-vs-target variance. Target is the company-P&L
+    // target series (source l1_target); actual prefers the company-P&L actual
+    // series (l1_actual) and falls back to income_statement when l1_actual is
+    // absent for that period, so a period with a target always resolves an
+    // actual counterpart. variance = actual - target for each dollar metric.
+    const { rows: varRows } = await pool.query(
+      `SELECT
+         t.period, t.fiscal_year, t.quarter,
+         (t.period LIKE '%Q%') AS is_quarter,
+         a.actual_orders AS actual_orders, a.actual_sales AS actual_sales, a.actual_ebit AS actual_ebit,
+         t.actual_orders AS target_orders, t.actual_sales AS target_sales, t.actual_ebit AS target_ebit
+       FROM financial_actuals t
+       LEFT JOIN LATERAL (
+         SELECT x.actual_orders, x.actual_sales, x.actual_ebit
+           FROM financial_actuals x
+          WHERE x.period = t.period AND x.fiscal_year = t.fiscal_year AND x.quarter = t.quarter
+            AND x.source IN ('l1_actual', 'income_statement')
+          ORDER BY CASE x.source WHEN 'l1_actual' THEN 0 ELSE 1 END
+          LIMIT 1
+       ) a ON true
+       WHERE t.source = 'l1_target'
+       ORDER BY t.fiscal_year, t.quarter`,
+    );
+
+    const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
+    const diff = (act: number | null, tgt: number | null): number | null =>
+      act === null || tgt === null ? null : act - tgt;
+
+    const variance = varRows.map((r) => {
+      const actualSales = num(r.actual_sales);
+      const actualEbit = num(r.actual_ebit);
+      const actualOrders = num(r.actual_orders);
+      const targetSales = num(r.target_sales);
+      const targetEbit = num(r.target_ebit);
+      const targetOrders = num(r.target_orders);
+      return {
+        period: r.period as string,
+        is_quarter: Boolean(r.is_quarter),
+        actual_orders: actualOrders,
+        actual_sales: actualSales,
+        actual_ebit: actualEbit,
+        target_orders: targetOrders,
+        target_sales: targetSales,
+        target_ebit: targetEbit,
+        orders_variance: diff(actualOrders, targetOrders),
+        sales_variance: diff(actualSales, targetSales),
+        ebit_variance: diff(actualEbit, targetEbit),
+      };
+    });
+
+    variance.sort((a, b) => {
+      const aQ = a.is_quarter ? 1 : 0;
+      const bQ = b.is_quarter ? 1 : 0;
+      if (aQ !== bQ) return aQ - bQ;
+      const aMonth = a.period.split(' ')[1] || '';
+      const bMonth = b.period.split(' ')[1] || '';
+      return fiscalMonthIndex(aMonth) - fiscalMonthIndex(bMonth);
+    });
+
+    return reply.send(successEnvelope({ items, variance }, req.requestId));
   });
 
   // GET /v3/financials/plan
@@ -337,12 +423,26 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const whereClause = period ? 'WHERE period = $1' : '';
     const params = period ? [period] : [];
 
+    // Per-period source preference: the deterministic Trended Income Statement
+    // (source income_statement) is the authoritative, reconcilable dollar figure,
+    // so when it exists for a period we return ONLY those rows and hide the legacy
+    // tgt_vs_act rows (which summed to garbage / cents). Falls back to legacy for
+    // any period the income statement never covered. Non-destructive: both source
+    // rows remain in the table.
     const { rows } = await pool.query(
-      `SELECT period, fiscal_year, quarter, cost_element, pool,
-              target_amount, actual_amount, variance_amount
-       FROM cost_detail_actuals
-       ${whereClause}
-       ORDER BY cost_element, pool`,
+      `WITH ranked AS (
+         SELECT period, fiscal_year, quarter, cost_element, pool,
+                target_amount, actual_amount, variance_amount,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM cost_detail_actuals
+         ${whereClause}
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period)
+       SELECT r.period, r.fiscal_year, r.quarter, r.cost_element, r.pool,
+              r.target_amount, r.actual_amount, r.variance_amount
+       FROM ranked r
+       JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       ORDER BY r.cost_element, r.pool`,
       params,
     );
 
@@ -363,11 +463,21 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/financials/cost-detail/trend
   // All periods, all cost elements
   app.get('/v3/financials/cost-detail/trend', async (req, reply) => {
+    // Same per-period income_statement-first source preference as the single
+    // period route, applied across all periods (see that route for rationale).
     const { rows } = await pool.query(
-      `SELECT period, fiscal_year, quarter, cost_element, pool,
-              target_amount, actual_amount, variance_amount
-       FROM cost_detail_actuals
-       ORDER BY fiscal_year, quarter, period, cost_element, pool`,
+      `WITH ranked AS (
+         SELECT period, fiscal_year, quarter, cost_element, pool,
+                target_amount, actual_amount, variance_amount,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM cost_detail_actuals
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period)
+       SELECT r.period, r.fiscal_year, r.quarter, r.cost_element, r.pool,
+              r.target_amount, r.actual_amount, r.variance_amount
+       FROM ranked r
+       JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       ORDER BY r.fiscal_year, r.quarter, r.period, r.cost_element, r.pool`,
     );
 
     const items = rows.map((r) => ({
@@ -391,13 +501,24 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const whereClause = period ? 'WHERE period = $1' : '';
     const params = period ? [period] : [];
 
+    // Per-period source preference: prefer the deterministic income_statement
+    // indirect rows (real per-account dollars reconciling to Total Cost of
+    // Operations) over the legacy sie rows (which carried rates / cents). Falls
+    // back to legacy for uncovered periods. Non-destructive.
     const { rows } = await pool.query(
-      `SELECT period, fiscal_year, quarter, pool, account_code, account_name,
-              current_period_actual, current_period_budget,
-              ytd_actual, ytd_budget
-       FROM indirect_expense_actuals
-       ${whereClause}
-       ORDER BY pool, account_code NULLS LAST, account_name`,
+      `WITH ranked AS (
+         SELECT period, fiscal_year, quarter, pool, account_code, account_name,
+                current_period_actual, current_period_budget, ytd_actual, ytd_budget,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM indirect_expense_actuals
+         ${whereClause}
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period)
+       SELECT r.period, r.fiscal_year, r.quarter, r.pool, r.account_code, r.account_name,
+              r.current_period_actual, r.current_period_budget, r.ytd_actual, r.ytd_budget
+       FROM ranked r
+       JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       ORDER BY r.pool, r.account_code NULLS LAST, r.account_name`,
       params,
     );
 
@@ -420,13 +541,27 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/financials/indirect-expenses/trend
   // Time series of total indirect by pool
   app.get('/v3/financials/indirect-expenses/trend', async (req, reply) => {
+    // Aggregate per pool AFTER applying the per-period income_statement-first
+    // source preference, so a period's totals never mix authoritative and legacy
+    // rows (see /indirect-expenses for rationale).
     const { rows } = await pool.query(
-      `SELECT period, fiscal_year, quarter, pool,
+      `WITH ranked AS (
+         SELECT period, fiscal_year, quarter, pool,
+                current_period_actual, current_period_budget, ytd_actual, ytd_budget,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM indirect_expense_actuals
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       )
+       SELECT period, fiscal_year, quarter, pool,
               SUM(current_period_actual) AS period_actual,
               SUM(current_period_budget) AS period_budget,
               SUM(ytd_actual) AS ytd_actual,
               SUM(ytd_budget) AS ytd_budget
-       FROM indirect_expense_actuals
+       FROM preferred
        GROUP BY period, fiscal_year, quarter, pool
        ORDER BY fiscal_year, quarter, period, pool`,
     );
@@ -796,75 +931,107 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /v3/financials/ingestion-coverage
-  // For each financial vault doc, show destination table + row count, or reason it didn't ingest.
+  // For each financial vault doc, show destination table + row count, or an
+  // explicit, human-readable reason it did not ingest. Zero-touch requirement
+  // (F-1142): NO file may fail silently. Every doc resolves to one of:
+  //   ingested | skipped_duplicate | not_ingested (reason) | extraction_failed
   app.get('/v3/financials/ingestion-coverage', async (req, reply) => {
     noStore(reply);
     const { rows: docs } = await pool.query(
-      `SELECT id, filename, doc_type, extraction_status, uploaded_at
+      `SELECT id, filename, doc_type, extraction_status, extracted_text, uploaded_at
        FROM vault_documents
        WHERE deleted_at IS NULL
          AND (doc_type = 'financial' OR doc_type = 'other')
        ORDER BY uploaded_at DESC`,
     );
 
-    const coverage: Array<{
-      doc_id: number;
-      filename: string;
-      extraction_status: string;
-      destinations: Array<{ table: string; row_count: number }>;
-      status: 'ingested' | 'no_handler' | 'extraction_failed';
-    }> = [];
+    const tables = [
+      'financial_actuals',
+      'balance_sheet_actuals',
+      'cost_detail_actuals',
+      'indirect_expense_actuals',
+      'ap_actuals',
+      'ar_actuals',
+      'trial_balance',
+      'project_revenue_actuals',
+    ];
 
-    for (const doc of docs) {
-      const docId = Number(doc.id);
-      const destinations: Array<{ table: string; row_count: number }> = [];
-
-      const tables = [
-        'financial_actuals',
-        'balance_sheet_actuals',
-        'cost_detail_actuals',
-        'indirect_expense_actuals',
-        'ap_actuals',
-        'ar_actuals',
-        'trial_balance',
-        'project_revenue_actuals',
-      ];
-
-      for (const table of tables) {
-        const { rows: [countRow] } = await pool.query(
-          `SELECT COUNT(*) AS cnt FROM ${table} WHERE source_doc_id = $1`,
-          [docId],
-        );
-        const cnt = Number(countRow?.cnt ?? 0);
-        if (cnt > 0) destinations.push({ table, row_count: cnt });
+    // One grouped query per table (not one per doc) → destinations per doc_id.
+    const destinationsByDoc = new Map<number, Array<{ table: string; row_count: number }>>();
+    for (const table of tables) {
+      const { rows: counts } = await pool.query(
+        `SELECT source_doc_id, COUNT(*) AS cnt
+         FROM ${table}
+         WHERE source_doc_id IS NOT NULL
+         GROUP BY source_doc_id`,
+      );
+      for (const c of counts) {
+        const docId = Number(c.source_doc_id);
+        const cnt = Number(c.cnt ?? 0);
+        if (cnt <= 0) continue;
+        const list = destinationsByDoc.get(docId) ?? [];
+        list.push({ table, row_count: cnt });
+        destinationsByDoc.set(docId, list);
       }
-
-      const extractionStatus = doc.extraction_status as string;
-      let status: 'ingested' | 'no_handler' | 'extraction_failed';
-      if (extractionStatus !== 'success') {
-        status = 'extraction_failed';
-      } else if (destinations.length > 0) {
-        status = 'ingested';
-      } else {
-        status = 'no_handler';
-      }
-
-      coverage.push({
-        doc_id: docId,
-        filename: doc.filename as string,
-        extraction_status: extractionStatus,
-        destinations,
-        status,
-      });
     }
+
+    // Build the per-doc facts the coverage classifier needs. A doc_type='other'
+    // file that no financial handler recognizes (e.g. a supplier list) is not a
+    // financial-ingestion target at all — it is excluded from the financial
+    // coverage report rather than surfaced as a bogus no_handler miss. The
+    // content-based classifier still recognizes genuinely financial content
+    // regardless of filename, so a real financial doc is never dropped here.
+    const docInputs: CoverageDocInput[] = docs.flatMap((doc) => {
+      const docId = Number(doc.id);
+      const filename = doc.filename as string;
+      const destinations = destinationsByDoc.get(docId) ?? [];
+      const rowCount = destinations.reduce((s, d) => s + d.row_count, 0);
+      const docType = (doc.doc_type as string | null) ?? null;
+      const cls = classifyFinancialDoc(
+        filename,
+        (doc.extracted_text as string | null) ?? '',
+        docType,
+      );
+      const matched = handlerMatched(cls);
+      if (docType === 'other' && !matched && rowCount === 0) return [];
+      return [{
+        doc_id: docId,
+        filename,
+        extraction_status: doc.extraction_status as string,
+        row_count: rowCount,
+        primary_type: primaryTypeOf(cls),
+        period: inferDocPeriod(filename),
+        handler_matched: matched,
+      }];
+    });
+
+    const verdicts = classifyCoverage(docInputs);
+
+    const coverage = docInputs.map((d) => {
+      const verdict = verdicts.get(d.doc_id)!;
+      const destinations = destinationsByDoc.get(d.doc_id) ?? [];
+      return {
+        doc_id: d.doc_id,
+        filename: d.filename,
+        extraction_status: d.extraction_status,
+        destinations,
+        row_count: d.row_count,
+        status: verdict.status,
+        reason: verdict.reason,
+        duplicate_of: verdict.duplicate_of,
+      };
+    });
 
     return reply.send(successEnvelope({
       coverage,
       summary: {
         total: coverage.length,
         ingested: coverage.filter((c) => c.status === 'ingested').length,
-        no_handler: coverage.filter((c) => c.status === 'no_handler').length,
+        skipped_duplicate: coverage.filter((c) => c.status === 'skipped_duplicate').length,
+        not_ingested: coverage.filter((c) => c.status === 'not_ingested').length,
         extraction_failed: coverage.filter((c) => c.status === 'extraction_failed').length,
+        // Back-compat alias: NOT-INGESTED includes the former `no_handler` bucket.
+        no_handler: coverage.filter((c) => c.status === 'not_ingested' && c.reason === 'no_handler').length,
       },
     }, req.requestId));
   });
@@ -1313,13 +1480,25 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const fiscalYear = normalizeFiscalYear(fy);
     const orderedMonths = getMonthsForMode(mode);
 
+    // Aggregate after applying the per-period income_statement-first source
+    // preference so each period's cost lines come from a single source.
     const { rows } = await pool.query(
-      `SELECT period, cost_element, pool,
+      `WITH ranked AS (
+         SELECT period, cost_element, pool, target_amount, actual_amount, variance_amount,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM cost_detail_actuals
+         WHERE fiscal_year = $1
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       )
+       SELECT period, cost_element, pool,
               SUM(target_amount) AS planned,
               SUM(actual_amount) AS actual,
               SUM(variance_amount) AS variance
-       FROM cost_detail_actuals
-       WHERE fiscal_year = $1
+       FROM preferred
        GROUP BY period, cost_element, pool
        ORDER BY cost_element, pool, period`,
       [fiscalYear],
@@ -1352,18 +1531,20 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     // always represented — even months with no actuals yet.
     const fyShort = `FY${fiscalYear % 100}`;
 
-    // Plan: source precedence user_aop > l1_target. DISTINCT ON picks the
-    // highest-priority source per period so we never double-count.
+    // Plan: the annual operating plan (user_aop) is the AOP-execution baseline
+    // and covers all 12 months. BUG 5: l1_target is the company-P&L TARGET
+    // series and now lives exclusively in financial_actuals (feeding the
+    // trend/variance path); it is no longer read here. DISTINCT ON keeps one row
+    // per period defensively.
     const { rows: planRows } = await pool.query(
       `SELECT DISTINCT ON (period)
               period, source, plan_orders, plan_sales, plan_ebit,
               plan_gross_margin, plan_ros
        FROM financial_plan
        WHERE is_seed = false
-         AND source IN ('user_aop', 'l1_target')
+         AND source = 'user_aop'
          AND fiscal_year = $1 AND period NOT LIKE '%Q%'
-       ORDER BY period,
-                CASE source WHEN 'user_aop' THEN 0 WHEN 'l1_target' THEN 1 ELSE 2 END`,
+       ORDER BY period`,
       [fiscalYear],
     );
 
@@ -1803,64 +1984,79 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        LIMIT 1`,
     );
 
-    // Cost by pool. cost_detail_actuals can carry overlapping rows from several
-    // source docs plus, from earlier tolerant ingestion, raw account labels and
-    // non-cost-of-revenue pool junk. Summing all of it double-counts the DIRECT
-    // pool. Instead roll up only the authoritative canonical DIRECT lines (the
-    // single highest-ranked source per period) so this reflects real direct cost.
-    // Indirect pools are surfaced separately from indirect_expense_actuals.
+    // Cost detail aggregated by pool (contract P&L proxy). Per-period
+    // income_statement-first source preference applied before the pool rollup.
+    // Restrict to the eight canonical DIRECT cost-of-revenue lines: a reingest
+    // leaves the pre-canonical raw account labels in place alongside the new
+    // canonical rows, so summing every DIRECT row would double-count. The
+    // canonical filter also drops the non-cost-of-revenue pool junk (account
+    // codes, balance-sheet rows) that tolerant ingestion parked here; indirect
+    // pools are surfaced separately from indirect_expense_actuals.
     const { rows: costByPool } = await pool.query(
-      `WITH direct AS (
-         SELECT period, actual_amount,
-                CASE source WHEN 'income_statement' THEN 1 WHEN 'tgt_vs_act' THEN 2 ELSE 3 END AS src_rank
+      `WITH ranked AS (
+         SELECT period, pool, LOWER(pool) AS lpool, cost_element,
+                target_amount, actual_amount, variance_amount,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
          FROM cost_detail_actuals
-         WHERE LOWER(pool) = 'direct'
-           AND cost_element = ANY($1::text[])
        ),
-       best AS (
-         SELECT period, MIN(src_rank) AS src_rank FROM direct GROUP BY period
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
        )
-       SELECT 'DIRECT' AS pool,
-              0::numeric AS total_target,
-              SUM(d.actual_amount) AS total_actual,
-              0::numeric AS total_variance
-       FROM direct d
-       JOIN best b ON b.period = d.period AND b.src_rank = d.src_rank
-       HAVING SUM(d.actual_amount) IS NOT NULL`,
+       SELECT pool,
+              SUM(target_amount) AS total_target,
+              SUM(actual_amount) AS total_actual,
+              SUM(variance_amount) AS total_variance
+       FROM preferred
+       WHERE lpool = 'direct' AND cost_element = ANY($1::text[])
+       GROUP BY pool
+       ORDER BY SUM(actual_amount) DESC`,
       [Array.from(CANONICAL_DIRECT_COST_LINES)],
     );
 
-    // Direct cost breakdown by period and cost element for the income statement
-    // cost-of-revenue lines. Restrict to the eight canonical DIRECT-pool line
-    // items and, per period, take the single highest-ranked source that carries
-    // them (the trended Income Statement is the only complete six-month source
-    // and is preferred over the partial GL/tgt_vs_act docs). This yields one
-    // authoritative, reconciling row per (period, cost_element) and is immune to
-    // the overlapping/duplicate rows earlier tolerant ingestion left behind.
+    // Direct cost breakdown by period and cost element (for income statement
+    // detail). Uses pool='DIRECT' to get the pure direct-cost component per
+    // element, restricted to the eight canonical cost-of-revenue lines the
+    // frontend renders. The canonical filter excludes the pre-canonical raw
+    // account labels a reingest leaves behind, so each period returns exactly
+    // one authoritative, reconciling row per line.
     const { rows: directCostRows } = await pool.query(
-      `WITH direct AS (
-         SELECT period, cost_element, actual_amount,
-                CASE source WHEN 'income_statement' THEN 1 WHEN 'tgt_vs_act' THEN 2 ELSE 3 END AS src_rank
+      `WITH ranked AS (
+         SELECT period, cost_element, actual_amount, LOWER(pool) AS lpool,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
          FROM cost_detail_actuals
-         WHERE LOWER(pool) = 'direct'
-           AND cost_element = ANY($1::text[])
        ),
-       best AS (
-         SELECT period, MIN(src_rank) AS src_rank FROM direct GROUP BY period
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
        )
-       SELECT d.period, d.cost_element, SUM(d.actual_amount) AS amount
-       FROM direct d
-       JOIN best b ON b.period = d.period AND b.src_rank = d.src_rank
-       GROUP BY d.period, d.cost_element
-       ORDER BY d.period, d.cost_element`,
+       SELECT period, cost_element,
+              SUM(actual_amount) AS amount
+       FROM preferred
+       WHERE lpool = 'direct' AND cost_element = ANY($1::text[])
+       GROUP BY period, cost_element
+       ORDER BY period, cost_element`,
       [Array.from(CANONICAL_DIRECT_COST_LINES)],
     );
 
     // Indirect expense breakdown by period and pool (Fringe, Overhead, G&A).
+    // Per-period income_statement-first source preference applied before rollup.
     const { rows: indirectRows } = await pool.query(
-      `SELECT period, pool,
+      `WITH ranked AS (
+         SELECT period, pool, current_period_actual,
+                CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
+         FROM indirect_expense_actuals
+       ),
+       best AS (SELECT period, MIN(src_rank) AS best_rank FROM ranked GROUP BY period),
+       preferred AS (
+         SELECT r.* FROM ranked r
+         JOIN best b ON r.period = b.period AND r.src_rank = b.best_rank
+       )
+       SELECT period, pool,
               SUM(current_period_actual) AS amount
-       FROM indirect_expense_actuals
+       FROM preferred
        GROUP BY period, pool
        ORDER BY period, pool`,
     );
