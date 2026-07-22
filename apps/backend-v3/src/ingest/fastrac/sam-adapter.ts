@@ -7,6 +7,7 @@
  */
 
 import { logger } from '../../lib/logger.js';
+import { envFirst } from '../../lib/env.js';
 import { inferHorizon, inferSignalType, extractMissionTags } from './normalize.js';
 import { isCommoditySignal } from './commodity-filter.js';
 import type { FasTracSignal, SourceConfig } from './types.js';
@@ -42,7 +43,7 @@ interface SAMResponse {
 }
 
 function getSAMApiKey(): string {
-  const key = process.env.SAM_GOV_API_KEY ?? process.env.SAM_API_KEY;
+  const key = envFirst(['SAM_GOV_API_KEY', 'SAM_API_KEY']);
   if (!key) throw new Error('SAM_GOV_API_KEY not set — FasTrac SAM adapter cannot run');
   return key;
 }

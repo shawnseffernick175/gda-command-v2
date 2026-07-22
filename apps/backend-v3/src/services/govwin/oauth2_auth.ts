@@ -11,9 +11,9 @@
 import { createHash } from 'node:crypto';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
+import { envStr } from '../../lib/env.js';
 
-const TOKEN_URL =
-  process.env['GOVWIN_TOKEN_URL'] ?? 'https://services.govwin.com/neo-ws/oauth/token';
+const TOKEN_URL = envStr('GOVWIN_TOKEN_URL', 'https://services.govwin.com/neo-ws/oauth/token');
 const TOKEN_BUFFER_MS = 60_000; // refresh 60s before expiry
 
 interface TokenCache {

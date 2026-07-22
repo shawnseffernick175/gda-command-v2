@@ -1,15 +1,19 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+// Treat unset OR blank/whitespace-only env values identically, so a variable
+// declared-but-empty in a deploy config (e.g. `HOST=`) falls back to the
+// intended default instead of silently becoming '' (or NaN for ints).
 function env(key: string, fallback?: string): string {
-  const val = process.env[key] ?? fallback;
+  const raw = process.env[key];
+  const val = raw !== undefined && raw.trim() !== '' ? raw : fallback;
   if (val === undefined) throw new Error(`Missing required env var: ${key}`);
   return val;
 }
 
 function envInt(key: string, fallback: number): number {
   const raw = process.env[key];
-  if (raw === undefined) return fallback;
+  if (raw === undefined || raw.trim() === '') return fallback;
   const n = parseInt(raw, 10);
   if (Number.isNaN(n)) throw new Error(`Env var ${key} must be an integer, got: ${raw}`);
   return n;
