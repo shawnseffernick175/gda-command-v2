@@ -160,3 +160,58 @@ describe('discoverRecentOpportunitiesWithDetailApi — Deltek V3 sub-endpoint en
     expect(result.detailFetches).toBe(0);
   });
 });
+
+describe('discovery query — oppSelectionDateFrom resilience', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    process.env['GOVWIN_AUTH_MODE'] = 'oauth2';
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env['GOVWIN_AUTH_MODE'];
+    delete process.env['GOVWIN_OPP_SELECTION_DATE_FROM'];
+  });
+
+  // Regression: prod set GOVWIN_OPP_SELECTION_DATE_FROM='' (blank). `??` does
+  // not fall back on an empty string, so the query sent oppSelectionDateFrom=
+  // and GovWin rejected every discovery call with HTTP 422 → zero opps ingested.
+  it('falls back to -12H when GOVWIN_OPP_SELECTION_DATE_FROM is set but blank', async () => {
+    process.env['GOVWIN_OPP_SELECTION_DATE_FROM'] = '';
+    const calledPaths: string[] = [];
+    const mockFetch = vi.fn((url: string) => {
+      calledPaths.push(url);
+      return Promise.resolve(jsonResponse({ opportunities: [] }));
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { discoverRecentOpportunitiesApi } = await import(
+      '../../src/services/govwin/api_client.js'
+    );
+    await discoverRecentOpportunitiesApi(1);
+
+    const discoveryUrl = calledPaths.find((p) => p.includes('/opportunities?'));
+    expect(discoveryUrl).toBeDefined();
+    const dateFrom = new URL(discoveryUrl!).searchParams.get('oppSelectionDateFrom');
+    expect(dateFrom).toBe('-12H');
+    expect(dateFrom).not.toBe('');
+  });
+
+  it('honors an explicit GOVWIN_OPP_SELECTION_DATE_FROM value', async () => {
+    process.env['GOVWIN_OPP_SELECTION_DATE_FROM'] = '01/01/1900';
+    const calledPaths: string[] = [];
+    const mockFetch = vi.fn((url: string) => {
+      calledPaths.push(url);
+      return Promise.resolve(jsonResponse({ opportunities: [] }));
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { discoverRecentOpportunitiesApi } = await import(
+      '../../src/services/govwin/api_client.js'
+    );
+    await discoverRecentOpportunitiesApi(1);
+
+    const discoveryUrl = calledPaths.find((p) => p.includes('/opportunities?'));
+    expect(new URL(discoveryUrl!).searchParams.get('oppSelectionDateFrom')).toBe('01/01/1900');
+  });
+});

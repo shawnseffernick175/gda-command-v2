@@ -33,9 +33,23 @@ import { logger } from '../../lib/logger.js';
 import { evaluateRelevance } from '../../constants/relevance.js';
 import { ENVISION_NAICS } from '../../constants/envision-naics.js';
 
-const API_BASE = process.env['GOVWIN_API_BASE'] ?? 'https://services.govwin.com/neo-ws';
+/**
+ * Read an env var, treating unset OR empty/whitespace-only as "not provided".
+ *
+ * Deployment configs frequently declare a var with a blank value (e.g.
+ * `GOVWIN_OPP_SELECTION_DATE_FROM=` in the prod compose env). `??` only falls
+ * back on null/undefined, so a blank value slips through — which sent an empty
+ * `oppSelectionDateFrom` on every discovery call and made GovWin reject the
+ * whole query with HTTP 422, so ingest pulled zero opportunities.
+ */
+function envOrDefault(name: string, fallback: string): string {
+  const raw = process.env[name];
+  return raw !== undefined && raw.trim() !== '' ? raw : fallback;
+}
+
+const API_BASE = envOrDefault('GOVWIN_API_BASE', 'https://services.govwin.com/neo-ws');
 /** WSAPI org-wide rolling hourly cap. Default 3,500 (safety margin under 4,000). */
-const HOURLY_LIMIT = parseInt(process.env['GOVWIN_HOURLY_LIMIT'] ?? '3500', 10);
+const HOURLY_LIMIT = parseInt(envOrDefault('GOVWIN_HOURLY_LIMIT', '3500'), 10);
 const HOUR_MS = 3_600_000;
 const DEFAULT_BACKOFF_MS = 60_000;
 /** Max attempts for a single request before surfacing the rate-limit error. */
@@ -63,9 +77,9 @@ const DISCOVERY_OPP_CATEGORY = '2';
  * Relative window for the 6-hourly cron. `-12H` overlaps two runs so nothing is
  * missed. For a full backfill set GOVWIN_OPP_SELECTION_DATE_FROM=01/01/1900.
  */
-const DISCOVERY_DATE_FROM = process.env['GOVWIN_OPP_SELECTION_DATE_FROM'] ?? '-12H';
+const DISCOVERY_DATE_FROM = envOrDefault('GOVWIN_OPP_SELECTION_DATE_FROM', '-12H');
 /** Bound the paging loop so a run can never fan out unbounded. */
-const MAX_DISCOVERY_PAGES = parseInt(process.env['GOVWIN_MAX_DISCOVERY_PAGES'] ?? '5', 10);
+const MAX_DISCOVERY_PAGES = parseInt(envOrDefault('GOVWIN_MAX_DISCOVERY_PAGES', '5'), 10);
 
 /**
  * Envision NAICS codes usable as a GovWin `naics` filter. GovWin accepts full or
