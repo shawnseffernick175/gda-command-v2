@@ -6,6 +6,7 @@ import type { FinancialAnalyzeInput } from '../lib/llm-router.types.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
 import { parseCalendarMode, getMonthsForMode, fiscalMonthIndex, type CalendarMode } from '../lib/fiscal-calendar.js';
 import { classifyFinancialDoc } from '../services/financials/reingest-doc.js';
+import { CANONICAL_DIRECT_COST_LINES } from '../services/financials/deterministic-parsers.js';
 import {
   classifyCoverage,
   primaryTypeOf,
@@ -1985,9 +1986,16 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
     // Cost detail aggregated by pool (contract P&L proxy). Per-period
     // income_statement-first source preference applied before the pool rollup.
+    // Restrict to the eight canonical DIRECT cost-of-revenue lines: a reingest
+    // leaves the pre-canonical raw account labels in place alongside the new
+    // canonical rows, so summing every DIRECT row would double-count. The
+    // canonical filter also drops the non-cost-of-revenue pool junk (account
+    // codes, balance-sheet rows) that tolerant ingestion parked here; indirect
+    // pools are surfaced separately from indirect_expense_actuals.
     const { rows: costByPool } = await pool.query(
       `WITH ranked AS (
-         SELECT period, pool, target_amount, actual_amount, variance_amount,
+         SELECT period, pool, LOWER(pool) AS lpool, cost_element,
+                target_amount, actual_amount, variance_amount,
                 CASE WHEN source = 'income_statement' THEN 1 ELSE 2 END AS src_rank
          FROM cost_detail_actuals
        ),
@@ -2001,14 +2009,18 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
               SUM(actual_amount) AS total_actual,
               SUM(variance_amount) AS total_variance
        FROM preferred
+       WHERE lpool = 'direct' AND cost_element = ANY($1::text[])
        GROUP BY pool
        ORDER BY SUM(actual_amount) DESC`,
+      [Array.from(CANONICAL_DIRECT_COST_LINES)],
     );
 
     // Direct cost breakdown by period and cost element (for income statement
     // detail). Uses pool='DIRECT' to get the pure direct-cost component per
-    // element. Aggregated cost elements are mapped to proper labels in the
-    // frontend; only the DIRECT pool is used here.
+    // element, restricted to the eight canonical cost-of-revenue lines the
+    // frontend renders. The canonical filter excludes the pre-canonical raw
+    // account labels a reingest leaves behind, so each period returns exactly
+    // one authoritative, reconciling row per line.
     const { rows: directCostRows } = await pool.query(
       `WITH ranked AS (
          SELECT period, cost_element, actual_amount, LOWER(pool) AS lpool,
@@ -2023,9 +2035,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        SELECT period, cost_element,
               SUM(actual_amount) AS amount
        FROM preferred
-       WHERE lpool = 'direct'
+       WHERE lpool = 'direct' AND cost_element = ANY($1::text[])
        GROUP BY period, cost_element
        ORDER BY period, cost_element`,
+      [Array.from(CANONICAL_DIRECT_COST_LINES)],
     );
 
     // Indirect expense breakdown by period and pool (Fringe, Overhead, G&A).
