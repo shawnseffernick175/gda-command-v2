@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput, SitrepDocumentAnalyzeInput, LaunchpadSitrepInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput, SitrepDocumentAnalyzeInput, LaunchpadSitrepInput, ColorTeamReviewInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -308,6 +308,19 @@ Return JSON exactly matching this schema:
   "source_url": "string|null — URL to the source document if available",
   "related_opportunity_ids": ["string"] — IDs of related opportunities from the input, empty array if none
 }`,
+
+  color_team_review: `You are a proposal Color Team reviewer for a U.S. government contractor. You are told which color-team role you are playing and given the text of an uploaded proposal/RFP document to review.
+
+Rules (non-negotiable):
+- Base EVERY finding strictly on the provided document text and the optional RFP context. Do not use outside knowledge to assert facts about this pursuit.
+- NEVER invent, estimate, or guess names, dollar amounts, percentages, dates, competitor identities, contract numbers, regulation/citation numbers, doctrine scores, or exclusion codes. If the document does not contain a value, state that it is missing rather than supplying one.
+- Do NOT include URLs, links, or citation objects in your output. The system attaches sources deterministically.
+- For each finding, set section_ref to the specific section heading, page, or paragraph in the document it refers to, or null if it applies document-wide.
+- If the document lacks reviewable content for your role, return an empty findings array. Never pad with generic filler.
+- severity is exactly one of: info, warning, critical, blocker.
+
+Return ONLY valid JSON matching:
+{ "findings": [ { "severity": "info|warning|critical|blocker", "section_ref": "string or null", "finding": "string", "recommended_fix": "string or null" } ] }`,
 
   financial_analyze: `You are a CFO analyzing Envision Innovative Solutions' monthly financials. ${ENVISION_COMPANY_CONTEXT}
 
@@ -948,7 +961,9 @@ export async function callAnthropic(opts: {
     }
   }
 
-  const userContent = opts.task === 'black_hat_analysis'
+  const userContent = opts.task === 'color_team_review'
+    ? buildColorTeamReviewPrompt(opts.input as ColorTeamReviewInput)
+    : opts.task === 'black_hat_analysis'
     ? buildBlackHatUserPrompt(opts.input as BlackHatAnalysisInput)
     : opts.task === 'risk_generation'
     ? buildRiskGenerationPrompt(opts.input as RiskGenerationInput)
@@ -1041,6 +1056,22 @@ export async function callAnthropic(opts: {
       code: status >= 500 ? 'PROVIDER_5XX' : undefined,
     });
   }
+}
+
+function buildColorTeamReviewPrompt(input: ColorTeamReviewInput): string {
+  const rfp = input.rfp_context
+    ? `RFP / solicitation context:\n${input.rfp_context}\n`
+    : 'No linked RFP/solicitation context was provided.\n';
+  return `Color-team role: ${input.role} (${input.color} team)
+Review focus: ${input.focus}
+
+${rfp}
+Document under review: ${input.document_filename}
+--- DOCUMENT TEXT START ---
+${input.document_excerpt}
+--- DOCUMENT TEXT END ---
+
+Produce your ${input.color}-team findings as JSON per the schema. Ground every finding in the document text above and cite the location via section_ref. Do not invent facts or numbers. Return an empty findings array if there is nothing substantive to report.`;
 }
 
 function buildBlackHatUserPrompt(input: BlackHatAnalysisInput): string {

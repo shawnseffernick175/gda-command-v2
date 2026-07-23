@@ -1,17 +1,23 @@
 "use client";
 
-import type { ColorTeamDoctrineScore, ColorTeamMarginCheck } from "@/lib/types";
+import type {
+  ColorTeamDoctrineScore,
+  ColorTeamMarginCheck,
+  ColorTeamPricingStrategy,
+} from "@/lib/types";
 
 interface DoctrineScorecardPanelProps {
   doctrineScores: ColorTeamDoctrineScore[];
   marginCheck: ColorTeamMarginCheck | null;
   exclusionHits: string[] | null;
+  pricingStrategy: ColorTeamPricingStrategy | null;
 }
 
 export function DoctrineScorecardPanel({
   doctrineScores,
   marginCheck,
   exclusionHits,
+  pricingStrategy,
 }: DoctrineScorecardPanelProps) {
   return (
     <div className="space-y-3">
@@ -111,6 +117,63 @@ export function DoctrineScorecardPanel({
           <p className="mt-1 text-xs text-gda-red/80">
             {exclusionHits.join(", ")} {"\u2014"} Executive override required
           </p>
+        </div>
+      )}
+
+      {/* Pricing Strategy */}
+      {pricingStrategy && (
+        <div className="rounded border border-border bg-gda-panel p-4">
+          <h4 className="mb-3 text-sm font-semibold text-gda-green">
+            Pricing Strategy
+            {pricingStrategy.status === "unavailable" && (
+              <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                (inputs incomplete)
+              </span>
+            )}
+          </h4>
+          {pricingStrategy.sourced_facts.length > 0 && (
+            <div className="mb-3 space-y-1">
+              {pricingStrategy.sourced_facts.map((f) => (
+                <div
+                  key={`${f.label}-${f.source}`}
+                  className="flex items-center justify-between text-xs"
+                >
+                  <span className="text-foreground">{f.label}</span>
+                  <span className="font-mono text-foreground">{f.value}</span>
+                  <span
+                    className="max-w-[45%] truncate text-[11px] text-muted-foreground"
+                    title={f.source}
+                  >
+                    {f.source}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {pricingStrategy.recommendations.length > 0 && (
+            <div className="mb-2">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Recommendations
+              </p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-foreground">
+                {pricingStrategy.recommendations.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {pricingStrategy.missing_inputs.length > 0 && (
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Inputs required
+              </p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-gda-amber">
+                {pricingStrategy.missing_inputs.map((m, i) => (
+                  <li key={i}>{m}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

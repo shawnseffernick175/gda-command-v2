@@ -52,7 +52,8 @@ export type Task =
   | 'workshop_generate'
   | 'sitrep_document_analyze'
   | 'launchpad_sitrep'
-  | 'action_item_draft';
+  | 'action_item_draft'
+  | 'color_team_review';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -312,6 +313,33 @@ export interface ActionItemDraftOutput {
   evidence_refs: ActionItemDraftEvidenceRef[];
   has_sufficient_context: boolean;
   no_context_reason: string | null;
+}
+
+/**
+ * Color Team qualitative review input. One call per color per run.
+ * The LLM only produces qualitative, document-grounded findings; it never
+ * supplies numbers, citations, or URLs. Green-team quantitative outputs
+ * (doctrine scores, exclusions, margin, pricing strategy) are computed
+ * deterministically from authoritative sources, not by this task.
+ */
+export interface ColorTeamReviewInput {
+  color: string;
+  role: string;
+  focus: string;
+  document_filename: string;
+  document_excerpt: string;
+  rfp_context: string | null;
+}
+
+export interface ColorTeamReviewFinding {
+  severity: 'info' | 'warning' | 'critical' | 'blocker';
+  section_ref: string | null;
+  finding: string;
+  recommended_fix: string | null;
+}
+
+export interface ColorTeamReviewOutput {
+  findings: ColorTeamReviewFinding[];
 }
 
 export interface BlackHatAnalysisInput {
@@ -1016,6 +1044,7 @@ export interface TaskInputMap {
   sitrep_document_analyze: SitrepDocumentAnalyzeInput;
   launchpad_sitrep: LaunchpadSitrepInput;
   action_item_draft: ActionItemDraftInput;
+  color_team_review: ColorTeamReviewInput;
 }
 
 export interface TaskOutputMap {
@@ -1052,6 +1081,7 @@ export interface TaskOutputMap {
   sitrep_document_analyze: SitrepDocumentAnalyzeOutput;
   launchpad_sitrep: LaunchpadSitrepOutput;
   action_item_draft: ActionItemDraftOutput;
+  color_team_review: ColorTeamReviewOutput;
 }
 
 // ---------------------------------------------------------------------------

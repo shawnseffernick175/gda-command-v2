@@ -301,7 +301,13 @@ function generatePdfHtml(
     citations: Array<{ source: string; url: string; grade: string }>;
     doctrine_score: Array<{ principle: string; score: number; detail: string }> | null;
     exclusion_hits: string[] | null;
-    margin_check: { projected_margin: number; floor: number; pass: boolean } | null;
+    margin_check: { projected_margin: number; floor: number; pass: boolean; source?: string } | null;
+    pricing_strategy: {
+      status: string;
+      sourced_facts: Array<{ label: string; value: string; source: string }>;
+      recommendations: string[];
+      missing_inputs: string[];
+    } | null;
   }>,
   counts: Array<{ color: string; count: number }>,
   doc: { filename: string } | null,
@@ -358,8 +364,10 @@ function generatePdfHtml(
     }
 
     if (color === 'green') {
-      const greenFinding = colorFindings.find((f) => f.doctrine_score && f.doctrine_score.length > 0);
-      if (greenFinding?.doctrine_score) {
+      const greenFinding = colorFindings.find(
+        (f) => f.margin_check || f.pricing_strategy || (f.doctrine_score && f.doctrine_score.length > 0)
+      );
+      if (greenFinding?.doctrine_score && greenFinding.doctrine_score.length > 0) {
         sectionsHtml += `<div style="margin-top:12px;border:1px solid #D4D1CA;border-radius:4px;padding:12px;">`;
         sectionsHtml += `<h3 style="margin:0 0 8px 0;font-size:14px;color:#01696F;">Doctrine Alignment Scorecard</h3>`;
         sectionsHtml += `<table style="width:100%;border-collapse:collapse;font-size:12px;">`;
@@ -379,6 +387,25 @@ function generatePdfHtml(
       if (greenFinding?.exclusion_hits && greenFinding.exclusion_hits.length > 0) {
         sectionsHtml += `<div style="margin-top:8px;padding:8px 12px;border-left:3px solid #ff4444;background:#FFF5F5;">`;
         sectionsHtml += `<strong style="color:#ff4444;">Exclusion Hits:</strong> ${greenFinding.exclusion_hits.join(', ')} &mdash; Executive override required`;
+        sectionsHtml += `</div>`;
+      }
+      const ps = greenFinding?.pricing_strategy;
+      if (ps) {
+        sectionsHtml += `<div style="margin-top:12px;border:1px solid #D4D1CA;border-radius:4px;padding:12px;">`;
+        sectionsHtml += `<h3 style="margin:0 0 8px 0;font-size:14px;color:#01696F;">Pricing Strategy${ps.status === 'unavailable' ? ' (inputs incomplete)' : ''}</h3>`;
+        if (ps.sourced_facts.length > 0) {
+          sectionsHtml += `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;">`;
+          for (const fact of ps.sourced_facts) {
+            sectionsHtml += `<tr style="border-bottom:1px solid #F0EFEC;"><td style="padding:4px;">${fact.label}</td><td style="text-align:right;padding:4px;font-weight:600;">${fact.value}</td><td style="padding:4px 4px 4px 12px;color:#7A7974;">${fact.source}</td></tr>`;
+          }
+          sectionsHtml += `</table>`;
+        }
+        if (ps.recommendations.length > 0) {
+          sectionsHtml += `<div style="font-size:12px;color:#28251D;"><strong>Recommendations:</strong><ul style="margin:4px 0;padding-left:18px;">${ps.recommendations.map((r) => `<li>${r}</li>`).join('')}</ul></div>`;
+        }
+        if (ps.missing_inputs.length > 0) {
+          sectionsHtml += `<div style="font-size:12px;color:#7A7974;"><strong>Inputs required:</strong><ul style="margin:4px 0;padding-left:18px;">${ps.missing_inputs.map((m) => `<li>${m}</li>`).join('')}</ul></div>`;
+        }
         sectionsHtml += `</div>`;
       }
     }

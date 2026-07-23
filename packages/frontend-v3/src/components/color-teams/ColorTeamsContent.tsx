@@ -78,13 +78,17 @@ export function ColorTeamsContent() {
   const greenDoctrineData = useMemo(() => {
     const greenFindings = findingsByColor.get("green") ?? [];
     const f = greenFindings.find(
-      (gf) => gf.doctrine_score && gf.doctrine_score.length > 0,
+      (gf) =>
+        gf.margin_check ||
+        gf.pricing_strategy ||
+        (gf.doctrine_score && gf.doctrine_score.length > 0),
     );
     if (!f) return null;
     return {
       doctrineScores: f.doctrine_score ?? [],
       marginCheck: f.margin_check,
       exclusionHits: f.exclusion_hits,
+      pricingStrategy: f.pricing_strategy,
     };
   }, [findingsByColor]);
 
@@ -394,6 +398,7 @@ export function ColorTeamsContent() {
                     doctrineScores={greenDoctrineData.doctrineScores}
                     marginCheck={greenDoctrineData.marginCheck}
                     exclusionHits={greenDoctrineData.exclusionHits}
+                    pricingStrategy={greenDoctrineData.pricingStrategy}
                   />
                 )}
             </div>

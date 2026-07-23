@@ -44,6 +44,7 @@ import type {
   SitrepDocumentAnalyzeOutput,
   LaunchpadSitrepOutput,
   ActionItemDraftOutput,
+  ColorTeamReviewOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -514,6 +515,16 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       has_sufficient_context: true,
       no_context_reason: null,
     } satisfies ActionItemDraftOutput,
+    color_team_review: {
+      findings: [
+        {
+          severity: 'warning',
+          section_ref: 'Section 3.2',
+          finding: 'Mock finding: the win theme is not tied to the evaluation criteria.',
+          recommended_fix: 'Mock fix: align the theme with the Section M factors.',
+        },
+      ],
+    } satisfies ColorTeamReviewOutput,
   };
 
   return {

@@ -35,6 +35,29 @@ export interface MarginCheck {
   projected_margin: number;
   floor: number;
   pass: boolean;
+  /** R1: where the projected margin and floor came from (e.g. pricing scenario id). */
+  source?: string;
+}
+
+/** A single sourced quantitative fact used in the green pricing strategy. */
+export interface PricingStrategyFact {
+  label: string;
+  value: string;
+  /** R1: authoritative origin of the value (Financial Bible version, scenario id, etc.). */
+  source: string;
+}
+
+/**
+ * Green-team pricing strategy. Distinguishes sourced facts (traceable to the
+ * Financial Bible / pricing scenarios) from qualitative recommendations and the
+ * concrete inputs still missing. Never contains invented numbers, competitor
+ * identities, or pricing claims — recommendations are posture guidance only.
+ */
+export interface PricingStrategy {
+  status: 'available' | 'unavailable';
+  sourced_facts: PricingStrategyFact[];
+  recommendations: string[];
+  missing_inputs: string[];
 }
 
 export interface ColorTeamRunRow {
@@ -63,6 +86,7 @@ export interface ColorTeamFindingRow {
   doctrine_score: DoctrineScoreRow[] | null;
   exclusion_hits: string[] | null;
   margin_check: MarginCheck | null;
+  pricing_strategy: PricingStrategy | null;
   action_item_id: string | null;
   created_at: string;
 }
