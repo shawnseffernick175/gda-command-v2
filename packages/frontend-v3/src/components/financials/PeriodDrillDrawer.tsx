@@ -288,13 +288,13 @@ function MetricsRow({
           </p>
         </div>
         <div>
-          <span className="text-[12px] text-muted-foreground">GM%</span>
+          <span className="text-[12px] text-muted-foreground">Gross Margin %</span>
           <p className="text-foreground tabular-nums">
             {metrics.gross_margin.toFixed(1)}%
           </p>
         </div>
         <div>
-          <span className="text-[12px] text-muted-foreground">ROS%</span>
+          <span className="text-[12px] text-muted-foreground">Return on Sales %</span>
           <p className="text-foreground tabular-nums">
             {metrics.ros.toFixed(1)}%
           </p>
@@ -336,7 +336,7 @@ function VarianceTable({
       plan: plan.gross_margin,
       isMoney: false,
     },
-    { label: "ROS", actual: actuals.ros, plan: plan.ros, isMoney: false },
+    { label: "Return on Sales", actual: actuals.ros, plan: plan.ros, isMoney: false },
   ];
 
   return (
