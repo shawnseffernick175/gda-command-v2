@@ -8,6 +8,21 @@ import {
 } from "@/hooks/use-financial-bible";
 import { formatMoney, formatMoneyFull } from "@/lib/format-money";
 import type { ContractWaterfallData, WaterfallContract } from "@/lib/types";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const CONTRACT_COLUMNS: ColumnSortConfig[] = [
+  { field: "to_name", type: "string" },
+  { field: "parent_vehicle_short_name", type: "string" },
+  { field: "ceiling", type: "number" },
+  { field: "funded_to_date", type: "number" },
+  { field: "monthly_revenue", type: "number" },
+  { field: "annual_revenue", type: "number" },
+  { field: "margin_pct", type: "number" },
+  { field: "margin_source", type: "string" },
+  { field: "pop_start", type: "date" },
+];
 
 type ViewMode = "revenue" | "profit" | "both";
 type StatusFilter = "" | "active" | "closeout" | "expired" | "awarded_not_started";
@@ -666,24 +681,31 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
 /* ── Contract Table ───────────────────────────────── */
 
 function ContractTable({ contracts, portfolioMargin }: { contracts: WaterfallContract[]; portfolioMargin: number }) {
+  const { sortBy, sortDir, handleSort } = useTableSort("cw");
+  const sorted = sortData(
+    contracts as unknown as Record<string, unknown>[],
+    sortBy,
+    sortDir,
+    CONTRACT_COLUMNS,
+  ) as unknown as WaterfallContract[];
   return (
     <div className="rounded border border-border bg-card overflow-x-auto">
       <table className="w-full text-[12px]">
         <thead>
           <tr className="border-b border-border bg-gda-bg-deep">
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Task Order</th>
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Vehicle</th>
-            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Ceiling</th>
-            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Funded</th>
-            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Monthly Rev</th>
-            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Annual Rev</th>
-            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Margin</th>
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Source</th>
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">PoP</th>
+            <SortableHeader label="Task Order" field="to_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Vehicle" field="parent_vehicle_short_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Ceiling" field="ceiling" align="right" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Funded" field="funded_to_date" align="right" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Monthly Rev" field="monthly_revenue" align="right" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Annual Rev" field="annual_revenue" align="right" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Margin" field="margin_pct" align="right" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Source" field="margin_source" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="PoP" field="pop_start" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
           </tr>
         </thead>
         <tbody>
-          {contracts.map((c) => (
+          {sorted.map((c) => (
             <tr key={c.id} className="border-b border-border/50 hover:bg-gda-bg-deep/50">
               <td className="px-3 py-2 font-medium text-foreground">{c.to_name}</td>
               <td className="px-3 py-2 text-muted-foreground">{c.parent_vehicle_short_name ?? "\u2014"}</td>
