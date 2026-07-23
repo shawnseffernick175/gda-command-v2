@@ -12,7 +12,7 @@ export function CostDetailMatrix() {
   const { data, isLoading } = useCostDetail(selectedPeriod);
 
   if (isLoading) {
-    return <div className="h-48 animate-pulse rounded bg-gda-panel" />;
+    return <div className="h-48 animate-pulse rounded bg-gda-skeleton" />;
   }
 
   const items = data?.items ?? [];

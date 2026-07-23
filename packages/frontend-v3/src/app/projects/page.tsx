@@ -44,15 +44,15 @@ function ProjectSnapshotView({
   if (isLoading) {
     return (
       <div className="mx-auto max-w-7xl space-y-4 p-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-gda-panel" />
+        <div className="h-8 w-64 animate-pulse rounded bg-gda-skeleton" />
         <div className="grid grid-cols-6 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded bg-gda-panel" />
+            <div key={i} className="h-24 animate-pulse rounded bg-gda-skeleton" />
           ))}
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div className="h-72 animate-pulse rounded bg-gda-panel" />
-          <div className="h-72 animate-pulse rounded bg-gda-panel" />
+          <div className="h-72 animate-pulse rounded bg-gda-skeleton" />
+          <div className="h-72 animate-pulse rounded bg-gda-skeleton" />
         </div>
       </div>
     );
@@ -118,7 +118,7 @@ function ProjectSnapshotView({
         <ProfitMarginCard project={project} />
         <ItdBurnChart project={project} />
         {trendLoading ? (
-          <div className="h-72 animate-pulse rounded bg-gda-panel" />
+          <div className="h-72 animate-pulse rounded bg-gda-skeleton" />
         ) : (
           <MonthlyRevenueTrend items={trendItems} />
         )}
@@ -227,7 +227,7 @@ function ProjectsContent() {
       {isLoading && (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-10 animate-pulse rounded bg-gda-panel" />
+            <div key={i} className="h-10 animate-pulse rounded bg-gda-skeleton" />
           ))}
         </div>
       )}
@@ -376,7 +376,7 @@ export default function ProjectsPage() {
     <Suspense
       fallback={
         <div className="mx-auto max-w-7xl p-6">
-          <div className="h-10 w-48 animate-pulse rounded bg-gda-panel" />
+          <div className="h-10 w-48 animate-pulse rounded bg-gda-skeleton" />
         </div>
       }
     >

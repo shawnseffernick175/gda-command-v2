@@ -55,6 +55,8 @@
   --color-gda-bg-raised: #ffffff;
   --color-gda-panel: #ffffff;
   --color-gda-panel-alt: #f0eee8;
+  /* Loading-skeleton fill — muted so animate-pulse stays visible on white cards */
+  --color-gda-skeleton: #e7e3d8;
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);

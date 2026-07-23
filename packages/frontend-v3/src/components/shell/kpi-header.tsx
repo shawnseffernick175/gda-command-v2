@@ -103,7 +103,7 @@ export function KpiHeader() {
                     {tile.label}
                   </div>
                   {isLoading ? (
-                    <div className="h-5 w-14 animate-pulse rounded bg-gda-panel mt-0.5" />
+                    <div className="h-5 w-14 animate-pulse rounded bg-gda-skeleton mt-0.5" />
                   ) : (
                     <div
                       className={cn(
