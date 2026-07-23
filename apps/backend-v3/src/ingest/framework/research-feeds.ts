@@ -10,3 +10,25 @@
 export function isResearchFeedsEnabled(): boolean {
   return process.env['RESEARCH_FEEDS_ENABLED'] === 'true';
 }
+
+/**
+ * Per-feed gate for arXiv. Defaults ON (when research feeds are enabled) so
+ * behavior is unchanged, but `ENABLE_ARXIV_INGEST=false` throttles just arXiv
+ * off — it is by far the highest-volume feed (~1,600 rows, ~200/week) and can
+ * dominate the opportunities table. The other feeds are unaffected.
+ */
+export function isArxivIngestEnabled(): boolean {
+  return process.env['ENABLE_ARXIV_INGEST'] !== 'false';
+}
+
+/**
+ * Per-feed gate for NSF. Defaults OFF: the NSF Awards API is queried by award
+ * *start date* within a 7-day lookback (see ingest/nsf/job.ts + client.ts), and
+ * award start dates rarely fall inside a recent 7-day window, so the feed
+ * reliably returns 0 records — it only adds scheduled no-op runs and
+ * health-panel noise. Set `ENABLE_NSF_INGEST=true` to re-enable once the query
+ * window is corrected to fix the zero-result behavior.
+ */
+export function isNsfIngestEnabled(): boolean {
+  return process.env['ENABLE_NSF_INGEST'] === 'true';
+}
