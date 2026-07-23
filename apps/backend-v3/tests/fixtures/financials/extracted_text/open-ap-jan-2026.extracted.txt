@@ -1,0 +1,240 @@
+## Sheet: JAN-2026
+Vendor Name | Voucher | Current
+Status | Invoice | Invoice
+Date | Due
+Date | Current | 1 to 30 | 31 to 60 | 61 to 90 | Over 90 | Total
+Account: 200-001 - Accounts Payable
+Organization: 1.01 - Envision
+ACR Technical Services - ACR0001 |  | ACR Technical Services - ACR0001
+ | 7083 | PAID | 3962 |  |  | 0 | 20620 | 0 | 0 | 0 | 20620
+ | 7084 | PAID | 3937-C |  |  | 0 | 11373.1 | 0 | 0 | 0 | 11373.1
+ | 7198 | PAID | 3926-1 |  |  | 370.22 | 0 | 0 | 0 | 0 | 370.22
+ | Subtotal for ACR Technical Services:  |  |  |  |  | 370.22 | 31993.1 | 0 | 0 | 0 | 32363.32
+Alliance Consulting - ALL0002 |  | Alliance Consulting - ALL0002
+ | 7154 | PAID | PEO023 |  |  | 0 | 20820.8 | 0 | 0 | 0 | 20820.8
+ | 7268 | PAID | PEO24 |  |  | 21695.71 | 0 | 0 | 0 | 0 | 21695.71
+ | Subtotal for Alliance Consulting:  |  |  |  |  | 21695.71 | 20820.8 | 0 | 0 | 0 | 42516.509999999995
+American Express - AME0009 |  | American Express - AME0009
+ | 7206 | PAID | PMMC-JAN26 |  |  | 286.23 | 0 | 0 | 0 | 0 | 286.23
+ | 7217 | PAID | STEPOY2-JAN26 |  |  | 3701.01 | 0 | 0 | 0 | 0 | 3701.01
+ | 7221 | PAID | STEPOY1-JAN26 |  |  | 765.52 | 0 | 0 | 0 | 0 | 765.52
+ | 7230 | PAID | STEPBY-2-01/26 |  |  | 6708.16 | 0 | 0 | 0 | 0 | 6708.16
+ | 7269 | PAID | STEPOY2-01/26 |  |  | 1569.36 | 0 | 0 | 0 | 0 | 1569.36
+ | 7298 | PAID | 9-01001-12/25 |  |  | 0 | 1100.24 | 0 | 0 | 0 | 1100.24
+ | Subtotal for American Express:  |  |  |  |  | 13030.28 | 1100.24 | 0 | 0 | 0 | 14130.52
+AR Teacher Solutions LLC - ART0001 |  | AR Teacher Solutions LLC - ART0001
+ | 7223 | PAID | 01-2026 |  |  | 4000 | 0 | 0 | 0 | 0 | 4000
+ | Subtotal for AR Teacher Solutions LLC:  |  |  |  |  | 4000 | 0 | 0 | 0 | 0 | 4000
+August Schell Enterprises - AUG0001 |  | August Schell Enterprises - AUG0001
+ | 7148 | PAID | 2025-2021 |  |  | 0 | 7596.12 | 0 | 0 | 0 | 7596.12
+ | Subtotal for August Schell Enterprises:  |  |  |  |  | 0 | 7596.12 | 0 | 0 | 0 | 7596.12
+BD Squared LLC - BDS0252 |  | BD Squared LLC - BDS0252
+ | 6937 | PAID | 8337 |  |  | 0 | 0 | 0 | 3250 | 0 | 3250
+ | 7015 | PAID | 8425 |  |  | 0 | 0 | 3250 | 0 | 0 | 3250
+ | 7114 | PAID | 8528 |  |  | 0 | 3250 | 0 | 0 | 0 | 3250
+ | Subtotal for BD Squared LLC:  |  |  |  |  | 0 | 3250 | 3250 | 3250 | 0 | 9750
+BGE - BGE0018 |  | BGE - BGE0018
+ | 7244 | PAID | 6590865407-012
+6 |  |  | 591.87 | 0 | 0 | 0 | 0 | 591.87
+ | Subtotal for BGE:  |  |  |  |  | 591.87 | 0 | 0 | 0 | 0 | 591.87
+Blue Sky Mobile Power - BLU0002 |  | Blue Sky Mobile Power - BLU0002
+ | 7144 | PAID | BSMP123125 |  |  | 0 | 137769.2 | 0 | 0 | 0 | 137769.2
+ | Subtotal for Blue Sky Mobile Power:  |  |  |  |  | 0 | 137769.2 | 0 | 0 | 0 | 137769.2
+Bren-Tronics Defense LLC - BRE0250 |  | Bren-Tronics Defense LLC - BRE0250
+ | 7078 | PAID | 64538 |  |  | 0 | 18508.18 | 0 | 0 | 0 | 18508.18
+ | 7177 | PAID | 64579-64590 |  |  | 0 | 208676.07 | 0 | 0 | 0 | 208676.07
+ | 7264 | PAID | 644939 |  |  | 2881.9 | 0 | 0 | 0 | 0 | 2881.9
+ | Subtotal for Bren-Tronics Defense LLC:  |  |  |  |  | 2881.9 | 227184.25 | 0 | 0 | 0 | 230066.15
+Christopher Robbins - 000328 |  | Christopher Robbins - 000328
+ | 7201 | PAID | 01-2026 CERT |  |  | 135 | 0 | 0 | 0 | 0 | 135
+ | Subtotal for Christopher Robbins:  |  |  |  |  | 135 | 0 | 0 | 0 | 0 | 135
+Covington & Burling, LLP - COV0034 |  | Covington & Burling, LLP - COV0034
+ | 6822 | PAID | 61155539 |  |  | 0 | 0 | 0 | 0 | 77891.82 | 77891.82
+ | 6910 | PPHOLD | 61158923 |  |  | 0 | 0 | 0 | 207320.98 | 0 | 207320.98
+ | 7408 | HOLD | 61170893-12/25 |  |  | 0 | 16781.83 | 0 | 0 | 0 | 16781.83
+ | Subtotal for Covington & Burling, LLP:  |  |  |  |  | 0 | 16781.83 | 0 | 207320.98 | 77891.82 | 301994.63000000006
+Craig Gorrell - 000315 |  | Craig Gorrell - 000315
+ | 7186 | PAID | 01-26 COMPTIA 
+R |  |  | 200 | 0 | 0 | 0 | 0 | 200
+ | Subtotal for Craig Gorrell:  |  |  |  |  | 200 | 0 | 0 | 0 | 0 | 200
+DAS, LLC - DAS0001 |  | DAS, LLC - DAS0001
+ | 7156 | PAID | INV-2261 |  |  | 0 | 13317.8 | 0 | 0 | 0 | 13317.8
+ | 7258 | PAID | INV-2287 |  |  | 11241.79 | 0 | 0 | 0 | 0 | 11241.79
+ | Subtotal for DAS, LLC:  |  |  |  |  | 11241.79 | 13317.8 | 0 | 0 | 0 | 24559.59
+DCI Solutions - DCI00001 |  | DCI Solutions - DCI00001
+ | 7157 | PAID | 4312 |  |  | 0 | 16999.22 | 0 | 0 | 0 | 16999.22
+ | 7256 | PAID | 4388 |  |  | 12803.21 | 0 | 0 | 0 | 0 | 12803.21
+ | Subtotal for DCI Solutions:  |  |  |  |  | 12803.21 | 16999.22 | 0 | 0 | 0 | 29802.43
+Dimitar Babov - DIM0262 |  | Dimitar Babov - DIM0262
+ | 7215 | PAID | 119 |  |  | 15200 | 0 | 0 | 0 | 0 | 15200
+ | Subtotal for Dimitar Babov:  |  |  |  |  | 15200 | 0 | 0 | 0 | 0 | 15200
+FastLion Energy Inc. - FAS0001 |  | FastLion Energy Inc. - FAS0001
+ | 7199 | PAID | 2026-001 |  |  | 125000 | 0 | 0 | 0 | 0 | 125000
+ | Subtotal for FastLion Energy Inc.:  |  |  |  |  | 125000 | 0 | 0 | 0 | 0 | 125000
+Frank G Hamard - 000375 |  | Frank G Hamard - 000375
+ | 7207 | PAID | 010726 TVL CO |  |  | 3961.62 | 0 | 0 | 0 | 0 | 3961.62
+ | 7208 | PAID | 010726 TVL 
+CO-2 |  |  | 103.07 | 0 | 0 | 0 | 0 | 103.07
+ | Subtotal for Frank G Hamard:  |  |  |  |  | 4064.69 | 0 | 0 | 0 | 0 | 4064.69
+General Techincal Service - GTS0001 |  | General Techincal Service - GTS0001
+ | 7134 | PAID | 8100 |  |  | 0 | 41389.66 | 0 | 0 | 0 | 41389.66
+ | 7135 | PAID | INV-8099 |  |  | 0 | 156.3 | 0 | 0 | 0 | 156.3
+ | 7235 | PAID | 8168 |  |  | 35067.73 | 0 | 0 | 0 | 0 | 35067.73
+ | Subtotal for General Techincal Service:  |  |  |  |  | 35067.73 | 41545.96000000001 | 0 | 0 | 0 | 76613.69
+Goldie Bradbury - GOL |  | Goldie Bradbury - GOL
+ | 7185 | PAID | 73 |  |  | 135 | 0 | 0 | 0 | 0 | 135
+ | Subtotal for Goldie Bradbury:  |  |  |  |  | 135 | 0 | 0 | 0 | 0 | 135
+GSA FAS AAS - GSA0001 |  | GSA FAS AAS - GSA0001
+ | 7069 | PAID | NOV CAF FEE |  |  | 0 | 0 | 226.99 | 0 | 0 | 226.99
+ | 7142 | PAID | DECCAF |  |  | 0 | 259.05 | 0 | 0 | 0 | 259.05
+ | 7250 | PAID | JANCAF |  |  | 229.2 | 0 | 0 | 0 | 0 | 229.2
+ | 7253 | PAID | CAFJAN |  |  | 13.94 | 0 | 0 | 0 | 0 | 13.94
+ | 7274 | PAID | 4THQTR2025 |  |  | 0 | 390.05 | 0 | 0 | 0 | 390.05
+ | Subtotal for GSA FAS AAS:  |  |  |  |  | 243.14 | 649.1 | 226.99 | 0 | 0 | 1119.23
+immixTechnology, Inc. - IMI0286 |  | immixTechnology, Inc. - IMI0286
+ | 7051 | PAID | 169841 |  |  | 0 | 0 | 7000 | 0 | 0 | 7000
+ | Subtotal for immixTechnology, Inc.:  |  |  |  |  | 0 | 0 | 7000 | 0 | 0 | 7000
+Inventus Power - INV0001 |  | Inventus Power - INV0001
+ | 7182 | PAID | 26IN500120 |  |  | 58020 | 0 | 0 | 0 | 0 | 58020
+ | Subtotal for Inventus Power:  |  |  |  |  | 58020 | 0 | 0 | 0 | 0 | 58020
+Jenna R Henderson - 000411 |  | Jenna R Henderson - 000411
+ | 7240 | PAID | 010426 TVL TX |  |  | 4450.98 | 0 | 0 | 0 | 0 | 4450.98
+ | Subtotal for Jenna R Henderson:  |  |  |  |  | 4450.98 | 0 | 0 | 0 | 0 | 4450.98
+Jennifer Carr - JEN0260 |  | Jennifer Carr - JEN0260
+ | 7239 | PAID | 01-2026 |  |  | 1024 | 0 | 0 | 0 | 0 | 1024
+ | Subtotal for Jennifer Carr:  |  |  |  |  | 1024 | 0 | 0 | 0 | 0 | 1024
+JHT, INC - JHT001 |  | JHT, INC - JHT001
+ | 7127 | PAID | INV-37656 |  |  | 0 | 70183.87 | 0 | 0 | 0 | 70183.87
+ | 7233 | PAID | INV-40227 |  |  | 73395.65 | 0 | 0 | 0 | 0 | 73395.65
+ | Subtotal for JHT, INC:  |  |  |  |  | 73395.65 | 70183.87 | 0 | 0 | 0 | 143579.52
+JL O'Connell & Assoc, LLC - JLO0261 |  | JL O'Connell & Assoc, LLC - JLO0261
+ | 7216 | PAID | 7246 |  |  | 962.5 | 0 | 0 | 0 | 0 | 962.5
+ | Subtotal for JL O'Connell & Assoc, LLC:  |  |  |  |  | 962.5 | 0 | 0 | 0 | 0 | 962.5
+Joseph K Lu - 000402 |  | Joseph K Lu - 000402
+ | 7210 | PAID | 012326 TVL 
+GLAS |  |  | 93.53 | 0 | 0 | 0 | 0 | 93.53
+ | Subtotal for Joseph K Lu:  |  |  |  |  | 93.53 | 0 | 0 | 0 | 0 | 93.53
+Kay A Edwards - 000408 |  | Kay A Edwards - 000408
+ | 7245 | PAID | 012726 TVL NC |  |  | 1048.7 | 0 | 0 | 0 | 0 | 1048.7
+ | Subtotal for Kay A Edwards:  |  |  |  |  | 1048.7 | 0 | 0 | 0 | 0 | 1048.7
+MACCOR - MAC0001 |  | MACCOR - MAC0001
+ | 7101 | PAID | 8039 |  |  | 0 | 6670 | 0 | 0 | 0 | 6670
+ | Subtotal for MACCOR:  |  |  |  |  | 0 | 6670 | 0 | 0 | 0 | 6670
+Manufacturers Serv Assoc - MAN0078 |  | Manufacturers Serv Assoc - MAN0078
+ | 7212 | PAID | 1640 |  |  | 1600 | 0 | 0 | 0 | 0 | 1600
+ | Subtotal for Manufacturers Serv Assoc:  |  |  |  |  | 1600 | 0 | 0 | 0 | 0 | 1600
+Merrill Trusted Solutions - MER0001 |  | Merrill Trusted Solutions - MER0001
+ | 7158 | PAID | EMTS-26 |  |  | 0 | 35243.26 | 0 | 0 | 0 | 35243.26
+ | 7260 | PAID | EMTS-27 |  |  | 31385.27 | 0 | 0 | 0 | 0 | 31385.27
+ | Subtotal for Merrill Trusted Solutions:  |  |  |  |  | 31385.27 | 35243.26 | 0 | 0 | 0 | 66628.53
+Michael Veluz - MIC0082 |  | Michael Veluz - MIC0082
+ | 7229 | PAID | 47QFWA-2026-01 |  |  | 9258.4 | 0 | 0 | 0 | 0 | 9258.4
+ | Subtotal for Michael Veluz:  |  |  |  |  | 9258.4 | 0 | 0 | 0 | 0 | 9258.4
+Mr. Alexander Cortez - ALE0001 |  | Mr. Alexander Cortez - ALE0001
+ | 7225 | PAID | 0002 |  |  | 17500 | 0 | 0 | 0 | 0 | 17500
+ | Subtotal for Mr. Alexander Cortez:  |  |  |  |  | 17500 | 0 | 0 | 0 | 0 | 17500
+Mr. Bruce Hillner - BRU0275 |  | Mr. Bruce Hillner - BRU0275
+ | 7218 | PAID | 86 |  |  | 5175 | 0 | 0 | 0 | 0 | 5175
+ | Subtotal for Mr. Bruce Hillner:  |  |  |  |  | 5175 | 0 | 0 | 0 | 0 | 5175
+MV Defense LLC - MVD0001 |  | MV Defense LLC - MVD0001
+ | 7076 | PAID | 1079 |  |  | 0 | 960.97 | 0 | 0 | 0 | 960.97
+ | 7136 | PAID | 1081 |  |  | 0 | 48177 | 0 | 0 | 0 | 48177
+ | 7147 | PAID | 1080 |  |  | 0 | 124760.77 | 0 | 0 | 0 | 124760.77
+ | Subtotal for MV Defense LLC:  |  |  |  |  | 0 | 173898.74 | 0 | 0 | 0 | 173898.74
+Navitas Systems - NAV001 |  | Navitas Systems - NAV001
+ | 7118 | PAID | 18230 |  |  | 0 | 125000 | 0 | 0 | 0 | 125000
+ | 7237 | PAID | 18423 |  |  | 125000 | 0 | 0 | 0 | 0 | 125000
+ | Subtotal for Navitas Systems:  |  |  |  |  | 125000 | 125000 | 0 | 0 | 0 | 250000
+Novatio Engineering - NOV0001 |  | Novatio Engineering - NOV0001
+ | 7077 | PAID | 1145 |  |  | 0 | 150000 | 0 | 0 | 0 | 150000
+ | Subtotal for Novatio Engineering:  |  |  |  |  | 0 | 150000 | 0 | 0 | 0 | 150000
+Ocean Computer Group - OCE0253 |  | Ocean Computer Group - OCE0253
+ | 7027 | PAID | 298769M |  |  | 0 | 0 | 4233.01 | 0 | 0 | 4233.01
+ | 7037 | PAID | 298855G |  |  | 0 | 0 | 863.11 | 0 | 0 | 863.11
+ | 7054 | PAID | 298882G |  |  | 0 | 0 | 17.91 | 0 | 0 | 17.91
+ | 7060 | PAID | 298902G |  |  | 0 | 0 | 159.93 | 0 | 0 | 159.93
+ | 7103 | PAID | 299048G |  |  | 0 | 21.66 | 0 | 0 | 0 | 21.66
+ | 7123 | PAID | 299079G |  |  | 0 | 159.93 | 0 | 0 | 0 | 159.93
+ | 7138 | PAID | 299207G |  |  | 0 | 855.79 | 0 | 0 | 0 | 855.79
+ | 7139 | PAID | 299209G |  |  | 0 | 3095.11 | 0 | 0 | 0 | 3095.11
+ | 7140 | PAID | 299210G |  |  | 0 | 648.13 | 0 | 0 | 0 | 648.13
+ | 7166 | PAID | 299111M |  |  | 4233.01 | 0 | 0 | 0 | 0 | 4233.01
+ | 7222 | PAID | 299435G |  |  | 855.79 | 0 | 0 | 0 | 0 | 855.79
+ | 7226 | PAID | 299359G |  |  | 21.66 | 0 | 0 | 0 | 0 | 21.66
+ | Subtotal for Ocean Computer Group:  |  |  |  |  | 5110.46 | 4780.62 | 5273.96 | 0 | 0 | 15165.04
+Parsons Government Svc - PAR0001 |  | Parsons Government Svc - PAR0001
+ | 7132 | PAID | 1787685 |  |  | 0 | 14209.86 | 0 | 0 | 0 | 14209.86
+ | 7236 | PAID | 2001823 |  |  | 107226.96 | 0 | 0 | 0 | 0 | 107226.96
+ | Subtotal for Parsons Government Svc:  |  |  |  |  | 107226.96 | 14209.86 | 0 | 0 | 0 | 121436.82
+PCI - PCI0242 |  | PCI - PCI0242
+ | 7173 | PAID | INV-0000159855 |  |  | 1480 | 0 | 0 | 0 | 0 | 1480
+ | 7211 | PAID | INV-0000160327 |  |  | 1369 | 0 | 0 | 0 | 0 | 1369
+ | Subtotal for PCI:  |  |  |  |  | 2849 | 0 | 0 | 0 | 0 | 2849
+Real Time Innovations - RTI0001 |  | Real Time Innovations - RTI0001
+ | 7086 | PAID | INV13982 |  |  | 0 | 0 | 136280 | 0 | 0 | 136280
+ | Subtotal for Real Time Innovations:  |  |  |  |  | 0 | 0 | 136280 | 0 | 0 | 136280
+Robert Sales - RSA0001 |  | Robert Sales - RSA0001
+ | 7213 | PAID | EIS 26-01 |  |  | 13250 | 0 | 0 | 0 | 0 | 13250
+ | Subtotal for Robert Sales:  |  |  |  |  | 13250 | 0 | 0 | 0 | 0 | 13250
+Serco, Inc. - SER0001 |  | Serco, Inc. - SER0001
+ | 7099 | PAID | 00002 |  |  | 0 | 27281.34 | 0 | 0 | 0 | 27281.34
+ | Subtotal for Serco, Inc.:  |  |  |  |  | 0 | 27281.34 | 0 | 0 | 0 | 27281.34
+Sev1 Tech, LLC - SEV0001 |  | Sev1 Tech, LLC - SEV0001
+ | 7133 | PAID | SOL-1301 |  |  | 0 | 23589.28 | 0 | 0 | 0 | 23589.28
+ | 7159 | PAID | SOL-1300 |  |  | 0 | 54894.64 | 0 | 0 | 0 | 54894.64
+ | 7252 | PAID | SOL1305 |  |  | 21444.8 | 0 | 0 | 0 | 0 | 21444.8
+ | 7261 | PAID | SOL-1303 |  |  | 53720 | 0 | 0 | 0 | 0 | 53720
+ | Subtotal for Sev1 Tech, LLC:  |  |  |  |  | 75164.8 | 78483.92 | 0 | 0 | 0 | 153648.72
+Shawn Nesaw - 000334 |  | Shawn Nesaw - 000334
+ | 7176 | PAID | 01426TVLHAG |  |  | 150.35 | 0 | 0 | 0 | 0 | 150.35
+ | Subtotal for Shawn Nesaw:  |  |  |  |  | 150.35 | 0 | 0 | 0 | 0 | 150.35
+Solari Creative - SOL0115 |  | Solari Creative - SOL0115
+ | 7160 | PAID | 11856 |  |  | 0 | 118285.7 | 0 | 0 | 0 | 118285.7
+ | 7254 | PAID | 11891 |  |  | 119423.82 | 0 | 0 | 0 | 0 | 119423.82
+ | Subtotal for Solari Creative:  |  |  |  |  | 119423.82 | 118285.7 | 0 | 0 | 0 | 237709.52000000002
+South 8 Technologies, Inc - SOU0001 |  | South 8 Technologies, Inc - SOU0001
+ | 7181 | PAID | 215-IN |  |  | 275000 | 0 | 0 | 0 | 0 | 275000
+ | Subtotal for South 8 Technologies, Inc:  |  |  |  |  | 275000 | 0 | 0 | 0 | 0 | 275000
+Spectrum Research - SPE001 |  | Spectrum Research - SPE001
+ | 7102 | PAID | DCGMA34018 |  |  | 0 | 1148.48 | 0 | 0 | 0 | 1148.48
+ | 7131 | PAID | DCGMA34019 |  |  | 0 | 1148.48 | 0 | 0 | 0 | 1148.48
+ | Subtotal for Spectrum Research:  |  |  |  |  | 0 | 2296.96 | 0 | 0 | 0 | 2296.96
+SupplyNet - SUP0001 |  | SupplyNet - SUP0001
+ | 7183 | PAID | PSI014546 |  |  | 23334.4 | 0 | 0 | 0 | 0 | 23334.4
+ | Subtotal for SupplyNet:  |  |  |  |  | 23334.4 | 0 | 0 | 0 | 0 | 23334.4
+THALES - THA001 |  | THALES - THA001
+ | 7180 | PAID | 45003726 |  |  | 416066 | 0 | 0 | 0 | 0 | 416066
+ | Subtotal for THALES:  |  |  |  |  | 416066 | 0 | 0 | 0 | 0 | 416066
+The Hartford - THE0137 |  | The Hartford - THE0137
+ | 7187 | PAID | 17254913-01-26 |  |  | 2873.69 | 0 | 0 | 0 | 0 | 2873.69
+ | Subtotal for The Hartford:  |  |  |  |  | 2873.69 | 0 | 0 | 0 | 0 | 2873.69
+Twin Oaks Computing, Inc. - TWI0001 |  | Twin Oaks Computing, Inc. - TWI0001
+ | 7068 | PAID | CDX25121201 |  |  | 0 | 29715 | 0 | 0 | 0 | 29715
+ | Subtotal for Twin Oaks Computing, Inc.:  |  |  |  |  | 0 | 29715 | 0 | 0 | 0 | 29715
+University of Delaware - UNI0150 |  | University of Delaware - UNI0150
+ | 7179 | PAID | GM00094110 |  |  | 0 | 262450 | 0 | 0 | 0 | 262450
+ | Subtotal for University of Delaware:  |  |  |  |  | 0 | 262450 | 0 | 0 | 0 | 262450
+Valor Tactics - VAL0001 |  | Valor Tactics - VAL0001
+ | 7257 | PAID | 001 |  |  | 2804.49 | 0 | 0 | 0 | 0 | 2804.49
+ | Subtotal for Valor Tactics:  |  |  |  |  | 2804.49 | 0 | 0 | 0 | 0 | 2804.49
+Verizon - VER0153 |  | Verizon - VER0153
+ | 7266 | PAID | 000118-01-26MD |  |  | 487.44 | 0 | 0 | 0 | 0 | 487.44
+ | Subtotal for Verizon:  |  |  |  |  | 487.44 | 0 | 0 | 0 | 0 | 487.44
+Wall Twshp Bureau of Fire - WAL0001 |  | Wall Twshp Bureau of Fire - WAL0001
+ | 7283 | PAID | REGISTRATION |  |  | 0 | 125 | 0 | 0 | 0 | 125
+ | Subtotal for Wall Twshp Bureau of Fire:  |  |  |  |  | 0 | 125 | 0 | 0 | 0 | 125
+Wendy Merz - WEN238 |  | Wendy Merz - WEN238
+ | 7259 | PAID | 65 |  |  | 11780.58 | 0 | 0 | 0 | 0 | 11780.58
+ | Subtotal for Wendy Merz:  |  |  |  |  | 11780.58 | 0 | 0 | 0 | 0 | 11780.58
+Xentris Wireless, LLC. - XEN001 |  | Xentris Wireless, LLC. - XEN001
+ | 7178 | PAID | 886361 |  |  | 15360 | 0 | 0 | 0 | 0 | 15360
+ | 7197 | PAID | 886570 |  |  | 24882.97 | 0 | 0 | 0 | 0 | 24882.97
+ | 7262 | PAID | 886705 |  |  | 6400 | 0 | 0 | 0 | 0 | 6400
+ | 7263 | PAID | 886706 |  |  | 28118.49 | 0 | 0 | 0 | 0 | 28118.49
+ | Subtotal for Xentris Wireless, LLC.:  |  |  |  |  | 74761.46 | 0 | 0 | 0 | 0 | 74761.46
+Zdon Contracting Inc. - ZDO0001 |  | Zdon Contracting Inc. - ZDO0001
+ | 7090 | PAID | 25-050 |  |  | 0 | 20535.05 | 0 | 0 | 0 | 20535.05
+ | Subtotal for Zdon Contracting Inc.:  |  |  |  |  | 0 | 20535.05 | 0 | 0 | 0 | 20535.05
+ | Subtotal for 1.01:  |  |  |  |  | 1705858.02 | 1638166.94 | 152030.95 | 210570.98 | 77891.82 | 3784518.7099999995
+ | Subtotal for 200-001:  |  |  |  |  | 1705858.02 | 1638166.94 | 152030.95 | 210570.98 | 77891.82 | 3784518.7099999995
+ | Report Total: |  |  |  |  | 1705858.02 | 1638166.94 | 152030.95 | 210570.98 | 77891.82 | 3784518.7099999995

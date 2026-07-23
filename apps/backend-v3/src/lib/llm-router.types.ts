@@ -619,6 +619,7 @@ export interface ApExtractOutput {
     due_date: string | null;
     amount: number;
     age_bucket: string | null;
+    status?: string | null;
   }[];
   notes: string;
   model_used: string;
