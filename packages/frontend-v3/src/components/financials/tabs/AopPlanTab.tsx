@@ -14,7 +14,7 @@ type FieldKey =
 const DOLLAR_FIELDS: { key: FieldKey; label: string }[] = [
   { key: "plan_orders", label: "Orders (annual $)" },
   { key: "plan_sales", label: "Sales (annual $)" },
-  { key: "plan_ebit", label: "EBIT (annual $)" },
+  { key: "plan_ebit", label: "Operating Income (annual $)" },
 ];
 
 const PERCENT_FIELDS: { key: FieldKey; label: string }[] = [
@@ -115,7 +115,7 @@ export function AopPlanTab({ fy }: { fy: string }) {
         <p className="text-[12px] text-muted-foreground">
           Enter your board-approved annual operating plan for {fy}. Enter ONE
           annual number per metric. On save, dollar targets (Orders, Sales,
-          EBIT) are split evenly across 12 months (annual {"÷"} 12);
+          Operating Income) are split evenly across 12 months (annual {"÷"} 12);
           percentages (Gross Margin, ROS) apply the same value to every month.
           These are your real numbers {"—"} not seeded benchmarks.
         </p>
@@ -183,7 +183,7 @@ export function AopPlanTab({ fy }: { fy: string }) {
                   </span>
                 </span>
                 <span>
-                  EBIT / month:{" "}
+                  Operating Income / month:{" "}
                   <span className="tabular-nums text-foreground">
                     {fmtMoney((parsed.plan_ebit as number) / 12)}
                   </span>

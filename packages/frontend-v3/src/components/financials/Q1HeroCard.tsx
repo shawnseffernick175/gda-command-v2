@@ -32,7 +32,7 @@ export function Q1HeroCard({ data }: { data: KpiHeaderData }) {
             delta={data.sales.delta}
           />
           <MetricCell
-            label="EBIT"
+            label="Operating Income"
             value={formatMoney(data.ebit.value)}
             plan={data.ebit.plan !== null ? formatMoney(data.ebit.plan) : null}
             delta={data.ebit.delta}
