@@ -454,10 +454,17 @@ export async function reingestFinancialDoc(params: {
       const detAp = parseOpenAp(extractedText, filename);
       if (detAp && detAp.rows.length > 0) {
         const warn = assessAgingBatch('AP', detAp.rows);
-        if (warn) result.parse_warnings.push(warn);
-        result.parsers_run.push('ap_extract (deterministic)');
-        result.ap = await ingestApRows(detAp.rows, docId);
-        if (result.ap > 0) result.any_ingested = true;
+        if (warn) {
+          // Snapshot-replace ingest deletes the period before writing, so an
+          // implausible parse must NOT be persisted — it would overwrite good
+          // rows with garbage. Flag for human review and leave existing rows.
+          result.parse_warnings.push(warn);
+          result.parsers_skipped.push('ap_extract (implausible batch — not written to protect existing data)');
+        } else {
+          result.parsers_run.push('ap_extract (deterministic)');
+          result.ap = await ingestApRows(detAp.rows, docId);
+          if (result.ap > 0) result.any_ingested = true;
+        }
       } else {
         // Fallback to LLM parser
         const apResult = await llmRouter.route({
@@ -467,9 +474,13 @@ export async function reingestFinancialDoc(params: {
         result.parsers_run.push('ap_extract');
         if (apResult.ok && apResult.output.is_ap && apResult.output.rows.length > 0) {
           const warn = assessAgingBatch('AP', apResult.output.rows);
-          if (warn) result.parse_warnings.push(warn);
-          result.ap = await ingestApRows(apResult.output.rows, docId);
-          if (result.ap > 0) result.any_ingested = true;
+          if (warn) {
+            result.parse_warnings.push(warn);
+            result.parsers_skipped.push('ap_extract (implausible batch — not written to protect existing data)');
+          } else {
+            result.ap = await ingestApRows(apResult.output.rows, docId);
+            if (result.ap > 0) result.any_ingested = true;
+          }
         } else {
           logger.warn({ docId, filename, is_ap: apResult.ok ? apResult.output.is_ap : false }, 'reingest: ap_extract returned 0 rows — header/row detection failed (check for _x000D_ in headers or grouped vendor rows)');
           result.parse_warnings.push('ap_extract: 0 rows (header/row detection failed)');
@@ -491,10 +502,14 @@ export async function reingestFinancialDoc(params: {
       const detAr = parseAgedAr(extractedText, filename);
       if (detAr && detAr.rows.length > 0) {
         const warn = assessAgingBatch('AR', detAr.rows);
-        if (warn) result.parse_warnings.push(warn);
-        result.parsers_run.push('ar_extract (deterministic)');
-        result.ar = await ingestArRows(detAr.rows, docId);
-        if (result.ar > 0) result.any_ingested = true;
+        if (warn) {
+          result.parse_warnings.push(warn);
+          result.parsers_skipped.push('ar_extract (implausible batch — not written to protect existing data)');
+        } else {
+          result.parsers_run.push('ar_extract (deterministic)');
+          result.ar = await ingestArRows(detAr.rows, docId);
+          if (result.ar > 0) result.any_ingested = true;
+        }
       } else {
         // Fallback to LLM parser
         const arResult = await llmRouter.route({
@@ -504,9 +519,13 @@ export async function reingestFinancialDoc(params: {
         result.parsers_run.push('ar_extract');
         if (arResult.ok && arResult.output.is_ar && arResult.output.rows.length > 0) {
           const warn = assessAgingBatch('AR', arResult.output.rows);
-          if (warn) result.parse_warnings.push(warn);
-          result.ar = await ingestArRows(arResult.output.rows, docId);
-          if (result.ar > 0) result.any_ingested = true;
+          if (warn) {
+            result.parse_warnings.push(warn);
+            result.parsers_skipped.push('ar_extract (implausible batch — not written to protect existing data)');
+          } else {
+            result.ar = await ingestArRows(arResult.output.rows, docId);
+            if (result.ar > 0) result.any_ingested = true;
+          }
         } else {
           logger.warn({ docId, filename, is_ar: arResult.ok ? arResult.output.is_ar : false }, 'reingest: ar_extract returned 0 rows — header/row detection failed (check for grouped customer rows with blank Customer column)');
           result.parse_warnings.push('ar_extract: 0 rows (header/row detection failed)');

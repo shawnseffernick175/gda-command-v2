@@ -24,14 +24,20 @@ import { join } from 'node:path';
 
 const calls: Array<{ sql: string; params: unknown[] }> = [];
 
-vi.mock('../../src/lib/db.js', () => ({
-  pool: {
-    query: vi.fn(async (sql: string, params: unknown[]) => {
-      calls.push({ sql, params: params ?? [] });
-      return { rows: [], rowCount: 1 };
-    }),
-  },
-}));
+vi.mock('../../src/lib/db.js', () => {
+  const query = vi.fn(async (sql: string, params?: unknown[]) => {
+    calls.push({ sql, params: params ?? [] });
+    return { rows: [], rowCount: 1 };
+  });
+  return {
+    pool: {
+      query,
+      // AP/AR snapshot-replace ingest runs its DELETE+INSERTs on a pooled client
+      // inside a transaction; hand back the same recording query fn.
+      connect: vi.fn(async () => ({ query, release: vi.fn() })),
+    },
+  };
+});
 
 import {
   parseTrialBalance,

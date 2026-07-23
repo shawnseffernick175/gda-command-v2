@@ -629,38 +629,74 @@ export function assessAgingBatch(
 
 type ApRow = ApExtractOutput['rows'][number];
 
+/**
+ * Group parsed rows by their period snapshot, preserving source order so each
+ * row's ordinal within its report is stable. Snapshot-replace ingest keys on
+ * (source, period, line_seq); grouping lets a single call carry more than one
+ * period without cross-period line_seq collisions.
+ */
+function groupByPeriod<T extends { period: string; fiscal_year: number; quarter: number | null }>(
+  rows: T[],
+): Map<string, T[]> {
+  const byPeriod = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = `${row.period}\u0000${row.fiscal_year}\u0000${row.quarter}`;
+    const list = byPeriod.get(key);
+    if (list) list.push(row);
+    else byPeriod.set(key, [row]);
+  }
+  return byPeriod;
+}
+
+/**
+ * Snapshot-replace AP ingest (F-625). A period's rows come from exactly one Open
+ * AP report, so the whole period is deleted and re-inserted as an ordered set:
+ * every parsed voucher persists with a per-report ordinal (line_seq), duplicate
+ * vendor+invoice lines are never merged, and a re-ingest self-cleans any rows a
+ * prior (mis-)parse left behind. Each period is one transaction so a failed
+ * insert rolls back to the previously-good snapshot rather than a partial one.
+ */
 export async function ingestApRows(
   rows: ApRow[],
   sourceDocId?: number | null,
 ): Promise<number> {
+  const valid = rows.filter((r) => r.period && r.fiscal_year && r.vendor_name);
   let count = 0;
-  for (const row of rows) {
-    if (!row.period || !row.fiscal_year || !row.vendor_name) continue;
+  for (const group of groupByPeriod(valid).values()) {
+    const { period, fiscal_year, quarter } = group[0];
+    const client = await pool.connect();
     try {
-      await pool.query(
-        `INSERT INTO ap_actuals
-           (period, fiscal_year, quarter, vendor_name, invoice_number,
-            invoice_date, due_date, amount, age_bucket, status, source, source_doc_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open_ap', $11)
-         ON CONFLICT (source, period, vendor_name, COALESCE(invoice_number, ''))
-         DO UPDATE SET
-           invoice_date = EXCLUDED.invoice_date,
-           due_date = EXCLUDED.due_date,
-           amount = EXCLUDED.amount,
-           age_bucket = EXCLUDED.age_bucket,
-           status = EXCLUDED.status,
-           source_doc_id = EXCLUDED.source_doc_id`,
-        [
-          row.period, row.fiscal_year, row.quarter,
-          row.vendor_name, row.invoice_number,
-          row.invoice_date, row.due_date,
-          row.amount, row.age_bucket, row.status ?? null,
-          sourceDocId ?? null,
-        ],
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM ap_actuals
+           WHERE source = 'open_ap' AND period = $1
+             AND fiscal_year = $2 AND quarter IS NOT DISTINCT FROM $3`,
+        [period, fiscal_year, quarter ?? null],
       );
-      count++;
+      let seq = 0;
+      for (const row of group) {
+        await client.query(
+          `INSERT INTO ap_actuals
+             (period, fiscal_year, quarter, vendor_name, invoice_number,
+              invoice_date, due_date, amount, age_bucket, status, source, source_doc_id, line_seq)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open_ap', $11, $12)`,
+          [
+            row.period, row.fiscal_year, row.quarter,
+            row.vendor_name, row.invoice_number,
+            row.invoice_date, row.due_date,
+            row.amount, row.age_bucket, row.status ?? null,
+            sourceDocId ?? null, seq,
+          ],
+        );
+        seq++;
+      }
+      await client.query('COMMIT');
+      count += seq;
     } catch (err) {
-      logger.warn({ err, period: row.period, vendor_name: row.vendor_name }, 'AP row upsert failed');
+      await client.query('ROLLBACK').catch(() => undefined);
+      logger.warn({ err, period, fiscal_year }, 'AP snapshot ingest failed — rolled back, prior rows kept');
+    } finally {
+      client.release();
     }
   }
   return count;
@@ -672,37 +708,55 @@ export async function ingestApRows(
 
 type ArRow = ArExtractOutput['rows'][number];
 
+/**
+ * Snapshot-replace AR ingest (F-625). Same identity model as AP: a period's rows
+ * come from one Aged AR report, so the period is deleted and re-inserted as an
+ * ordered set keyed by (source, period, line_seq). Duplicate customer+invoice
+ * lines are preserved, and a re-ingest self-cleans stale rows — the double-count
+ * that a re-uploaded month previously produced can no longer happen. Per-period
+ * transaction so a failed insert rolls back to the prior good snapshot.
+ */
 export async function ingestArRows(
   rows: ArRow[],
   sourceDocId?: number | null,
 ): Promise<number> {
+  const valid = rows.filter((r) => r.period && r.fiscal_year && r.customer_name);
   let count = 0;
-  for (const row of rows) {
-    if (!row.period || !row.fiscal_year || !row.customer_name) continue;
+  for (const group of groupByPeriod(valid).values()) {
+    const { period, fiscal_year, quarter } = group[0];
+    const client = await pool.connect();
     try {
-      await pool.query(
-        `INSERT INTO ar_actuals
-           (period, fiscal_year, quarter, customer_name, invoice_number,
-            invoice_date, due_date, amount, age_bucket, source, source_doc_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aged_ar', $10)
-         ON CONFLICT (source, period, customer_name, COALESCE(invoice_number, ''))
-         DO UPDATE SET
-           invoice_date = EXCLUDED.invoice_date,
-           due_date = EXCLUDED.due_date,
-           amount = EXCLUDED.amount,
-           age_bucket = EXCLUDED.age_bucket,
-           source_doc_id = EXCLUDED.source_doc_id`,
-        [
-          row.period, row.fiscal_year, row.quarter,
-          row.customer_name, row.invoice_number,
-          row.invoice_date, row.due_date,
-          row.amount, row.age_bucket,
-          sourceDocId ?? null,
-        ],
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM ar_actuals
+           WHERE source = 'aged_ar' AND period = $1
+             AND fiscal_year = $2 AND quarter IS NOT DISTINCT FROM $3`,
+        [period, fiscal_year, quarter ?? null],
       );
-      count++;
+      let seq = 0;
+      for (const row of group) {
+        await client.query(
+          `INSERT INTO ar_actuals
+             (period, fiscal_year, quarter, customer_name, invoice_number,
+              invoice_date, due_date, amount, age_bucket, source, source_doc_id, line_seq)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aged_ar', $10, $11)`,
+          [
+            row.period, row.fiscal_year, row.quarter,
+            row.customer_name, row.invoice_number,
+            row.invoice_date, row.due_date,
+            row.amount, row.age_bucket,
+            sourceDocId ?? null, seq,
+          ],
+        );
+        seq++;
+      }
+      await client.query('COMMIT');
+      count += seq;
     } catch (err) {
-      logger.warn({ err, period: row.period, customer_name: row.customer_name }, 'AR row upsert failed');
+      await client.query('ROLLBACK').catch(() => undefined);
+      logger.warn({ err, period, fiscal_year }, 'AR snapshot ingest failed — rolled back, prior rows kept');
+    } finally {
+      client.release();
     }
   }
   return count;
