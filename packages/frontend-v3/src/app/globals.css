@@ -37,24 +37,24 @@
   --color-band-discovery: #38bdf8;
   --color-band-pass: #6b7280;
 
-  /* GDA accent palette */
-  --color-gda-green: #00ff88;
-  --color-gda-green-muted: #22c55e;
-  --color-gda-amber: #f59e0b;
-  --color-gda-orange: #ff6b35;
-  --color-gda-yellow: #ffcc00;
-  --color-gda-red: #ff4444;
-  --color-gda-red-muted: #ef4444;
-  --color-gda-cyan: #38bdf8;
-  --color-gda-blue: #4488ff;
-  --color-gda-purple: #aa44ff;
+  /* GDA accent palette (accessible on light surfaces) */
+  --color-gda-green: #15803d;
+  --color-gda-green-muted: #16a34a;
+  --color-gda-amber: #b45309;
+  --color-gda-orange: #c2410c;
+  --color-gda-yellow: #a16207;
+  --color-gda-red: #dc2626;
+  --color-gda-red-muted: #dc2626;
+  --color-gda-cyan: #0284c7;
+  --color-gda-blue: #2563eb;
+  --color-gda-purple: #9333ea;
 
-  /* Surface palette */
-  --color-gda-bg-deep: #080c14;
-  --color-gda-bg-base: #0a1428;
-  --color-gda-bg-raised: #0d1420;
-  --color-gda-panel: #1a2535;
-  --color-gda-panel-alt: #21262d;
+  /* Surface palette (light, per aesthetics canonical) */
+  --color-gda-bg-deep: #efede7;
+  --color-gda-bg-base: #f7f6f2;
+  --color-gda-bg-raised: #ffffff;
+  --color-gda-panel: #ffffff;
+  --color-gda-panel-alt: #f0eee8;
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -64,11 +64,11 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  --color-chart-1: #22c55e;
-  --color-chart-2: #f59e0b;
-  --color-chart-3: #38bdf8;
-  --color-chart-4: #aa44ff;
-  --color-chart-5: #ef4444;
+  --color-chart-1: #16a34a;
+  --color-chart-2: #b45309;
+  --color-chart-3: #0284c7;
+  --color-chart-4: #9333ea;
+  --color-chart-5: #dc2626;
 
   /* Financial chart tokens (aesthetics canonical palette) */
   --color-fin-teal: #01696F;
@@ -95,36 +95,36 @@
   --color-sidebar: var(--sidebar);
 }
 
-/* GDA always-dark command-center theme (no light mode) */
+/* GDA light command-center theme (aesthetics canonical: warm off-white, single teal accent) */
 :root {
-  --background: #080c14;
-  --foreground: #e2e8f0;
-  --card: #1a2535;
-  --card-foreground: #e2e8f0;
-  --popover: #1a2535;
-  --popover-foreground: #e2e8f0;
-  --primary: #00ff88;
-  --primary-foreground: #080c14;
-  --secondary: #21262d;
-  --secondary-foreground: #e2e8f0;
-  --muted: #21262d;
-  --muted-foreground: #94a3b8;
-  --accent: #0d1420;
-  --accent-foreground: #e2e8f0;
-  --destructive: #ef4444;
-  --border: #2d3748;
-  --input: #2d3748;
-  --ring: #00ff88;
+  --background: #f7f6f2;
+  --foreground: #28251d;
+  --card: #ffffff;
+  --card-foreground: #28251d;
+  --popover: #ffffff;
+  --popover-foreground: #28251d;
+  --primary: #01696f;
+  --primary-foreground: #ffffff;
+  --secondary: #f0eee8;
+  --secondary-foreground: #28251d;
+  --muted: #f0eee8;
+  --muted-foreground: #7a7974;
+  --accent: #01696f;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --border: #d4d1ca;
+  --input: #d4d1ca;
+  --ring: #01696f;
   --radius: 0.5rem;
 
-  --sidebar: #0a1428;
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #00ff88;
-  --sidebar-primary-foreground: #080c14;
-  --sidebar-accent: #1a2535;
-  --sidebar-accent-foreground: #e2e8f0;
-  --sidebar-border: #2d3748;
-  --sidebar-ring: #00ff88;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #28251d;
+  --sidebar-primary: #01696f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0eee8;
+  --sidebar-accent-foreground: #28251d;
+  --sidebar-border: #d4d1ca;
+  --sidebar-ring: #01696f;
 }
 
 @layer base {
@@ -147,5 +147,5 @@
 
 /* Gantt bar hatched pattern for sub-contracts (SVG to avoid gradient token) */
 .gantt-bar-hatched {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cpath d='M-1 1l3-3M0 6l6-6M5 7l3-3' stroke='rgba(255,255,255,0.15)' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cpath d='M-1 1l3-3M0 6l6-6M5 7l3-3' stroke='rgba(0,0,0,0.15)' stroke-width='1.5'/%3E%3C/svg%3E");
 }
