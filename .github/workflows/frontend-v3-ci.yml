@@ -170,7 +170,10 @@ jobs:
           # executive charts on every Financial Bible tab.
           # 700→710: next 16.2.7→16.2.11 security patch adds ~3KB (703KB); small
           # headroom so a required security bump isn't blocked by the budget.
-          MAX_MAIN_KB=710
+          # 710→725: echarts v5→v6 (clears the echarts <6.1.0 XSS advisory) adds
+          # ~13KB to the tree-shaken core (716KB). Same rationale — a required
+          # security upgrade shouldn't be blocked by the perf budget.
+          MAX_MAIN_KB=725
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
