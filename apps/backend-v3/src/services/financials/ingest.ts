@@ -624,6 +624,9 @@ export async function ingestServiceCenterRows(
   let count = 0;
   for (const [fy, group] of byFy.entries()) {
     const client = await pool.connect();
+    // Tally per-fiscal-year and only fold into the returned total AFTER COMMIT,
+    // so a rolled-back batch contributes 0 and is never reported as ingested.
+    let seq = 0;
     try {
       await client.query('BEGIN');
       await client.query(
@@ -643,9 +646,10 @@ export async function ingestServiceCenterRows(
             row.classification, row.amount, source, sourceDocId ?? null,
           ],
         );
-        count++;
+        seq++;
       }
       await client.query('COMMIT');
+      count += seq;
     } catch (err) {
       await client.query('ROLLBACK');
       logger.warn({ err, fy }, 'Service-center snapshot ingest failed; rolled back to prior snapshot');
@@ -680,6 +684,8 @@ export async function ingestPoolRateRows(
   let count = 0;
   for (const [fy, group] of byFy.entries()) {
     const client = await pool.connect();
+    // Only fold into the returned total AFTER COMMIT (see ingestServiceCenterRows).
+    let seq = 0;
     try {
       await client.query('BEGIN');
       await client.query(
@@ -697,9 +703,10 @@ export async function ingestPoolRateRows(
             row.actual_rate, row.provisional_rate, source, sourceDocId ?? null,
           ],
         );
-        count++;
+        seq++;
       }
       await client.query('COMMIT');
+      count += seq;
     } catch (err) {
       await client.query('ROLLBACK');
       logger.warn({ err, fy }, 'Pool-rate snapshot ingest failed; rolled back to prior snapshot');
