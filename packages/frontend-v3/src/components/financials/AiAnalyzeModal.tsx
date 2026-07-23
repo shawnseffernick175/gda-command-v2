@@ -15,18 +15,20 @@ export function AiAnalyzeModal({
   analysis,
   generatedAt,
   isLoading,
+  title,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   analysis: string | null;
   generatedAt: string | null;
   isLoading: boolean;
+  title?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>CFO Analysis</DialogTitle>
+          <DialogTitle>{title ? `AI Analysis — ${title}` : "CFO Analysis"}</DialogTitle>
           <DialogDescription>
             AI-generated financial analysis for Envision Innovative Solutions
           </DialogDescription>

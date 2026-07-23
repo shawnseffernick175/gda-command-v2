@@ -15,10 +15,7 @@ import { TrialBalanceTab } from "@/components/financials/tabs/TrialBalanceTab";
 import { ProjectRevenueTab } from "@/components/financials/tabs/ProjectRevenueTab";
 import { IngestionCoverageTab } from "@/components/financials/tabs/IngestionCoverageTab";
 import { FinancialBibleTab } from "@/components/financials/tabs/FinancialBibleTab";
-import {
-  useAiAnalyze,
-  useP2Financials,
-} from "@/hooks/use-financial-bible";
+import { useAiAnalyze } from "@/hooks/use-financial-bible";
 import { cn } from "@/lib/utils";
 import type { CalendarMode } from "@/lib/types";
 
@@ -156,31 +153,16 @@ export default function FinancialsPage() {
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const aiAnalyze = useAiAnalyze();
-  const p2Data = useP2Financials();
 
   const fy = `${calendarMode}${selectedYear}`;
   const yearControlsActive = YEAR_AWARE_TABS.has(activeTab);
 
+  // Context-aware analysis: send the active tab; the backend fetches that tab's
+  // real data as the single source of truth.
   const handleAiAnalyze = useCallback(() => {
-    const kpi = p2Data.data?.kpi;
-    const costPools = p2Data.data?.cost_by_pool ?? [];
-
-    aiAnalyze.mutate({
-      ytd_revenue: kpi?.ytd_revenue,
-      ytd_expenses: kpi?.ytd_expenses,
-      ytd_profit: kpi?.ytd_profit,
-      margin: kpi?.ytd_margin,
-      contracts: costPools.map((c) => ({
-        name: c.pool,
-        revenue: null,
-        cost: c.actual,
-        profit: null,
-        margin: null,
-      })),
-    });
-
+    aiAnalyze.mutate({ tab: activeTab });
     setAiModalOpen(true);
-  }, [p2Data.data, aiAnalyze]);
+  }, [activeTab, aiAnalyze]);
 
   return (
     <div className="space-y-4">
@@ -308,6 +290,7 @@ export default function FinancialsPage() {
         analysis={aiAnalyze.data?.analysis ?? null}
         generatedAt={aiAnalyze.data?.generated_at ?? null}
         isLoading={aiAnalyze.isPending}
+        title={tabTitle(activeTab)}
       />
     </div>
   );
