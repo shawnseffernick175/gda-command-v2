@@ -215,7 +215,7 @@ function AwardsContent() {
             value={kpis?.already_pursuing}
             onClick={() => handleTabChange("pursuing")}
             active={activeTab === "pursuing"}
-            colorClass="text-gda-green-muted border-gda-green-muted/30"
+            colorClass="text-gda-green border-gda-green-muted/30"
           />
         </div>
 

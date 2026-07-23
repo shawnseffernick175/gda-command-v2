@@ -141,7 +141,7 @@ export function TrendChart({
               <p className={cn("text-base font-bold", m.textClass)}>
                 {m.format(latest)}
               </p>
-              <div className={cn("text-[12px]", delta >= 0 ? "text-gda-green" : "text-red-400")}>
+              <div className={cn("text-[12px]", delta >= 0 ? "text-gda-green" : "text-gda-red")}>
                 {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}% vs prior period
               </div>
               <SparkLine points={m.values} max={m.max} color={m.color} />
@@ -164,7 +164,7 @@ export function TrendChart({
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Orders" field="orders" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-cyan" />
               <SortableHeader label="Sales" field="sales" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-green" />
-              <SortableHeader label="EBIT" field="ebit" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-amber-400" />
+              <SortableHeader label="EBIT" field="ebit" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Gross Margin" field="gross_margin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Return on Sales" field="ros" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>
@@ -185,7 +185,7 @@ export function TrendChart({
                   <td className="px-3 py-2 text-left text-foreground">{item.period}</td>
                   <td className="px-3 py-2 text-left text-gda-cyan">{formatMoney(item.orders)}</td>
                   <td className="px-3 py-2 text-left text-gda-green">{formatMoney(item.sales)}</td>
-                  <td className={cn("px-3 py-2 text-left", item.ebit >= 0 ? "text-amber-400" : "text-red-400")}>
+                  <td className={cn("px-3 py-2 text-left", item.ebit >= 0 ? "text-gda-green" : "text-gda-red")}>
                     {formatMoney(item.ebit)}
                   </td>
                   <td className="px-3 py-2 text-left text-foreground tabular-nums">
@@ -218,7 +218,7 @@ export function TrendChart({
                       <td className="px-3 py-2 text-left text-foreground">{item.period}</td>
                       <td className="px-3 py-2 text-left text-gda-cyan">{formatMoney(item.orders)}</td>
                       <td className="px-3 py-2 text-left text-gda-green">{formatMoney(item.sales)}</td>
-                      <td className={cn("px-3 py-2 text-left", item.ebit >= 0 ? "text-amber-400" : "text-red-400")}>
+                      <td className={cn("px-3 py-2 text-left", item.ebit >= 0 ? "text-gda-green" : "text-gda-red")}>
                         {formatMoney(item.ebit)}
                       </td>
                       <td className="px-3 py-2 text-left text-foreground tabular-nums">

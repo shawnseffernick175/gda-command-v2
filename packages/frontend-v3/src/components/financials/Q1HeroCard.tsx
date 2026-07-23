@@ -3,6 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { SourceChip } from "@/components/shared/source-chip";
 import { formatMoney } from "@/lib/format-money";
+import { DeltaValue } from "@/components/financials/primitives/DeltaValue";
 import type { KpiHeaderData } from "@/lib/types";
 
 export function Q1HeroCard({ data }: { data: KpiHeaderData }) {
@@ -77,13 +78,7 @@ function MetricCell({
         {plan !== null && (
           <span className="text-muted-foreground">Plan: {plan}</span>
         )}
-        {delta !== null && (
-          <span
-            className={delta >= 0 ? "text-gda-green-muted" : "text-gda-red"}
-          >
-            {delta >= 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}%
-          </span>
-        )}
+        {delta !== null && <DeltaValue value={delta} />}
       </div>
     </div>
   );

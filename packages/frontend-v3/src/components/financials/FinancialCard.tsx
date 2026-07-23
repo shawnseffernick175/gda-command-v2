@@ -30,7 +30,7 @@ export function FinancialCard({
           {delta !== null && (
             <span
               className={
-                delta >= 0 ? "text-gda-green-muted" : "text-gda-red"
+                delta >= 0 ? "text-gda-green" : "text-gda-red"
               }
             >
               {delta >= 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}%

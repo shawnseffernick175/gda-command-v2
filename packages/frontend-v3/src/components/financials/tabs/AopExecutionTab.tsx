@@ -71,7 +71,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
     if (v === null) return "text-muted-foreground";
     const good = favorable === "higher" ? v > 0 : v < 0;
     const bad = favorable === "higher" ? v < 0 : v > 0;
-    if (good) return "text-gda-green-muted";
+    if (good) return "text-gda-green";
     if (bad) return "text-gda-red";
     return "text-foreground";
   };
@@ -299,7 +299,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
               className={
                 Number(gapPercent) > 0
                   ? "text-gda-red"
-                  : "text-gda-green-muted"
+                  : "text-gda-green"
               }
             >
               {Number(gapPercent) > 0 ? "+" : ""}
@@ -344,7 +344,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
                       et.totalVariance > 0
                         ? "text-gda-red"
                         : et.totalVariance < 0
-                          ? "text-gda-green-muted"
+                          ? "text-gda-green"
                           : undefined
                     }
                   />
@@ -367,7 +367,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
                     grandVariance > 0
                       ? "text-gda-red"
                       : grandVariance < 0
-                        ? "text-gda-green-muted"
+                        ? "text-gda-green"
                         : undefined
                   }
                 />

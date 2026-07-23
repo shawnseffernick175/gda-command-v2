@@ -151,7 +151,7 @@ function CellGroup({
       <td
         className={cn(
           "px-2 py-2 text-right tabular-nums",
-          variance > 0 ? "text-gda-red" : "text-gda-green-muted",
+          variance > 0 ? "text-gda-red" : "text-gda-green",
         )}
       >
         {formatMoney(variance)}

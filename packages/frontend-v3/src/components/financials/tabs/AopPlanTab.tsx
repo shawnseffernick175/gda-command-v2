@@ -225,7 +225,7 @@ export function AopPlanTab({ fy }: { fy: string }) {
                   : `Save ${fy} AOP Plan`}
             </button>
             {justSaved && !save.isPending && (
-              <span className="text-[13px] text-gda-green-muted">
+              <span className="text-[13px] text-gda-green">
                 Saved {"—"} 12 monthly rows written. AOP Execution now uses
                 this plan.
               </span>
