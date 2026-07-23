@@ -38,18 +38,18 @@ describe('per-feed research-feed gates', () => {
     });
   });
 
-  describe('NSF (default OFF)', () => {
-    it('is off when unset', () => {
+  describe('NSF (default ON)', () => {
+    it('is on when unset', () => {
       delete process.env[NSF];
-      expect(isNsfIngestEnabled()).toBe(false);
+      expect(isNsfIngestEnabled()).toBe(true);
     });
-    it('is off for any value except "true"', () => {
-      process.env[NSF] = 'false';
-      expect(isNsfIngestEnabled()).toBe(false);
-    });
-    it('is on only for exactly "true"', () => {
+    it('is on for any value except "false"', () => {
       process.env[NSF] = 'true';
       expect(isNsfIngestEnabled()).toBe(true);
+    });
+    it('is off only for exactly "false"', () => {
+      process.env[NSF] = 'false';
+      expect(isNsfIngestEnabled()).toBe(false);
     });
   });
 });

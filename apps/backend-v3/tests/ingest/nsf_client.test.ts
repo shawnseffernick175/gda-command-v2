@@ -68,12 +68,13 @@ describe('fetchNSFAwards', () => {
     mockRequest.mockReset();
   });
 
-  it('sends request with correct host, path, printFields, rpp, and date params', async () => {
+  it('sends request with correct host, path, printFields, rpp, and award-date params', async () => {
     mockRequest.mockResolvedValueOnce(makeApiResponse([makeAward('001')]));
 
     const since = new Date('2026-05-01T00:00:00Z');
     const until = new Date('2026-05-08T00:00:00Z');
-    await fetchNSFAwards({ since, until });
+    // Single keyword isolates one request.
+    await fetchNSFAwards({ since, until, keywords: ['quantum'] });
 
     expect(mockRequest).toHaveBeenCalledTimes(1);
     const url: string = mockRequest.mock.calls[0][0];
@@ -85,27 +86,30 @@ describe('fetchNSFAwards', () => {
     expect(url).toContain('title');
     expect(url).toContain('abstractText');
     expect(url).toContain('rpp=25');
-    // Dates in MM/DD/YYYY format
-    expect(url).toContain('startDateStart=05%2F01%2F2026');
-    expect(url).toContain('startDateEnd=05%2F08%2F2026');
+    expect(url).toContain('keyword=quantum');
+    // Filters on award date (dateStart/dateEnd), NOT startDate. MM/DD/YYYY.
+    expect(url).toContain('dateStart=05%2F01%2F2026');
+    expect(url).toContain('dateEnd=05%2F08%2F2026');
+    expect(url).not.toContain('startDateStart=');
   });
 
-  it('uses default keywords when none provided', async () => {
-    mockRequest.mockResolvedValueOnce(makeApiResponse([]));
+  it('issues one request per keyword (works around NSF 3-OR-clause limit)', async () => {
+    mockRequest.mockResolvedValue(makeApiResponse([]));
 
     const since = new Date('2026-05-01T00:00:00Z');
     const until = new Date('2026-05-08T00:00:00Z');
     await fetchNSFAwards({ since, until });
 
-    const url: string = mockRequest.mock.calls[0][0];
-    // Verify at least one keyword is in the URL
-    expect(url).toContain('keyword=');
+    // One request per default keyword, each carrying exactly that keyword.
+    expect(mockRequest).toHaveBeenCalledTimes(NSF_KEYWORDS.length);
+    const urls: string[] = mockRequest.mock.calls.map((c) => c[0] as string);
     for (const kw of NSF_KEYWORDS) {
-      expect(url).toContain(encodeURIComponent(kw).replace(/%20/g, '+'));
+      const enc = encodeURIComponent(kw).replace(/%20/g, '+');
+      expect(urls.some((u) => u.includes(`keyword=${enc}`))).toBe(true);
     }
   });
 
-  it('paginates until fewer than rpp rows return', async () => {
+  it('paginates until fewer than rpp rows return (per keyword)', async () => {
     // Page 1: 25 records (full page) -> page 2: 5 records (less than rpp, stop)
     const page1 = Array.from({ length: 25 }, (_, i) => makeAward(`P1-${i}`));
     const page2 = Array.from({ length: 5 }, (_, i) => makeAward(`P2-${i}`));
@@ -116,20 +120,37 @@ describe('fetchNSFAwards', () => {
 
     const since = new Date('2026-05-01T00:00:00Z');
     const until = new Date('2026-05-08T00:00:00Z');
-    const result = await fetchNSFAwards({ since, until });
+    const result = await fetchNSFAwards({ since, until, keywords: ['quantum'] });
 
     expect(mockRequest).toHaveBeenCalledTimes(2);
     expect(result).toHaveLength(30);
   });
 
-  it('stops at configured limit', async () => {
-    const page1 = Array.from({ length: 25 }, (_, i) => makeAward(`L-${i}`));
-
-    mockRequest.mockResolvedValueOnce(makeApiResponse(page1));
+  it('de-dupes awards that match multiple keywords', async () => {
+    // Two keywords, each returns the same award id plus one unique id.
+    mockRequest
+      .mockResolvedValueOnce(makeApiResponse([makeAward('shared'), makeAward('a')]))
+      .mockResolvedValueOnce(makeApiResponse([makeAward('shared'), makeAward('b')]));
 
     const since = new Date('2026-05-01T00:00:00Z');
     const until = new Date('2026-05-08T00:00:00Z');
-    const result = await fetchNSFAwards({ since, until, limit: 10 });
+    const result = await fetchNSFAwards({
+      since,
+      until,
+      keywords: ['quantum', 'autonomy'],
+    });
+
+    expect(result.map((r) => r.id).sort()).toEqual(['a', 'b', 'shared']);
+  });
+
+  it('stops at configured limit', async () => {
+    const page1 = Array.from({ length: 25 }, (_, i) => makeAward(`L-${i}`));
+
+    mockRequest.mockResolvedValue(makeApiResponse(page1));
+
+    const since = new Date('2026-05-01T00:00:00Z');
+    const until = new Date('2026-05-08T00:00:00Z');
+    const result = await fetchNSFAwards({ since, until, limit: 10, keywords: ['quantum'] });
 
     expect(result).toHaveLength(10);
   });
@@ -139,7 +160,7 @@ describe('fetchNSFAwards', () => {
 
     const since = new Date('2026-05-01T00:00:00Z');
     const until = new Date('2026-05-08T00:00:00Z');
-    const result = await fetchNSFAwards({ since, until });
+    const result = await fetchNSFAwards({ since, until, keywords: ['quantum'] });
 
     expect(result).toEqual([]);
   });
@@ -149,7 +170,7 @@ describe('fetchNSFAwards', () => {
 
     const since = new Date('2026-05-01T00:00:00Z');
     const until = new Date('2026-05-08T00:00:00Z');
-    const result = await fetchNSFAwards({ since, until });
+    const result = await fetchNSFAwards({ since, until, keywords: ['quantum'] });
 
     expect(result).toEqual([]);
   });
@@ -160,6 +181,8 @@ describe('fetchNSFAwards', () => {
     const since = new Date('2026-05-01T00:00:00Z');
     const until = new Date('2026-05-08T00:00:00Z');
 
-    await expect(fetchNSFAwards({ since, until })).rejects.toThrow('NSF API 403');
+    await expect(
+      fetchNSFAwards({ since, until, keywords: ['quantum'] }),
+    ).rejects.toThrow('NSF API 403');
   });
 });

@@ -62,12 +62,28 @@ describe('mapNSFAward', () => {
   });
 
   it('converts posted_at from MM/DD/YYYY to YYYY-MM-DD', () => {
-    const result = mapNSFAward(makeNSFRecord({ startDate: '01/31/2025' }));
+    const result = mapNSFAward(makeNSFRecord({ date: '01/31/2025' }));
     expect(result!.opportunity.posted_at).toBe('2025-01-31');
   });
 
+  it('prefers award date over startDate for posted_at', () => {
+    const result = mapNSFAward(
+      makeNSFRecord({ date: '03/10/2026', startDate: '10/01/2026' }),
+    );
+    expect(result!.opportunity.posted_at).toBe('2026-03-10');
+  });
+
+  it('falls back to startDate for posted_at when award date is absent', () => {
+    const result = mapNSFAward(
+      makeNSFRecord({ date: undefined, startDate: '10/01/2026' }),
+    );
+    expect(result!.opportunity.posted_at).toBe('2026-10-01');
+  });
+
   it('returns posted_at as null for unparseable date', () => {
-    const result = mapNSFAward(makeNSFRecord({ startDate: 'not-a-date' }));
+    const result = mapNSFAward(
+      makeNSFRecord({ date: 'not-a-date', startDate: 'not-a-date' }),
+    );
     expect(result!.opportunity.posted_at).toBeNull();
   });
 
@@ -130,8 +146,10 @@ describe('mapNSFAward', () => {
     expect(fields).not.toContain('value_max');
   });
 
-  it('omits posted_at citation when startDate is missing', () => {
-    const result = mapNSFAward(makeNSFRecord({ startDate: undefined }));
+  it('omits posted_at citation when both award date and startDate are missing', () => {
+    const result = mapNSFAward(
+      makeNSFRecord({ date: undefined, startDate: undefined }),
+    );
     const fields = result!.citations.map((c) => c.field);
     expect(fields).not.toContain('posted_at');
   });
