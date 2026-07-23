@@ -688,6 +688,41 @@ export interface ProjectRevenueExtractOutput {
   model_used: string;
 }
 
+// Cost Service Centers (Financial Bible). Deterministic-only extraction from the
+// YTD GL Detail ledger and the Trend SIE rate summary — not part of the LLM
+// router task map. See parseServiceCenterGlDetail / parsePoolRateSummary.
+export interface ServiceCenterExtractOutput {
+  is_service_center: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    month_num: number;
+    service_center_id: string;
+    service_center_name: string | null;
+    pool: string | null;
+    org_id: string | null;
+    classification: string;
+    amount: number;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
+export interface PoolRateExtractOutput {
+  is_pool_rate: boolean;
+  rows: {
+    fiscal_year: number;
+    pool_number: string;
+    pool_name: string;
+    month_num: number | null; // null = YTD summary row
+    actual_rate: number | null;
+    provisional_rate: number | null;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
 export interface FinancialStatementExtractOutput {
   is_financial: boolean;
   currency: string;

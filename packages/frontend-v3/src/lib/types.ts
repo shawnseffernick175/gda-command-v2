@@ -691,6 +691,46 @@ export interface ProjectRevenueData {
   meta: { table: string; row_count: number };
 }
 
+/* ── Cost Service Centers (Financial Bible) ───────────────────── */
+
+export interface ServiceCenterRow {
+  service_center_id: string;
+  service_center_name: string | null;
+  pool: string | null;
+  org_id: string | null;
+  /** month number (1..12) → INDIRECT cost for that month */
+  months: Record<string, number>;
+  ytd: number;
+  source_doc_id: number | null;
+}
+
+export interface ServiceCenterPoolSubtotal {
+  pool: string;
+  months: Record<string, number>;
+  ytd: number;
+}
+
+export interface PoolRateRow {
+  pool_number: string;
+  pool_name: string;
+  /** month number (1..12) → actual pool rate (decimal fraction) */
+  months: Record<string, number>;
+  ytd_actual: number | null;
+  provisional: number | null;
+  source_doc_id: number | null;
+}
+
+export interface ServiceCentersData {
+  fiscal_year: number | null;
+  available_years: number[];
+  /** fiscal periods present in the data (1..12) */
+  months: number[];
+  centers: ServiceCenterRow[];
+  pools: ServiceCenterPoolSubtotal[];
+  rates: PoolRateRow[];
+  meta: { table: string; row_count: number };
+}
+
 /* ── Project Financial Drill-Down (F-628) ─────────────────────── */
 
 export interface ProjectFullRow {

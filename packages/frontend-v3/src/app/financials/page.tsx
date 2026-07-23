@@ -13,6 +13,7 @@ import { ApTab } from "@/components/financials/tabs/ApTab";
 import { ArTab } from "@/components/financials/tabs/ArTab";
 import { TrialBalanceTab } from "@/components/financials/tabs/TrialBalanceTab";
 import { ProjectRevenueTab } from "@/components/financials/tabs/ProjectRevenueTab";
+import { ServiceCentersTab } from "@/components/financials/tabs/ServiceCentersTab";
 import { IngestionCoverageTab } from "@/components/financials/tabs/IngestionCoverageTab";
 import { FinancialBibleTab } from "@/components/financials/tabs/FinancialBibleTab";
 import {
@@ -32,6 +33,7 @@ type Tab =
   | "ar"
   | "trial-balance"
   | "project-revenue"
+  | "cost-service-centers"
   | "ingestion-coverage"
   | "definitions"
   | "financial-bible";
@@ -48,6 +50,7 @@ const TAB_GROUPS: TabGroup[] = [
       { id: "p2", label: "Income Statement" },
       { id: "balance-sheet", label: "Balance Sheet" },
       { id: "trial-balance", label: "Trial Balance" },
+      { id: "cost-service-centers", label: "Cost Service Centers" },
     ],
   },
   {
@@ -129,6 +132,8 @@ function tabTitle(tab: Tab): string {
       return "Trial Balance";
     case "project-revenue":
       return "Project Revenue";
+    case "cost-service-centers":
+      return "Cost Service Centers";
     case "ingestion-coverage":
       return "Ingestion Coverage";
     case "definitions":
@@ -296,6 +301,7 @@ export default function FinancialsPage() {
         {activeTab === "ar" && <ArTab />}
         {activeTab === "trial-balance" && <TrialBalanceTab />}
         {activeTab === "project-revenue" && <ProjectRevenueTab />}
+        {activeTab === "cost-service-centers" && <ServiceCentersTab />}
         {activeTab === "ingestion-coverage" && <IngestionCoverageTab />}
         {activeTab === "definitions" && <DefinitionsTab />}
         {activeTab === "financial-bible" && <FinancialBibleTab />}
