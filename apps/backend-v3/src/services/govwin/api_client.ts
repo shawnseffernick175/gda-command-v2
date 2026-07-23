@@ -625,7 +625,12 @@ export async function discoverRecentOpportunitiesApi(
     const data = await apiGet<GovWinSearchResult>(
       buildDiscoveryPath(pageSize, offset, DISCOVERY_DATE_FROM),
     );
-    const items = data.opportunities ?? data.results ?? data.data ?? [];
+    // The WSAPI usually returns an array under one of these keys, but on some
+    // responses (errors, single-object payloads, empty bodies) the field is a
+    // non-array value — spreading that throws "Spread syntax requires
+    // ...iterable". Coalesce defensively to an array before spreading.
+    const rawList = data.opportunities ?? data.results ?? data.data;
+    const items = Array.isArray(rawList) ? rawList : [];
     rawItems.push(...items);
 
     const reportedTotal = data.meta?.paging?.totalCount;

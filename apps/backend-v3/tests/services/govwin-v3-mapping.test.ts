@@ -204,6 +204,21 @@ describe('discoverRecentOpportunitiesApi — Deltek V3 discovery query', () => {
     const qs = new URLSearchParams(calledUrls[0]!.split('?')[1]);
     expect(qs.get('oppSelectionDateFrom')).toBe('01/01/1900');
   });
+
+  it('does not throw when the API returns a non-array opportunities field', async () => {
+    // Regression: some WSAPI responses put a non-array value under
+    // `opportunities` (error/single-object/empty bodies). Spreading that used
+    // to throw "Spread syntax requires ...iterable" and mark the run degraded.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(jsonResponse({ opportunities: { message: 'no results' }, meta: {} })),
+      ),
+    );
+
+    const { discoverRecentOpportunitiesApi } = await import('../../src/services/govwin/api_client.js');
+    await expect(discoverRecentOpportunitiesApi()).resolves.toEqual([]);
+  });
 });
 
 describe('hourly rolling limiter + 429 backoff', () => {
