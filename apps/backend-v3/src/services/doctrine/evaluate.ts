@@ -44,7 +44,7 @@ export interface DoctrineEvaluation {
   evaluated_at: string;
 }
 
-interface EntityContext {
+export interface EntityContext {
   title?: string;
   description?: string;
   agency?: string;
@@ -446,6 +446,91 @@ export function scoreDoctrineFromContext(context: {
     alignment_total: alignmentTotal,
     exclusion_triggers: exclusionResults,
   };
+}
+
+// ── Detailed (non-persisting) doctrine evaluation for Color Teams ─────────
+
+/**
+ * Canonical display names for the 8 doctrine principles, used when the DB
+ * config table has not been seeded. Keeps user-facing principle names stable
+ * and human-readable instead of leaking internal IDs.
+ */
+export const DOCTRINE_PRINCIPLE_DISPLAY_NAMES: Record<string, string> = {
+  alignment: 'Alignment',
+  ethics_always: 'Ethics Always',
+  teamwork: 'Teamwork',
+  data_first: 'Data First, Then Debate',
+  relentless_execution: 'Relentless Execution',
+  relationships: 'Relationships',
+  market_mission_brand: 'Market, Mission, Brand Focus',
+  customer_facing: 'Decision Filter Compliance',
+};
+
+/** Canonical display names for the doctrine exclusions (DB-config fallback). */
+export const DOCTRINE_EXCLUSION_DISPLAY_NAMES: Record<string, string> = {
+  low_assurance_cyber: 'Low-Assurance Cyber (no clearance)',
+  commercial_software_only: 'Commercial Software Only (no government nexus)',
+  staff_aug_only: 'Staff Augmentation Only (no solution ownership)',
+  below_margin_floor: 'Below Margin Floor',
+  non_cleared_commercial_it: 'Non-Cleared Commercial IT',
+  ou2_out_of_lane: 'OU2 (Riverstone) Out of Lane',
+};
+
+export interface DoctrineDetailResult {
+  /** Resolved principle definitions (DB config or defaults), for id→name mapping. */
+  principles: DoctrinePrinciple[];
+  principle_scores: Record<string, PrincipleScore>;
+  exclusion_triggers: ExclusionResult[];
+  alignment_total: number;
+  /** Whether principles/exclusions came from DB config or the built-in defaults. */
+  source: 'configured' | 'default';
+}
+
+/**
+ * Deterministic per-principle doctrine scoring for the green Color Team.
+ *
+ * Reads configured principles/exclusions from the DB (falling back to the
+ * built-in doctrine set when the config tables are empty) and runs the same
+ * rule-based scorePrinciple/evaluateExclusion logic as runDoctrineCheck — but
+ * does NOT persist. Scores are derived from the supplied context only; the LLM
+ * never supplies these numbers.
+ */
+export async function evaluateDoctrineDetail(context: EntityContext): Promise<DoctrineDetailResult> {
+  let principles = await getPrinciples();
+  let exclusions = await getExclusions();
+  let source: 'configured' | 'default' = 'configured';
+
+  if (principles.length === 0) {
+    source = 'default';
+    principles = DEFAULT_PRINCIPLE_IDS.map((id) => ({
+      id,
+      name: DOCTRINE_PRINCIPLE_DISPLAY_NAMES[id] ?? id,
+      short_form: id,
+      long_form: id,
+      evaluation_prompt: '',
+      display_order: 0,
+    }));
+  }
+  if (exclusions.length === 0) {
+    exclusions = DEFAULT_EXCLUSION_IDS.map((id) => ({
+      id,
+      name: DOCTRINE_EXCLUSION_DISPLAY_NAMES[id] ?? id,
+      description: '',
+      trigger_logic_prompt: '',
+      applies_to_ous: [],
+      is_hard_block: true,
+      override_requires: null,
+    }));
+  }
+
+  const principleScores: Record<string, PrincipleScore> = {};
+  for (const principle of principles) {
+    principleScores[principle.id] = scorePrinciple(principle, context);
+  }
+  const exclusionTriggers = exclusions.map((excl) => evaluateExclusion(excl, context));
+  const alignmentTotal = Object.values(principleScores).reduce((sum, s) => sum + s.score, 0);
+
+  return { principles, principle_scores: principleScores, exclusion_triggers: exclusionTriggers, alignment_total: alignmentTotal, source };
 }
 
 // ── Persisting doctrine check (existing behavior) ─────────────────────────

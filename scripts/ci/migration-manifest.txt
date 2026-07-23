@@ -147,3 +147,4 @@ v3_138_remove_govtribe.sql
 v3_139_financial_plan_drop_l1_target.sql
 v3_140_action_items_owner_email_default.sql
 v3_141_cost_detail_superseded.sql
+v3_142_color_team_pricing_strategy.sql

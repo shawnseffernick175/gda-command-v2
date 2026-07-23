@@ -49,6 +49,7 @@ const ALL_TASKS: readonly Task[] = [
   'sitrep_document_analyze',
   'launchpad_sitrep',
   'action_item_draft',
+  'color_team_review',
 ] as const;
 
 describe('Routing Table', () => {

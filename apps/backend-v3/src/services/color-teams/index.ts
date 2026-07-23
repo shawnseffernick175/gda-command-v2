@@ -16,9 +16,11 @@ import type {
   Citation,
   DoctrineScoreRow,
   MarginCheck,
+  PricingStrategy,
   FindingSeverity,
 } from './types.js';
 import { isValidColor, COLOR_TEAM_COLORS } from './types.js';
+import { runColorTeamAnalysis } from './runtime.js';
 
 // ─── Feature flag ───────────────────────────────────────────────────────────
 
@@ -167,12 +169,13 @@ export async function insertFinding(
     doctrine_score?: DoctrineScoreRow[] | null;
     exclusion_hits?: string[] | null;
     margin_check?: MarginCheck | null;
+    pricing_strategy?: PricingStrategy | null;
   }
 ): Promise<ColorTeamFindingRow> {
   const res = await pool.query<ColorTeamFindingRow>(
     `INSERT INTO color_team_findings
-     (run_id, color, severity, section_ref, finding, recommended_fix, citations, doctrine_score, exclusion_hits, margin_check)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     (run_id, color, severity, section_ref, finding, recommended_fix, citations, doctrine_score, exclusion_hits, margin_check, pricing_strategy)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       finding.run_id,
@@ -185,6 +188,7 @@ export async function insertFinding(
       finding.doctrine_score ? JSON.stringify(finding.doctrine_score) : null,
       finding.exclusion_hits ?? null,
       finding.margin_check ? JSON.stringify(finding.margin_check) : null,
+      finding.pricing_strategy ? JSON.stringify(finding.pricing_strategy) : null,
     ]
   );
   return res.rows[0]!;
@@ -343,10 +347,12 @@ export async function executeColorTeamRun(
   await updateRunStatus(pool, runId, 'running');
 
   try {
-    // F-300 Agent Runtime integration lands here. Until then this branch is
-    // unreachable in production (guarded by the flag above) so no fabricated
-    // findings are ever persisted.
-    throw new Error('F-300 Agent Runtime execution is not implemented');
+    const drafts = await runColorTeamAnalysis(pool, run);
+    for (const draft of drafts) {
+      await insertFinding(pool, { run_id: runId, ...draft });
+    }
+    await updateRunStatus(pool, runId, 'complete');
+    logger.info({ runId, findings: drafts.length }, 'Color team run complete');
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     logger.error({ err, runId }, 'Color team run failed');

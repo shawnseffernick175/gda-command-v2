@@ -1532,6 +1532,20 @@ export interface ColorTeamMarginCheck {
   projected_margin: number;
   floor: number;
   pass: boolean;
+  source?: string;
+}
+
+export interface ColorTeamPricingStrategyFact {
+  label: string;
+  value: string;
+  source: string;
+}
+
+export interface ColorTeamPricingStrategy {
+  status: "available" | "unavailable";
+  sourced_facts: ColorTeamPricingStrategyFact[];
+  recommendations: string[];
+  missing_inputs: string[];
 }
 
 export interface ColorTeamFinding {
@@ -1546,6 +1560,7 @@ export interface ColorTeamFinding {
   doctrine_score: ColorTeamDoctrineScore[] | null;
   exclusion_hits: string[] | null;
   margin_check: ColorTeamMarginCheck | null;
+  pricing_strategy: ColorTeamPricingStrategy | null;
   action_item_id: number | null;
   created_at: string;
 }
