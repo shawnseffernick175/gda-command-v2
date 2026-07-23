@@ -76,9 +76,13 @@ export async function runIngest(sourceKey: string): Promise<{
     // record it (do NOT resolve, which would hide the problem). Only a clean
     // success resolves open events for the source.
     if (result.degraded) {
-      onIngestDegraded(sourceKey, result.degradedReason).catch(() => {});
+      onIngestDegraded(sourceKey, result.degradedReason).catch((err) =>
+        logger.error({ err, source: sourceKey }, 'sentinel_degraded_hook_failed'),
+      );
     } else {
-      onIngestSuccess(sourceKey).catch(() => {});
+      onIngestSuccess(sourceKey).catch((err) =>
+        logger.error({ err, source: sourceKey }, 'sentinel_success_hook_failed'),
+      );
     }
 
     return { runId, result, durationMs };
@@ -100,7 +104,9 @@ export async function runIngest(sourceKey: string): Promise<{
     // Create sentinel event for the failure (fire-and-forget)
     const errorCode = (err as { statusCode?: number })?.statusCode
       ?? (err as { status?: number })?.status;
-    onIngestFailure(sourceKey, errorText, errorCode).catch(() => {});
+    onIngestFailure(sourceKey, errorText, errorCode).catch((hookErr) =>
+      logger.error({ err: hookErr, source: sourceKey }, 'sentinel_failure_hook_failed'),
+    );
 
     throw err;
   }

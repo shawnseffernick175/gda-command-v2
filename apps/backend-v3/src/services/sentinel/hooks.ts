@@ -10,10 +10,27 @@
  */
 
 import { pool } from '../../lib/db.js';
+import { logger } from '../../lib/logger.js';
 import { summarizeEvent } from './summarize-event.js';
 import type { RawSentinelEvent } from './summarize-event.js';
 
 export type SentinelEventType = 'handoff' | 'win' | 'break' | 'info';
+
+const VALID_SEVERITIES = new Set(['info', 'warning', 'critical']);
+
+/**
+ * The `sentinel_events` table constrains `severity` to
+ * ('info','warning','critical') and requires a NON-NULL `title`. The summary
+ * can come from an LLM (`summarizeEvent`), which may return an off-enum
+ * severity (e.g. 'high'/'medium') or an empty root_cause. Historically that
+ * made the INSERT throw a CHECK/NOT-NULL violation, and because callers invoke
+ * these hooks fire-and-forget, the error was swallowed and the event was lost
+ * silently — the exact failure mode that left Sentinel blind. Coerce to safe,
+ * constraint-valid values before writing.
+ */
+function coerceSeverity(value: string | undefined): 'info' | 'warning' | 'critical' {
+  return value && VALID_SEVERITIES.has(value) ? (value as 'info' | 'warning' | 'critical') : 'warning';
+}
 
 export interface RecordSentinelEventInput {
   event_type: SentinelEventType;
@@ -60,6 +77,12 @@ export async function recordSentinelEvent(input: RecordSentinelEventInput): Prom
 
   const summary = await summarizeEvent(rawEvent);
 
+  // Guard against constraint violations: `title` is NOT NULL and `severity`
+  // is CHECK-constrained. An empty/blank summary title falls back to the raw
+  // details (or a generic message) so the event is never dropped.
+  const title = summary.title?.trim() || input.details?.trim() || `${input.component} reported an issue`;
+  const severity = coerceSeverity(summary.severity);
+
   const { rows } = await pool.query(
     `INSERT INTO sentinel_events
        (event_type, severity, source_key, title, context, action_label, action_url, raw_event, due_by)
@@ -67,10 +90,10 @@ export async function recordSentinelEvent(input: RecordSentinelEventInput): Prom
      RETURNING id`,
     [
       input.event_type,
-      summary.severity,
+      severity,
       input.source_key ?? null,
-      summary.title,
-      summary.context,
+      title,
+      summary.context ?? null,
       summary.action_label ?? null,
       input.action_url ?? summary.action_url ?? null,
       input.raw_event ? JSON.stringify(input.raw_event) : null,
