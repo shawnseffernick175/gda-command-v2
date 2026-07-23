@@ -46,7 +46,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <Script
-          src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"
+          src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"
           strategy={"beforeInteractive" as const}
         />
         <Providers>{children}</Providers>
