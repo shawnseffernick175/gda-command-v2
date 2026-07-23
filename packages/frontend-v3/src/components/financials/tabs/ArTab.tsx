@@ -117,7 +117,7 @@ export function ArTab() {
       itemStyle: { color: bucketColor(bucket, i, bucketEntries.length) },
       label: {
         show: total ? amt / total > 0.06 : false,
-        color: "#fff",
+        color: "var(--color-fin-sand)",
         fontSize: 11,
         formatter: (p: { value: number }) => formatMoney(p.value),
       },

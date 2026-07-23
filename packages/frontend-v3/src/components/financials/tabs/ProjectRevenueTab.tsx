@@ -178,7 +178,7 @@ export function ProjectRevenueTab() {
       {withMargin.length > 0 && (
         <div className="rounded border border-border bg-card p-4">
           <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-            Margin by Project (red &lt;0% · amber &lt;8% · green ≥8%)
+            {"Margin by Project (red <0% · amber <8% · green ≥8%)"}
           </p>
           <ReactEChartsCore
             echarts={echarts}
