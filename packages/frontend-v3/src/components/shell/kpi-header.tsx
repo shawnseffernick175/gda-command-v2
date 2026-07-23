@@ -21,6 +21,8 @@ type KpiMetricKey =
 
 interface KpiTile {
   label: string;
+  /** Optional explicit line breaks for the header label (spelled-out metrics). */
+  labelLines?: string[];
   key: KpiMetricKey;
   scoreType: ScoreType;
   colorCoded: boolean;
@@ -28,13 +30,13 @@ interface KpiTile {
 }
 
 const KPI_TILES: KpiTile[] = [
-  { label: "ORDERS", key: "orders", scoreType: "orders", colorCoded: false, format: formatMoney },
-  { label: "SALES", key: "sales", scoreType: "sales", colorCoded: false, format: formatMoney },
-  { label: "OPERATING INCOME", key: "ebit", scoreType: "operating_income", colorCoded: true, format: formatMoney },
-  { label: "GM", key: "gross_margin", scoreType: "gross_margin", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
-  { label: "ROS", key: "ros", scoreType: "ros", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
-  { label: "FUNDED BACKLOG", key: "funded_backlog", scoreType: "funded_backlog", colorCoded: false, format: formatMoney },
-  { label: "BACKLOG", key: "backlog", scoreType: "backlog", colorCoded: false, format: formatMoney },
+  { label: "Orders", key: "orders", scoreType: "orders", colorCoded: false, format: formatMoney },
+  { label: "Sales", key: "sales", scoreType: "sales", colorCoded: false, format: formatMoney },
+  { label: "Operating Income", labelLines: ["Operating", "Income"], key: "ebit", scoreType: "operating_income", colorCoded: true, format: formatMoney },
+  { label: "Gross Margin", labelLines: ["Gross", "Margin"], key: "gross_margin", scoreType: "gross_margin", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
+  { label: "Return on Sales", labelLines: ["Return on", "Sales"], key: "ros", scoreType: "ros", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
+  { label: "Funded Backlog", labelLines: ["Funded", "Backlog"], key: "funded_backlog", scoreType: "funded_backlog", colorCoded: false, format: formatMoney },
+  { label: "Backlog", key: "backlog", scoreType: "backlog", colorCoded: false, format: formatMoney },
 ];
 
 function Divider() {
@@ -99,8 +101,10 @@ export function KpiHeader() {
                   href="/financials"
                   className="text-center whitespace-nowrap hover:opacity-80 transition-opacity"
                 >
-                  <div className="text-[12px] font-semibold uppercase tracking-[1px] text-foreground">
-                    {tile.label}
+                  <div className="flex min-h-[2.4em] flex-col items-center justify-start text-[13px] font-semibold uppercase leading-tight tracking-[0.5px] text-foreground">
+                    {(tile.labelLines ?? [tile.label]).map((line, i) => (
+                      <span key={i}>{line}</span>
+                    ))}
                   </div>
                   {isLoading ? (
                     <div className="h-5 w-14 animate-pulse rounded bg-gda-skeleton mt-0.5" />

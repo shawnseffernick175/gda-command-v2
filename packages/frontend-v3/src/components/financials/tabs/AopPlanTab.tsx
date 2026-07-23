@@ -19,7 +19,7 @@ const DOLLAR_FIELDS: { key: FieldKey; label: string }[] = [
 
 const PERCENT_FIELDS: { key: FieldKey; label: string }[] = [
   { key: "plan_gross_margin", label: "Gross Margin (%)" },
-  { key: "plan_ros", label: "ROS (%)" },
+  { key: "plan_ros", label: "Return on Sales (%)" },
 ];
 
 type FormState = Record<FieldKey, string>;
@@ -199,7 +199,7 @@ export function AopPlanTab({ fy }: { fy: string }) {
                   </span>
                 </span>
                 <span>
-                  ROS:{" "}
+                  Return on Sales:{" "}
                   <span className="tabular-nums text-foreground">
                     {(parsed.plan_ros as number).toLocaleString("en-US", {
                       maximumFractionDigits: 1,

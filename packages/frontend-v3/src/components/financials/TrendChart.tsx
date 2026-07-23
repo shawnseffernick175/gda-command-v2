@@ -166,7 +166,7 @@ export function TrendChart({
               <SortableHeader label="Sales" field="sales" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-green" />
               <SortableHeader label="EBIT" field="ebit" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-amber-400" />
               <SortableHeader label="Gross Margin" field="gross_margin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="ROS" field="ros" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Return on Sales" field="ros" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>

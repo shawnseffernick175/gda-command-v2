@@ -45,7 +45,7 @@ export function Q1HeroCard({ data }: { data: KpiHeaderData }) {
             />
           )}
           <MetricCell
-            label="ROS"
+            label="Return on Sales"
             value={`${data.ros.value.toFixed(1)}%`}
             plan={data.ros.plan !== null ? `${data.ros.plan.toFixed(1)}%` : null}
             delta={data.ros.delta}
