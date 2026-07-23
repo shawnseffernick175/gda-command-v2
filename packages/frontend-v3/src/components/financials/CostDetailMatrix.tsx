@@ -69,7 +69,7 @@ export function CostDetailMatrix() {
         <div className="rounded border border-border overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground uppercase tracking-wider">
+              <tr className="border-b border-border bg-gda-bg-base text-[12px] text-muted-foreground uppercase tracking-wider">
                 <th className="px-3 py-2 text-left font-medium">
                   Cost Element
                 </th>
@@ -83,7 +83,7 @@ export function CostDetailMatrix() {
                   </th>
                 ))}
               </tr>
-              <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+              <tr className="border-b border-border bg-gda-bg-base text-[12px] text-muted-foreground">
                 <th className="px-3 py-1" />
                 {POOLS.map((pool) => (
                   <SubHeaders key={pool} />

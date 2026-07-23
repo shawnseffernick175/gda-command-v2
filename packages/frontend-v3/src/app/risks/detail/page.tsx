@@ -55,19 +55,19 @@ function EventTimeline({ events }: { events: RiskEvent[] }) {
               <span className="text-xs font-medium text-foreground">
                 {eventTypeLabel(ev.event_type)}
               </span>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[12px] text-muted-foreground">
                 {new Date(ev.created_at).toLocaleString()}
               </span>
             </div>
             {ev.payload && Object.keys(ev.payload).length > 0 && (
-              <p className="text-[11px] text-muted-foreground mt-0.5">
+              <p className="text-[12px] text-muted-foreground mt-0.5">
                 {ev.event_type === "status_change" && `${(ev.payload as Record<string, string>).from} → ${(ev.payload as Record<string, string>).to}`}
                 {ev.event_type === "severity_change" && `${(ev.payload as Record<string, string>).from} → ${(ev.payload as Record<string, string>).to}`}
                 {ev.event_type === "owner_assigned" && `${(ev.payload as Record<string, string>).from ?? "unassigned"} → ${(ev.payload as Record<string, string>).to}`}
                 {ev.event_type === "duplicate_fire" && `Attempted: "${(ev.payload as Record<string, string>).attempted_title}"`}
               </p>
             )}
-            <p className="text-[11px] text-muted-foreground">by {ev.actor}</p>
+            <p className="text-[12px] text-muted-foreground">by {ev.actor}</p>
           </div>
         </div>
       ))}
@@ -140,19 +140,19 @@ function RiskDetailInner() {
           {risk.title}
         </h1>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={cn("text-[11px] font-mono font-bold uppercase tracking-wide border", severityColor(risk.severity ?? "medium"))}>
+          <Badge className={cn("text-[12px] font-mono font-bold uppercase tracking-wide border", severityColor(risk.severity ?? "medium"))}>
             {risk.severity ?? "medium"}
           </Badge>
-          <Badge className={cn("text-[11px] font-mono font-bold uppercase tracking-wide", isNegative ? "bg-red-500/15 text-red-400 border-red-500/30" : "bg-gda-green/15 text-gda-green border-gda-green/30")}>
+          <Badge className={cn("text-[12px] font-mono font-bold uppercase tracking-wide", isNegative ? "bg-red-500/15 text-red-400 border-red-500/30" : "bg-gda-green/15 text-gda-green border-gda-green/30")}>
             {isNegative ? "THREAT" : "OPPORTUNITY"}
           </Badge>
-          <Badge variant="outline" className="text-[11px] font-mono capitalize">
+          <Badge variant="outline" className="text-[12px] font-mono capitalize">
             {risk.category?.split("_").join(" ") ?? "operational"}
           </Badge>
-          <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono font-bold", scoreBg(score))}>
+          <span className={cn("rounded border px-1.5 py-0.5 text-[12px] font-mono font-bold", scoreBg(score))}>
             L{risk.likelihood} x I{risk.impact} = {score}
           </span>
-          <Badge variant="outline" className="text-[11px] font-mono capitalize">
+          <Badge variant="outline" className="text-[12px] font-mono capitalize">
             {risk.status ?? "open"}
           </Badge>
         </div>
@@ -168,14 +168,14 @@ function RiskDetailInner() {
         <div className="rounded border border-border bg-gda-panel p-4">
           <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-4">
             <div>
-              <p className="text-[11px] font-mono font-semibold text-muted-foreground mb-1">If this happens:</p>
+              <p className="text-[12px] font-mono font-semibold text-muted-foreground mb-1">If this happens:</p>
               <p className="text-xs text-foreground leading-relaxed">{risk.if_condition ?? "---"}</p>
             </div>
             <div className="flex items-center pt-4">
               <ArrowRightIcon className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-[11px] font-mono font-semibold text-muted-foreground mb-1">Then this occurs:</p>
+              <p className="text-[12px] font-mono font-semibold text-muted-foreground mb-1">Then this occurs:</p>
               <p className="text-xs text-foreground leading-relaxed">{risk.then_impact ?? "---"}</p>
             </div>
           </div>
@@ -197,7 +197,7 @@ function RiskDetailInner() {
         />
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Owner</label>
+            <label className="block text-[12px] text-muted-foreground mb-1">Owner</label>
             <input
               defaultValue={risk.owner ?? ""}
               onChange={(e) => setOwner(e.target.value)}
@@ -207,7 +207,7 @@ function RiskDetailInner() {
             />
           </div>
           <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Due Date</label>
+            <label className="block text-[12px] text-muted-foreground mb-1">Due Date</label>
             <input
               type="date"
               defaultValue={risk.due_at?.split("T")[0] ?? risk.due_date ?? ""}
@@ -240,7 +240,7 @@ function RiskDetailInner() {
           ))}
         </div>
         {risk.resolved_at && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             Resolved: {new Date(risk.resolved_at).toLocaleString()}
           </p>
         )}
@@ -274,7 +274,7 @@ function RiskDetailInner() {
           {risk.opportunity_id && (
             <a
               href={`/opportunities?highlight=${risk.opportunity_id}`}
-              className="inline-flex items-center gap-1 rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-[11px] font-mono text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
+              className="inline-flex items-center gap-1 rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-[12px] font-mono text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
             >
               {risk.opportunity_title ?? `Opportunity #${risk.opportunity_id}`}
             </a>
@@ -282,7 +282,7 @@ function RiskDetailInner() {
           {risk.related_capture_id && (
             <a
               href={`/capture?id=${risk.related_capture_id}`}
-              className="inline-flex items-center gap-1 rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-[11px] font-mono text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
+              className="inline-flex items-center gap-1 rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-[12px] font-mono text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
             >
               Capture #{risk.related_capture_id}
             </a>
@@ -290,7 +290,7 @@ function RiskDetailInner() {
           {risk.related_pipeline_item_id && (
             <a
               href={`/pipeline?highlight=${risk.related_pipeline_item_id}`}
-              className="inline-flex items-center gap-1 rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-[11px] font-mono text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
+              className="inline-flex items-center gap-1 rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-[12px] font-mono text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
             >
               Pipeline #{risk.related_pipeline_item_id}
             </a>
@@ -305,7 +305,7 @@ function RiskDetailInner() {
       {risk.source_event && Object.keys(risk.source_event).length > 0 && (
         <div className="rounded border border-border bg-gda-panel p-4 space-y-2">
           <h2 className="font-mono text-sm font-semibold text-foreground">Source Event</h2>
-          <pre className="text-[11px] text-muted-foreground font-mono overflow-x-auto whitespace-pre-wrap">
+          <pre className="text-[12px] text-muted-foreground font-mono overflow-x-auto whitespace-pre-wrap">
             {JSON.stringify(risk.source_event, null, 2)}
           </pre>
         </div>
@@ -318,7 +318,7 @@ function RiskDetailInner() {
       </div>
 
       {/* Meta */}
-      <div className="border-t border-border pt-3 text-[11px] text-muted-foreground space-y-0.5">
+      <div className="border-t border-border pt-3 text-[12px] text-muted-foreground space-y-0.5">
         <p>Identified: {new Date(risk.identified_at ?? risk.created_at).toLocaleString()}</p>
         <p>Created: {new Date(risk.created_at).toLocaleString()}</p>
         <p>Updated: {new Date(risk.updated_at).toLocaleString()}</p>

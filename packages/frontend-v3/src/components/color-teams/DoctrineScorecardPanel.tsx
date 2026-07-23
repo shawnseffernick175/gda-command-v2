@@ -50,7 +50,7 @@ export function DoctrineScorecardPanel({
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
                   {ds.detail}
                 </p>
               </div>
@@ -85,7 +85,7 @@ export function DoctrineScorecardPanel({
           </div>
           <div className="mt-2 flex items-end gap-4">
             <div>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[12px] text-muted-foreground">
                 Projected
               </span>
               <p className="font-mono text-lg text-foreground">
@@ -93,7 +93,7 @@ export function DoctrineScorecardPanel({
               </p>
             </div>
             <div>
-              <span className="text-[11px] text-muted-foreground">Floor</span>
+              <span className="text-[12px] text-muted-foreground">Floor</span>
               <p className="font-mono text-lg text-muted-foreground">
                 {marginCheck.floor}%
               </p>
@@ -128,7 +128,7 @@ export function DoctrineScorecardPanel({
           <h4 className="mb-3 text-sm font-semibold text-gda-green">
             Pricing Strategy
             {pricingStrategy.status === "unavailable" && (
-              <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+              <span className="ml-2 text-[12px] font-normal text-muted-foreground">
                 (inputs incomplete)
               </span>
             )}
@@ -143,7 +143,7 @@ export function DoctrineScorecardPanel({
                   <span className="text-foreground">{f.label}</span>
                   <span className="font-mono text-foreground">{f.value}</span>
                   <span
-                    className="max-w-[45%] truncate text-[11px] text-muted-foreground"
+                    className="max-w-[45%] truncate text-[12px] text-muted-foreground"
                     title={f.source}
                   >
                     {f.source}
@@ -154,7 +154,7 @@ export function DoctrineScorecardPanel({
           )}
           {pricingStrategy.recommendations.length > 0 && (
             <div className="mb-2">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
                 Recommendations
               </p>
               <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-foreground">
@@ -166,7 +166,7 @@ export function DoctrineScorecardPanel({
           )}
           {pricingStrategy.missing_inputs.length > 0 && (
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
                 Inputs required
               </p>
               <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-gda-amber">

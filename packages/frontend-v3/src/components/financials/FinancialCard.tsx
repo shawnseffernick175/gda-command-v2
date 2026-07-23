@@ -17,11 +17,11 @@ export function FinancialCard({
   return (
     <Card className="border-border bg-gda-panel">
       <CardContent className="py-4">
-        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p className="text-[12px] text-muted-foreground">{label}</p>
         <p className="mt-1 text-xl font-bold text-foreground tabular-nums">
           {value}
         </p>
-        <div className="mt-1 flex items-center gap-2 text-[11px]">
+        <div className="mt-1 flex items-center gap-2 text-[12px]">
           {plan !== null ? (
             <span className="text-muted-foreground">Plan: {plan}</span>
           ) : (

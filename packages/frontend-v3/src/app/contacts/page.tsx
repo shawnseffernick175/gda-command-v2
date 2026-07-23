@@ -153,16 +153,16 @@ function AddContactModal({
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[11px] text-muted-foreground">Name *</label>
+              <label className="mb-1 block text-[12px] text-muted-foreground">Name *</label>
               <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] text-muted-foreground">Title</label>
+              <label className="mb-1 block text-[12px] text-muted-foreground">Title</label>
               <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-muted-foreground">Category *</label>
+            <label className="mb-1 block text-[12px] text-muted-foreground">Category *</label>
             <select value={form.contact_category} onChange={(e) => setForm({ ...form, contact_category: e.target.value as ContactCategory })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50">
               <option value="government">Government</option>
               <option value="teaming_partner">Teaming Partner</option>
@@ -174,36 +174,36 @@ function AddContactModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[11px] text-muted-foreground">Agency</label>
+              <label className="mb-1 block text-[12px] text-muted-foreground">Agency</label>
               <input type="text" value={form.agency} onChange={(e) => setForm({ ...form, agency: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] text-muted-foreground">Company</label>
+              <label className="mb-1 block text-[12px] text-muted-foreground">Company</label>
               <input type="text" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[11px] text-muted-foreground">Email</label>
+              <label className="mb-1 block text-[12px] text-muted-foreground">Email</label>
               <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] text-muted-foreground">Phone</label>
+              <label className="mb-1 block text-[12px] text-muted-foreground">Phone</label>
               <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[11px] text-muted-foreground">LinkedIn URL</label>
+              <label className="mb-1 block text-[12px] text-muted-foreground">LinkedIn URL</label>
               <input type="url" value={form.linkedin_url} onChange={(e) => setForm({ ...form, linkedin_url: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] text-muted-foreground">Source Label</label>
+              <label className="mb-1 block text-[12px] text-muted-foreground">Source Label</label>
               <input type="text" value={form.source_label} placeholder="e.g. LinkedIn, Referral" onChange={(e) => setForm({ ...form, source_label: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-muted-foreground">Notes</label>
+            <label className="mb-1 block text-[12px] text-muted-foreground">Notes</label>
             <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -357,7 +357,7 @@ function ContactExpandRow({
 
           {/* Relationship */}
           <div>
-            <h4 className="font-mono text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <h4 className="font-mono text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
               Relationship
             </h4>
             <div className="mt-1 flex items-center gap-4 text-xs">
@@ -393,7 +393,7 @@ function ContactExpandRow({
 
           {/* Linked Pursuits */}
           <div>
-            <h4 className="font-mono text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <h4 className="font-mono text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
               Linked Pursuits
             </h4>
             <div className="mt-1 space-y-1">
@@ -424,7 +424,7 @@ function ContactExpandRow({
           {/* AI Enrichment */}
           {ai ? (
             <div>
-              <h4 className="font-mono text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <h4 className="font-mono text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
                 AI Enrichment
               </h4>
               <div className="mt-1 space-y-1 text-xs text-foreground">
@@ -440,7 +440,7 @@ function ContactExpandRow({
               <button
                 onClick={() => enrichMutation.mutate(contact.id)}
                 disabled={enrichMutation.isPending}
-                className="rounded border border-border px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                className="rounded border border-border px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
                 {enrichMutation.isPending ? "Enriching\u2026" : "Enrich with AI"}
               </button>
@@ -451,20 +451,20 @@ function ContactExpandRow({
           <div className="flex items-center gap-2 border-t border-border pt-3">
             <button
               onClick={onClose}
-              className="rounded border border-border px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+              className="rounded border border-border px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground"
             >
               Edit
             </button>
             <button
               onClick={() => setShowLinkModal(true)}
-              className="rounded border border-border px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+              className="rounded border border-border px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground"
             >
               + Link Opportunity
             </button>
             <button
               onClick={handleLogContact}
               disabled={logMutation.isPending}
-              className="rounded border border-border px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+              className="rounded border border-border px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
               {logMutation.isPending ? "Logging\u2026" : logMutation.isSuccess ? "Logged" : "Log Contact"}
             </button>
@@ -537,7 +537,7 @@ function ByAgencyView({
                           {c.name ?? "\u2014"}
                         </button>
                         {c.source_label && (
-                          <Badge variant="outline" className="border-border text-muted-foreground text-[11px] px-1 py-0 leading-tight">
+                          <Badge variant="outline" className="border-border text-muted-foreground text-[12px] px-1 py-0 leading-tight">
                             {c.source_label}
                           </Badge>
                         )}
@@ -594,7 +594,7 @@ function LinkedChips({ contact }: { contact: GovTriContact }) {
           key={`opp-${o.id}`}
           href={`/opportunities/${o.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center rounded bg-gda-cyan/10 px-1.5 py-0.5 text-[11px] text-gda-cyan hover:bg-gda-cyan/20"
+          className="inline-flex items-center rounded bg-gda-cyan/10 px-1.5 py-0.5 text-[12px] text-gda-cyan hover:bg-gda-cyan/20"
         >
           {o.title.length > 20 ? o.title.slice(0, 20) + "\u2026" : o.title} &#8599;
         </a>
@@ -604,7 +604,7 @@ function LinkedChips({ contact }: { contact: GovTriContact }) {
           key={`cap-${c.id}`}
           href={`/captures/${c.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center rounded bg-gda-green/10 px-1.5 py-0.5 text-[11px] text-gda-green hover:bg-gda-green/20"
+          className="inline-flex items-center rounded bg-gda-green/10 px-1.5 py-0.5 text-[12px] text-gda-green hover:bg-gda-green/20"
         >
           {c.title.length > 20 ? c.title.slice(0, 20) + "\u2026" : c.title} &#8599;
         </a>
@@ -720,18 +720,18 @@ function ContactsContent() {
 
         {/* Intelligence Bar */}
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="outline" className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]">
+          <Badge variant="outline" className="border-gda-cyan/30 text-gda-cyan font-mono text-[12px]">
             {meta.total_count.toLocaleString()} Total Contacts
           </Badge>
           {meta.warm_no_touch > 0 && (
-            <Badge variant="outline" className="border-gda-red/30 text-gda-red font-mono text-[11px]">
+            <Badge variant="outline" className="border-gda-red/30 text-gda-red font-mono text-[12px]">
               {meta.warm_no_touch} Warm — No Recent Touch
             </Badge>
           )}
-          <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[11px]">
+          <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[12px]">
             {meta.linked_to_pursuits} Linked to Active Pursuits
           </Badge>
-          <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[11px]">
+          <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[12px]">
             {meta.agency_count} Agencies
           </Badge>
           <button
@@ -906,7 +906,7 @@ function ContactsContent() {
                                 {c.name ?? "\u2014"}
                               </button>
                               {c.source_label && (
-                                <Badge variant="outline" className="border-border text-muted-foreground text-[11px] px-1 py-0 leading-tight">
+                                <Badge variant="outline" className="border-border text-muted-foreground text-[12px] px-1 py-0 leading-tight">
                                   {c.source_label}
                                 </Badge>
                               )}
@@ -952,7 +952,7 @@ function ContactsContent() {
                                   e.stopPropagation();
                                   handleToggleExpand(c.id);
                                 }}
-                                className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+                                className="rounded border border-border px-2 py-0.5 text-[12px] text-muted-foreground hover:text-foreground"
                                 title="Edit"
                               >
                                 Edit
@@ -965,7 +965,7 @@ function ContactsContent() {
                                       deleteMutation.mutate(c.id);
                                   }}
                                   disabled={deleteMutation.isPending}
-                                  className="rounded border border-gda-red/30 px-2 py-0.5 text-[11px] text-gda-red hover:bg-gda-red/10 disabled:opacity-50"
+                                  className="rounded border border-gda-red/30 px-2 py-0.5 text-[12px] text-gda-red hover:bg-gda-red/10 disabled:opacity-50"
                                   title="Delete"
                                 >
                                   Del

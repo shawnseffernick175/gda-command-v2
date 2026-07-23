@@ -240,7 +240,7 @@ export function AopPlanTab({ fy }: { fy: string }) {
           </div>
 
           {!allValid && (
-            <p className="text-[11px] text-muted-foreground italic">
+            <p className="text-[12px] text-muted-foreground italic">
               Enter all five values to save. Percentages must be between 0 and
               100.
             </p>

@@ -30,7 +30,7 @@ export function EligibilityChip({ eligible, reason }: EligibilityChipProps) {
   const chip = (
     <span
       className={cn(
-        "inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap",
+        "inline-flex items-center rounded border px-1.5 py-0.5 text-[12px] font-medium whitespace-nowrap",
         chipClass,
       )}
     >

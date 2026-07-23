@@ -71,7 +71,7 @@ export function RiskDetailPanel({
             <div className="flex flex-wrap items-center gap-2">
               <Badge
                 className={cn(
-                  "text-[11px] font-mono font-bold uppercase tracking-wide border",
+                  "text-[12px] font-mono font-bold uppercase tracking-wide border",
                   severityColor(risk.severity ?? "medium"),
                 )}
               >
@@ -79,7 +79,7 @@ export function RiskDetailPanel({
               </Badge>
               <Badge
                 className={cn(
-                  "text-[11px] font-mono font-bold uppercase tracking-wide",
+                  "text-[12px] font-mono font-bold uppercase tracking-wide",
                   isNegative
                     ? "bg-red-500/15 text-red-400 border-red-500/30"
                     : "bg-gda-green/15 text-gda-green border-gda-green/30",
@@ -89,13 +89,13 @@ export function RiskDetailPanel({
               </Badge>
               <Badge
                 variant="outline"
-                className="text-[11px] font-mono capitalize"
+                className="text-[12px] font-mono capitalize"
               >
                 {risk.category ?? "operational"}
               </Badge>
               <span
                 className={cn(
-                  "rounded border px-1.5 py-0.5 text-[11px] font-mono font-bold",
+                  "rounded border px-1.5 py-0.5 text-[12px] font-mono font-bold",
                   scoreBg(score),
                 )}
               >
@@ -103,7 +103,7 @@ export function RiskDetailPanel({
               </span>
               <Badge
                 variant="outline"
-                className="text-[11px] font-mono capitalize"
+                className="text-[12px] font-mono capitalize"
               >
                 {risk.status ?? "open"}
               </Badge>
@@ -120,7 +120,7 @@ export function RiskDetailPanel({
             <div className="rounded border border-border bg-gda-panel p-3">
               <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
                 <div>
-                  <p className="text-[11px] font-mono font-semibold text-muted-foreground mb-1">
+                  <p className="text-[12px] font-mono font-semibold text-muted-foreground mb-1">
                     If this happens:
                   </p>
                   <p className="text-xs text-foreground leading-relaxed">
@@ -131,7 +131,7 @@ export function RiskDetailPanel({
                   <ArrowRightIcon className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-mono font-semibold text-muted-foreground mb-1">
+                  <p className="text-[12px] font-mono font-semibold text-muted-foreground mb-1">
                     Then this occurs:
                   </p>
                   <p className="text-xs text-foreground leading-relaxed">
@@ -153,7 +153,7 @@ export function RiskDetailPanel({
               </p>
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">
+                  <label className="block text-[12px] text-muted-foreground mb-1">
                     Owner
                   </label>
                   <input
@@ -165,7 +165,7 @@ export function RiskDetailPanel({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">
+                  <label className="block text-[12px] text-muted-foreground mb-1">
                     Due Date
                   </label>
                   <input
@@ -192,7 +192,7 @@ export function RiskDetailPanel({
                 {risk.exploitation_plan ?? "No exploitation plan specified."}
               </p>
               <div className="pt-1">
-                <label className="block text-[11px] text-muted-foreground mb-1">
+                <label className="block text-[12px] text-muted-foreground mb-1">
                   Next Step
                 </label>
                 <input
@@ -214,7 +214,7 @@ export function RiskDetailPanel({
               </h3>
               <a
                 href={`/opportunities?highlight=${risk.opportunity_id}`}
-                className="inline-flex items-center gap-1 rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-[11px] font-mono text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
+                className="inline-flex items-center gap-1 rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-[12px] font-mono text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
               >
                 {risk.opportunity_title ?? `Opportunity #${risk.opportunity_id}`}
               </a>
@@ -243,7 +243,7 @@ export function RiskDetailPanel({
           </div>
 
           {/* ── Meta ───────────────────────────────────── */}
-          <div className="border-t border-border pt-3 text-[11px] text-muted-foreground space-y-0.5">
+          <div className="border-t border-border pt-3 text-[12px] text-muted-foreground space-y-0.5">
             <p>Created: {new Date(risk.created_at).toLocaleString()}</p>
             <p>Updated: {new Date(risk.updated_at).toLocaleString()}</p>
           </div>

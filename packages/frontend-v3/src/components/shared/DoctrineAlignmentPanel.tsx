@@ -55,19 +55,19 @@ function PrincipleRow({
           {score.score}/5
         </span>
         <EvidenceBadge grade={score.evidence_grade} showWarning={isMustWin} />
-        <span className={cn("text-[11px] text-muted-foreground transition-transform", expanded && "rotate-180")}>
+        <span className={cn("text-[12px] text-muted-foreground transition-transform", expanded && "rotate-180")}>
           v
         </span>
       </button>
       {expanded && (
         <div className="ml-2 pl-3 border-l border-border space-y-1 pb-1">
-          <p className="text-[11px] text-muted-foreground leading-relaxed">{score.rationale}</p>
+          <p className="text-[12px] text-muted-foreground leading-relaxed">{score.rationale}</p>
           {score.citations.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {score.citations.map((c, i) => (
                 <span
                   key={i}
-                  className="inline-block rounded border border-border bg-gda-panel px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                  className="inline-block rounded border border-border bg-gda-panel px-1.5 py-0.5 text-[12px] text-muted-foreground"
                 >
                   {c}
                 </span>
@@ -88,10 +88,10 @@ function ExclusionRow({ result }: { result: ExclusionResult }) {
         BLOCKED: {result.name}
       </p>
       {result.evidence.map((e, i) => (
-        <p key={i} className="text-[11px] text-muted-foreground">{e}</p>
+        <p key={i} className="text-[12px] text-muted-foreground">{e}</p>
       ))}
       {result.override_available && (
-        <p className="text-[11px] text-muted-foreground italic">
+        <p className="text-[12px] text-muted-foreground italic">
           Override available with executive rationale (min 50 chars)
         </p>
       )}
@@ -115,7 +115,7 @@ function EvaluationContent({ evaluation }: { evaluation: DoctrineEvaluation }) {
           </span>
           <AlignmentLabel total={evaluation.alignment_total} />
         </div>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {new Date(evaluation.evaluated_at).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -129,10 +129,10 @@ function EvaluationContent({ evaluation }: { evaluation: DoctrineEvaluation }) {
       {/* Lowest principle highlight */}
       {lowestPrinciple && lowestPrinciple[1].score <= 2 && (
         <div className="rounded border border-gda-amber/40 bg-gda-amber/5 px-3 py-2">
-          <p className="text-[11px] text-gda-amber font-medium">
+          <p className="text-[12px] text-gda-amber font-medium">
             Lowest: {lowestPrinciple[0].replace(/_/g, " ")} ({lowestPrinciple[1].score}/5)
           </p>
-          <p className="text-[11px] text-muted-foreground">{lowestPrinciple[1].rationale}</p>
+          <p className="text-[12px] text-muted-foreground">{lowestPrinciple[1].rationale}</p>
         </div>
       )}
 
@@ -151,7 +151,7 @@ function EvaluationContent({ evaluation }: { evaluation: DoctrineEvaluation }) {
           <p className="text-xs font-semibold text-gda-red">
             Margin floor violation: {evaluation.margin_check.margin_pct}% {"<"} {evaluation.margin_check.threshold}% minimum
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             Source: {evaluation.margin_check.source} | Override requires executive rationale
           </p>
         </div>
@@ -169,12 +169,12 @@ function EvaluationContent({ evaluation }: { evaluation: DoctrineEvaluation }) {
       {/* Recommendations */}
       {evaluation.recommendations.length > 0 && (
         <div className="space-y-1 pt-1 border-t border-border">
-          <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+          <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider">
             Recommendations
           </p>
           <ul className="space-y-1">
             {evaluation.recommendations.map((rec, i) => (
-              <li key={i} className="text-[11px] text-muted-foreground leading-relaxed">
+              <li key={i} className="text-[12px] text-muted-foreground leading-relaxed">
                 {rec}
               </li>
             ))}
@@ -225,7 +225,7 @@ export function DoctrineAlignmentPanel({ entityId }: { entityId: string }) {
             </span>
           )}
           {runCheck.isPending && (
-            <span className="text-[11px] text-muted-foreground italic">analyzing...</span>
+            <span className="text-[12px] text-muted-foreground italic">analyzing...</span>
           )}
           <span className={cn("ml-auto text-xs text-muted-foreground transition-transform", collapsed && "-rotate-90")}>
             v

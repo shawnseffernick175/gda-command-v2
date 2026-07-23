@@ -60,7 +60,7 @@ export function PipelineCoverageCard() {
               type="button"
               onClick={() => setFy(year)}
               className={cn(
-                "rounded px-2 py-0.5 font-mono text-[11px] transition-colors",
+                "rounded px-2 py-0.5 font-mono text-[12px] transition-colors",
                 fy === year
                   ? "bg-gda-cyan text-white"
                   : "text-muted-foreground hover:text-foreground",
@@ -83,7 +83,7 @@ export function PipelineCoverageCard() {
         <>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b border-border text-[12px] uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-2 text-left font-medium">Layer</th>
                 <th className="px-4 py-2 text-right font-medium">Required</th>
                 <th className="px-4 py-2 text-right font-medium">Actual</th>
@@ -110,7 +110,7 @@ export function PipelineCoverageCard() {
 
           {/* Source line */}
           <div className="border-t border-border px-4 py-2">
-            <p className="font-mono text-[11px] italic text-muted-foreground">
+            <p className="font-mono text-[12px] italic text-muted-foreground">
               Source: Shipley Capture Management Lifecycle. Required = AOP revenue target × layer multiple.
             </p>
           </div>
@@ -139,7 +139,7 @@ function CoverageRow({
       >
         <td className="px-4 py-2 text-left font-mono text-xs text-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               {isExpanded ? "▾" : "▸"}
             </span>
             {layer.label}
@@ -205,7 +205,7 @@ function DrilldownTable({ pursuits }: { pursuits: CoveragePursuit[] }) {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+        <tr className="border-b border-border text-[12px] uppercase tracking-wider text-muted-foreground">
           <SortableHeader label="Pursuit" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
           <SortableHeader label="Value" field="capture_value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
           <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -227,7 +227,7 @@ function DrilldownTable({ pursuits }: { pursuits: CoveragePursuit[] }) {
                 {p.title}
               </Link>
               {p.agency && (
-                <span className="text-[11px] text-muted-foreground truncate block max-w-[280px]">
+                <span className="text-[12px] text-muted-foreground truncate block max-w-[280px]">
                   {p.agency}
                 </span>
               )}

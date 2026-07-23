@@ -57,7 +57,7 @@ export function DoctrineOverrideModal({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+          <label className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider">
             Rationale (min 50 characters)
           </label>
           <textarea
@@ -67,7 +67,7 @@ export function DoctrineOverrideModal({
             placeholder="Provide executive rationale for overriding this rule..."
             className="w-full rounded border border-border bg-gda-bg-base px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 resize-none"
           />
-          <p className={`text-[11px] font-mono ${isValid ? "text-gda-green" : "text-muted-foreground"}`}>
+          <p className={`text-[12px] font-mono ${isValid ? "text-gda-green" : "text-muted-foreground"}`}>
             {charCount}/50 characters
           </p>
         </div>
@@ -91,7 +91,7 @@ export function DoctrineOverrideModal({
         </div>
 
         {override.isError && (
-          <p className="text-[11px] text-gda-red">
+          <p className="text-[12px] text-gda-red">
             Failed to submit override: {override.error instanceof Error ? override.error.message : "Unknown error"}
           </p>
         )}

@@ -56,7 +56,7 @@ export function EntityRisksTab({ entityType, entityId }: EntityRisksTabProps) {
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-mono text-sm font-semibold text-foreground">Risks</h3>
-        <Badge variant="outline" className="text-[11px] font-mono">
+        <Badge variant="outline" className="text-[12px] font-mono">
           {risks.length} risk{risks.length !== 1 ? "s" : ""}
         </Badge>
       </div>
@@ -71,19 +71,19 @@ export function EntityRisksTab({ entityType, entityId }: EntityRisksTabProps) {
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-foreground truncate">{risk.title}</p>
               {risk.description && (
-                <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                <p className="text-[12px] text-muted-foreground truncate mt-0.5">
                   {risk.description}
                 </p>
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <Badge className={cn("text-[10px] font-mono font-bold uppercase tracking-wide border", severityColor(risk.severity ?? "medium"))}>
+              <Badge className={cn("text-[12px] font-mono font-bold uppercase tracking-wide border", severityColor(risk.severity ?? "medium"))}>
                 {risk.severity ?? "medium"}
               </Badge>
-              <Badge variant={statusBadgeVariant(risk.status) as "outline" | "destructive" | "secondary"} className="text-[11px] capitalize">
+              <Badge variant={statusBadgeVariant(risk.status) as "outline" | "destructive" | "secondary"} className="text-[12px] capitalize">
                 {risk.status}
               </Badge>
-              <span className="text-[11px] font-mono text-muted-foreground">
+              <span className="text-[12px] font-mono text-muted-foreground">
                 {score}
               </span>
             </div>

@@ -81,7 +81,7 @@ export function Sidebar() {
           <Icon size={15} />
           <span className="flex-1">{item.label}</span>
           {item.href === "/regulatory" && regCount?.count != null && (
-            <span className="ml-auto rounded-full bg-gda-panel px-1.5 py-0.5 font-mono text-[11px] leading-none text-muted-foreground">
+            <span className="ml-auto rounded-full bg-gda-panel px-1.5 py-0.5 font-mono text-[12px] leading-none text-muted-foreground">
               {regCount.count}
             </span>
           )}
@@ -139,7 +139,7 @@ export function Sidebar() {
                 type="button"
                 onClick={() => toggleGroup(group.label)}
                 aria-expanded={open}
-                className="flex w-full items-center gap-1.5 rounded px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+                className="flex w-full items-center gap-1.5 rounded px-3 py-1 text-[12px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
               >
                 {open ? (
                   <ChevronDown size={13} />
@@ -159,7 +159,7 @@ export function Sidebar() {
       </nav>
 
       <div className="px-2 pb-2">
-        <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 px-3 py-1.5 text-[12px] text-muted-foreground">
           <span className={cn("h-2 w-2 rounded-full", sentinelColor)} />
           <span>Sentinel {sentinel?.overall ?? "..."}</span>
         </div>

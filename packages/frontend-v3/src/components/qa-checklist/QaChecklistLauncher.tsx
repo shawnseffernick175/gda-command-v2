@@ -13,7 +13,7 @@ export function QaChecklistLauncher() {
       className={cn(
         "fixed right-0 top-1/2 z-40 -translate-y-1/2",
         "rounded-l border border-r-0 border-border",
-        "px-1.5 py-3 font-mono text-[11px] font-semibold",
+        "px-1.5 py-3 font-mono text-[12px] font-semibold",
         "transition-colors [writing-mode:vertical-rl]",
         isOpen
           ? "bg-gda-green text-gda-bg-deep"

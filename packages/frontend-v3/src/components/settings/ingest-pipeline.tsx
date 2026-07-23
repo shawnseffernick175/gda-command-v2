@@ -60,7 +60,7 @@ function StatusLabel({ status }: { status: IngestSourceStatus["status"] }) {
   return (
     <span
       className={cn(
-        "text-[11px] font-mono capitalize",
+        "text-[12px] font-mono capitalize",
         status === "healthy" && "text-gda-green",
         status === "degraded" && "text-gda-amber",
         status === "stale" && "text-gda-amber",
@@ -121,7 +121,7 @@ function SourceDetail({
       <p className="font-mono text-xs font-semibold text-foreground">
         {source.display_name} — Detail
       </p>
-      <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-[11px]">
+      <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-[12px]">
         <span className="text-muted-foreground">Last run:</span>
         <span className="text-foreground">{lastRunFormatted}</span>
 
@@ -174,7 +174,7 @@ function SourceDetail({
             type="button"
             onClick={() => trigger.mutate(source.source_key)}
             disabled={trigger.isPending}
-            className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[11px] font-mono text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+            className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[12px] font-mono text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
           >
             {trigger.isPending ? "Running…" : "▶ Run Now"}
           </button>
@@ -182,14 +182,14 @@ function SourceDetail({
         <button
           type="button"
           onClick={() => setShowLogs((v) => !v)}
-          className="rounded border border-border px-3 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:border-foreground/30"
+          className="rounded border border-border px-3 py-1 text-[12px] font-mono text-muted-foreground hover:text-foreground hover:border-foreground/30"
         >
           {showLogs ? "Hide Logs" : "View Logs"}
         </button>
       </div>
 
       {showLogs && (
-        <pre className="mt-2 max-h-48 overflow-auto rounded border border-border bg-gda-panel p-2 font-mono text-[11px] text-muted-foreground">
+        <pre className="mt-2 max-h-48 overflow-auto rounded border border-border bg-gda-panel p-2 font-mono text-[12px] text-muted-foreground">
           {source.log_lines && source.log_lines.length > 0
             ? source.log_lines.slice(-20).join("\n")
             : "No log lines available."}
@@ -225,19 +225,19 @@ export function IngestPipelineSection() {
     <div className="space-y-0">
       {/* Header row */}
       <div className="grid grid-cols-[minmax(160px,1fr)_80px_80px_130px_minmax(180px,1.5fr)] gap-2 px-3 py-1.5 border-b border-border">
-        <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide">
+        <span className="font-mono text-[12px] text-muted-foreground uppercase tracking-wide">
           Source
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide">
+        <span className="font-mono text-[12px] text-muted-foreground uppercase tracking-wide">
           Status
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide">
+        <span className="font-mono text-[12px] text-muted-foreground uppercase tracking-wide">
           Last Run
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide">
+        <span className="font-mono text-[12px] text-muted-foreground uppercase tracking-wide">
           Last Successful Insert
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wide">
+        <span className="font-mono text-[12px] text-muted-foreground uppercase tracking-wide">
           Last Error
         </span>
       </div>
@@ -261,12 +261,12 @@ export function IngestPipelineSection() {
                 </span>
               </span>
               <StatusLabel status={source.status} />
-              <span className="font-mono text-[11px] text-muted-foreground">
+              <span className="font-mono text-[12px] text-muted-foreground">
                 {formatRelativeTime(source.last_run_at)}
               </span>
               <span
                 className={cn(
-                  "font-mono text-[11px]",
+                  "font-mono text-[12px]",
                   source.last_success_at === null
                     ? "text-gda-amber"
                     : "text-muted-foreground",
@@ -276,7 +276,7 @@ export function IngestPipelineSection() {
               </span>
               <span
                 className={cn(
-                  "font-mono text-[11px] break-words",
+                  "font-mono text-[12px] break-words",
                   source.last_error ? "text-gda-red" : "text-muted-foreground",
                 )}
               >

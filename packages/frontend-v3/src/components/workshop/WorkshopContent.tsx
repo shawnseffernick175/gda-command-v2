@@ -151,14 +151,14 @@ export function WorkshopContent() {
                   handleRowClick(item.id, item.filename, item.status, item.classification)
                 }
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-border text-[11px] font-bold text-muted-foreground">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-border text-[12px] font-bold text-muted-foreground">
                   {TYPE_ICONS[ext] ?? ext.toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium text-foreground">
                     {item.filename}
                   </p>
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
                     <span>{formatDate(item.uploaded_at)}</span>
                     {item.size_bytes && (
                       <span>{formatBytes(item.size_bytes)}</span>
@@ -166,7 +166,7 @@ export function WorkshopContent() {
                   </div>
                 </div>
                 {item.status === "analyzed" && (
-                  <span className="shrink-0 rounded border border-gda-green/30 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-medium text-gda-green">
+                  <span className="shrink-0 rounded border border-gda-green/30 bg-gda-green/10 px-1.5 py-0.5 text-[12px] font-medium text-gda-green">
                     Analyzed
                   </span>
                 )}
@@ -174,7 +174,7 @@ export function WorkshopContent() {
                   <span className="shrink-0 h-3 w-3 animate-spin rounded-full border border-gda-green border-t-transparent" />
                 )}
                 {item.status === "failed" && (
-                  <span className="shrink-0 rounded border border-gda-red/30 bg-gda-red/10 px-1.5 py-0.5 text-[11px] font-medium text-gda-red">
+                  <span className="shrink-0 rounded border border-gda-red/30 bg-gda-red/10 px-1.5 py-0.5 text-[12px] font-medium text-gda-red">
                     Failed
                   </span>
                 )}

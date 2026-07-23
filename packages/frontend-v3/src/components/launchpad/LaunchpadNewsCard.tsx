@@ -49,17 +49,17 @@ export default function LaunchpadNewsCard({ item, onFeedback }: LaunchpadNewsCar
       {/* Header row: agency chip + dollar value */}
       <div className="flex items-center gap-2 flex-wrap">
         {item.agency && (
-          <span className="inline-flex items-center rounded bg-gda-cyan/10 border border-gda-cyan/20 px-1.5 py-0.5 font-mono text-[11px] text-gda-cyan uppercase tracking-wide">
+          <span className="inline-flex items-center rounded bg-gda-cyan/10 border border-gda-cyan/20 px-1.5 py-0.5 font-mono text-[12px] text-gda-cyan uppercase tracking-wide">
             {item.agency}
           </span>
         )}
         {dollarStr && (
-          <span className="font-mono text-[11px] font-bold text-foreground tabular-nums">
+          <span className="font-mono text-[12px] font-bold text-foreground tabular-nums">
             {dollarStr}
           </span>
         )}
         {item.naics_code && (
-          <span className="font-mono text-[11px] text-muted-foreground">
+          <span className="font-mono text-[12px] text-muted-foreground">
             NAICS {item.naics_code}
           </span>
         )}
@@ -84,14 +84,14 @@ export default function LaunchpadNewsCard({ item, onFeedback }: LaunchpadNewsCar
 
       {/* Why it matters */}
       {item.why_it_matters && (
-        <p className="font-mono text-[11px] text-muted-foreground leading-relaxed">
+        <p className="font-mono text-[12px] text-muted-foreground leading-relaxed">
           {item.why_it_matters}
         </p>
       )}
 
       {/* Footer: source + time */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 font-mono text-[12px] text-muted-foreground">
           <span>Source: {sourceLabel}</span>
           {item.source_id && <span className="truncate max-w-[120px]">{item.source_id}</span>}
           <span>{relativeTime(item.posted_at)}</span>
@@ -112,7 +112,7 @@ export default function LaunchpadNewsCard({ item, onFeedback }: LaunchpadNewsCar
             <button
               type="button"
               onClick={() => onFeedback(item.id, "dismissed")}
-              className="font-mono text-[11px] text-muted-foreground hover:text-foreground px-1"
+              className="font-mono text-[12px] text-muted-foreground hover:text-foreground px-1"
               title="Dismiss"
             >
               x
@@ -123,7 +123,7 @@ export default function LaunchpadNewsCard({ item, onFeedback }: LaunchpadNewsCar
 
       {/* Doctrine excluded badge */}
       {item.doctrine_excluded && (
-        <span className="inline-block font-mono text-[11px] italic text-muted-foreground">
+        <span className="inline-block font-mono text-[12px] italic text-muted-foreground">
           Doctrine excluded
         </span>
       )}

@@ -124,7 +124,7 @@ export function TeardownView({
         </div>
         <Badge
           className={cn(
-            "text-[11px] font-semibold",
+            "text-[12px] font-semibold",
             wheelHouseClass(analysis.envision_relevance?.wheelhouse_match ?? "none"),
           )}
         >
@@ -439,7 +439,7 @@ function RelevancePanel({
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {section.items.map((item, i) => (
-                <Badge key={i} className="text-[11px] border-border text-foreground">
+                <Badge key={i} className="text-[12px] border-border text-foreground">
                   {item}
                 </Badge>
               ))}

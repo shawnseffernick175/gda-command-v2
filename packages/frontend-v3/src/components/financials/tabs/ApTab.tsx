@@ -114,14 +114,14 @@ export function ApTab() {
     xAxis: {
       type: "category" as const,
       data: bucketEntries.map(([b]) => b),
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
       axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     yAxis: {
       type: "value" as const,
       axisLabel: {
         color: "var(--color-fin-stone)",
-        fontSize: 11,
+        fontSize: 12,
         formatter: (v: number) => formatMoney(v),
       },
       splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
@@ -136,7 +136,7 @@ export function ApTab() {
         label: {
           show: true,
           position: "top" as const,
-          fontSize: 11,
+          fontSize: 12,
           color: "var(--color-fin-stone)",
           formatter: (p: { value: number }) => formatMoney(p.value),
         },
@@ -154,14 +154,14 @@ export function ApTab() {
     grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
     xAxis: {
       type: "value" as const,
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, formatter: (v: number) => formatMoney(v) },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12, formatter: (v: number) => formatMoney(v) },
       splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
     },
     yAxis: {
       type: "category" as const,
       inverse: true,
       data: topVendors.map(([v]) => (v.length > 26 ? v.slice(0, 24) + "…" : v)),
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
       axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     series: [
@@ -172,7 +172,7 @@ export function ApTab() {
         label: {
           show: true,
           position: "right" as const,
-          fontSize: 10,
+          fontSize: 12,
           color: "var(--color-fin-stone)",
           formatter: (p: { value: number }) => formatMoney(p.value),
         },
@@ -188,7 +188,7 @@ export function ApTab() {
     },
     legend: {
       bottom: 0,
-      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+      textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
     },
     series: [
       {
@@ -202,7 +202,7 @@ export function ApTab() {
         })),
         label: {
           color: "var(--color-fin-stone)",
-          fontSize: 11,
+          fontSize: 12,
           formatter: (p: { name: string; percent: number }) => `${p.name} ${p.percent.toFixed(0)}%`,
         },
       },
@@ -226,7 +226,7 @@ export function ApTab() {
       {/* Payment status breakdown (real, when ingested) */}
       {hasStatus && (
         <div className="rounded border border-border bg-card p-4">
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
             Open Payables by Payment Status
           </p>
           <ReactEChartsCore echarts={echarts} option={statusDonut} style={{ height: 260 }} notMerge />
@@ -236,13 +236,13 @@ export function ApTab() {
       {/* Aging + vendor concentration */}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded border border-border bg-card p-4">
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
             Payables by Age Bucket (risk-colored)
           </p>
           <ReactEChartsCore echarts={echarts} option={agingBar} style={{ height: 240 }} notMerge />
         </div>
         <div className="rounded border border-border bg-card p-4">
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
             Top Vendors by Open Payable
           </p>
           <ReactEChartsCore
@@ -258,7 +258,7 @@ export function ApTab() {
       <div className="rounded border border-border overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Vendor" field="vendor_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Invoice #" field="invoice_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />

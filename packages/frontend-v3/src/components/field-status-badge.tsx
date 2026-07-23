@@ -52,7 +52,7 @@ export function FieldStatusBadge({ reason, className }: FieldStatusBadgeProps) {
           <Badge
             variant="outline"
             aria-label={tooltip}
-            className={cn("text-[11px] font-mono cursor-default", style, className)}
+            className={cn("text-[12px] font-mono cursor-default", style, className)}
           />
         }
       >

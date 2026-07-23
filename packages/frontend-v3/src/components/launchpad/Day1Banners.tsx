@@ -41,16 +41,16 @@ export default function Day1Banners() {
           >
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded bg-gda-amber/10 border border-gda-amber/20 px-1.5 py-0.5 font-mono text-[11px] text-gda-amber uppercase tracking-wide">
+                <span className="inline-flex items-center rounded bg-gda-amber/10 border border-gda-amber/20 px-1.5 py-0.5 font-mono text-[12px] text-gda-amber uppercase tracking-wide">
                   Day-1
                 </span>
                 {banner.agency && (
-                  <span className="font-mono text-[11px] text-muted-foreground uppercase">
+                  <span className="font-mono text-[12px] text-muted-foreground uppercase">
                     {banner.agency}
                   </span>
                 )}
                 {dollarStr && (
-                  <span className="font-mono text-[11px] font-bold text-foreground tabular-nums">
+                  <span className="font-mono text-[12px] font-bold text-foreground tabular-nums">
                     {dollarStr}
                   </span>
                 )}
@@ -70,7 +70,7 @@ export default function Day1Banners() {
                 )}
               </p>
               {banner.why_it_matters && (
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="font-mono text-[12px] text-muted-foreground">
                   {banner.why_it_matters}
                 </p>
               )}

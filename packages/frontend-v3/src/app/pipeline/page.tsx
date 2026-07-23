@@ -361,7 +361,7 @@ function PipelineContent() {
                 >
                   <span
                     className={cn(
-                      "rounded px-1.5 py-0.5 text-[11px] font-mono shrink-0",
+                      "rounded px-1.5 py-0.5 text-[12px] font-mono shrink-0",
                       STAGE_ARROW_COLORS[mover.to_stage_label] ?? "bg-muted text-muted-foreground",
                     )}
                   >
@@ -405,7 +405,7 @@ function PipelineContent() {
             <span className="font-mono text-xs font-bold uppercase text-muted-foreground">
               Qualify — Staging (Not Counted)
             </span>
-            <span className="font-mono text-[11px] text-muted-foreground">
+            <span className="font-mono text-[12px] text-muted-foreground">
               {qualifyItems.length} opp{qualifyItems.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -462,7 +462,7 @@ function PipelineContent() {
                             },
                           )
                         }
-                        className="rounded border border-gda-green px-2 py-0.5 text-[11px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors"
+                        className="rounded border border-gda-green px-2 py-0.5 text-[12px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors"
                       >
                         Promote to Pipeline
                       </button>
@@ -478,7 +478,7 @@ function PipelineContent() {
                             },
                           )
                         }
-                        className="rounded border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground hover:bg-gda-bg-base transition-colors"
+                        className="rounded border border-border px-2 py-0.5 text-[12px] font-mono text-muted-foreground hover:bg-gda-bg-base transition-colors"
                       >
                         Remove
                       </button>
@@ -587,7 +587,7 @@ function IntelChip({
       className="bg-gda-panel border border-border rounded px-3 py-1.5 text-left"
     >
       <div className="font-mono text-sm font-bold text-foreground">{label}</div>
-      <div className="font-mono text-[11px] text-muted-foreground">{sub}</div>
+      <div className="font-mono text-[12px] text-muted-foreground">{sub}</div>
     </Tag>
   );
 }
@@ -612,7 +612,7 @@ function PipelineRow({ item }: { item: PipelineListItem }) {
             {item.opportunity_title}
           </Link>
           {item.opportunity_agency && (
-            <span className="text-[11px] text-muted-foreground truncate block max-w-xs">
+            <span className="text-[12px] text-muted-foreground truncate block max-w-xs">
               {item.opportunity_agency}
             </span>
           )}
@@ -621,7 +621,7 @@ function PipelineRow({ item }: { item: PipelineListItem }) {
       <td className="px-3 py-1.5 text-left">
         <span
           className={cn(
-            "rounded border px-1.5 py-0.5 text-[11px] font-mono",
+            "rounded border px-1.5 py-0.5 text-[12px] font-mono",
             STAGE_BADGE_COLORS[item.stage] ?? "border-border text-muted-foreground",
           )}
         >
@@ -641,7 +641,7 @@ function PipelineRow({ item }: { item: PipelineListItem }) {
             {item.pwin_band && (
               <span
                 className={cn(
-                  "rounded px-1 py-0.5 text-[10px] font-mono uppercase",
+                  "rounded px-1 py-0.5 text-[12px] font-mono uppercase",
                   item.pwin_band === "high" && "bg-gda-green/20 text-gda-green",
                   item.pwin_band === "medium" && "bg-gda-amber/20 text-gda-amber",
                   item.pwin_band === "low" && "bg-gda-red/10 text-gda-red",

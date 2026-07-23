@@ -86,7 +86,7 @@ export function CapabilityMatchCard({ opportunityId }: { opportunityId: string }
             <Badge
               variant="outline"
               className={cn(
-                "text-[11px] font-mono font-bold border",
+                "text-[12px] font-mono font-bold border",
                 qualification.qualified
                   ? "border-gda-green/40 text-gda-green bg-gda-green/10"
                   : "border-gda-red/40 text-gda-red bg-gda-red/10",
@@ -109,7 +109,7 @@ export function CapabilityMatchCard({ opportunityId }: { opportunityId: string }
             )}
           >
             {qualification.reasons.map((reason, i) => (
-              <p key={i} className="text-[11px] text-muted-foreground leading-relaxed">
+              <p key={i} className="text-[12px] text-muted-foreground leading-relaxed">
                 {reason}
               </p>
             ))}
@@ -119,7 +119,7 @@ export function CapabilityMatchCard({ opportunityId }: { opportunityId: string }
         {/* Top Envision matches */}
         {topMatches.length > 0 ? (
           <div className="space-y-1.5">
-            <p className="text-[11px] font-mono text-muted-foreground uppercase">
+            <p className="text-[12px] font-mono text-muted-foreground uppercase">
               Envision Matches ({envisionMatches.length})
             </p>
             {topMatches.map((match) => (
@@ -131,13 +131,13 @@ export function CapabilityMatchCard({ opportunityId }: { opportunityId: string }
               />
             ))}
             {envisionMatches.length > 3 && (
-              <p className="text-[11px] text-muted-foreground font-mono">
+              <p className="text-[12px] text-muted-foreground font-mono">
                 + {envisionMatches.length - 3} more
               </p>
             )}
           </div>
         ) : (
-          <p className="text-[11px] text-muted-foreground font-mono">
+          <p className="text-[12px] text-muted-foreground font-mono">
             No Envision capability matches found
           </p>
         )}
@@ -145,7 +145,7 @@ export function CapabilityMatchCard({ opportunityId }: { opportunityId: string }
         {/* Teaming context */}
         {teamingMatches.length > 0 && (
           <div className="space-y-1.5 border-t border-border pt-2">
-            <p className="text-[11px] font-mono text-muted-foreground uppercase">
+            <p className="text-[12px] font-mono text-muted-foreground uppercase">
               Teaming Context ({teamingMatches.length})
             </p>
             {teamingMatches.slice(0, 3).map((match) => (
@@ -173,7 +173,7 @@ export function CapabilityMatchCard({ opportunityId }: { opportunityId: string }
             });
           }}
           disabled={computeMatches.isPending}
-          className="w-full text-center rounded border border-border px-3 py-1.5 text-[11px] font-mono text-muted-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors disabled:opacity-50"
+          className="w-full text-center rounded border border-border px-3 py-1.5 text-[12px] font-mono text-muted-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors disabled:opacity-50"
         >
           Refresh Matches
         </button>
@@ -218,13 +218,13 @@ function MatchRow({
           {match.capability_name}
         </span>
 
-        <span className="text-[11px] font-mono text-muted-foreground/60 shrink-0">
+        <span className="text-[12px] font-mono text-muted-foreground/60 shrink-0">
           {OU_LABELS[match.capability_ou] ?? match.capability_ou}
         </span>
 
         {match.evidence_grade && (
           <span className={cn(
-            "text-[11px] font-mono font-bold shrink-0",
+            "text-[12px] font-mono font-bold shrink-0",
             match.evidence_grade === "A" ? "text-gda-green" : match.evidence_grade === "B" ? "text-gda-cyan" : "text-gda-amber",
           )}>
             {match.evidence_grade}
@@ -232,7 +232,7 @@ function MatchRow({
         )}
 
         {qualifies && match.capability_ou === "envision" && (
-          <span className="text-[11px] font-mono text-gda-green shrink-0">
+          <span className="text-[12px] font-mono text-gda-green shrink-0">
             qualifies
           </span>
         )}
@@ -240,11 +240,11 @@ function MatchRow({
 
       {expanded && (
         <div className="mt-2 space-y-1 border-t border-border/50 pt-2">
-          <p className="text-[11px] font-mono text-muted-foreground uppercase">
+          <p className="text-[12px] font-mono text-muted-foreground uppercase">
             {match.capability_category}
           </p>
           {match.match_reasons.map((reason) => (
-            <div key={reason.factor} className="flex items-center gap-2 text-[11px]">
+            <div key={reason.factor} className="flex items-center gap-2 text-[12px]">
               <span className="font-mono text-muted-foreground w-20 shrink-0 capitalize">
                 {reason.factor}
               </span>

@@ -252,7 +252,7 @@ export default function VehiclesPage() {
                             {v.short_name}
                           </span>
                           {v.needs_review && (
-                            <span className="inline-flex items-center rounded border border-amber-400/50 bg-amber-400/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-600">
+                            <span className="inline-flex items-center rounded border border-amber-400/50 bg-amber-400/10 px-1.5 py-0.5 text-[12px] font-semibold text-amber-600">
                               Needs Review
                             </span>
                           )}
@@ -354,7 +354,7 @@ function StatusBadge({
     >
       <span
         className={cn(
-          "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold",
+          "inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-semibold",
           isActive && "border border-gda-green/30 text-gda-green bg-gda-green/10",
           isExpired && "bg-critical text-white",
           !isActive && !isExpired && "border border-border text-muted-foreground",
@@ -410,7 +410,7 @@ function SortableHeader({
         title={`Sort by ${label}`}
       >
         <span>{label}</span>
-        {caret && <span className="font-mono text-[11px]">{caret}</span>}
+        {caret && <span className="font-mono text-[12px]">{caret}</span>}
       </button>
     </th>
   );

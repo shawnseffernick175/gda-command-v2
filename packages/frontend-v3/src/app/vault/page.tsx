@@ -121,7 +121,7 @@ function ExtractionStatusBadge({ status }: { status: string }) {
       return (
         <span
           title="Extraction failed"
-          className="inline-block rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold border border-gda-red/40 bg-gda-red/10 text-gda-red"
+          className="inline-block rounded px-1.5 py-0.5 text-[12px] font-mono font-semibold border border-gda-red/40 bg-gda-red/10 text-gda-red"
         >
           FAILED
         </span>
@@ -130,7 +130,7 @@ function ExtractionStatusBadge({ status }: { status: string }) {
       return (
         <span
           title="File type not supported for extraction"
-          className="inline-block rounded px-1.5 py-0.5 text-[11px] font-mono border border-gda-amber/40 bg-gda-amber/10 text-gda-amber"
+          className="inline-block rounded px-1.5 py-0.5 text-[12px] font-mono border border-gda-amber/40 bg-gda-amber/10 text-gda-amber"
         >
           N/A
         </span>
@@ -139,7 +139,7 @@ function ExtractionStatusBadge({ status }: { status: string }) {
       return (
         <span
           title="Dismissed by owner"
-          className="inline-block rounded px-1.5 py-0.5 text-[11px] font-mono border border-border text-muted-foreground"
+          className="inline-block rounded px-1.5 py-0.5 text-[12px] font-mono border border-border text-muted-foreground"
         >
           CLEARED
         </span>
@@ -304,7 +304,7 @@ export default function VaultPage() {
             {countData && (
               <Badge
                 variant="outline"
-                className="shrink-0 border-gda-cyan/30 text-gda-cyan font-mono text-[11px]"
+                className="shrink-0 border-gda-cyan/30 text-gda-cyan font-mono text-[12px]"
               >
                 {countData.count} documents
               </Badge>
@@ -316,7 +316,7 @@ export default function VaultPage() {
           {activeTab === "work_product" && (
             <div className="flex shrink-0 items-center gap-2">
               {resolveMsg && (
-                <span className="text-[11px] font-mono text-muted-foreground">
+                <span className="text-[12px] font-mono text-muted-foreground">
                   {resolveMsg}
                 </span>
               )}
@@ -398,7 +398,7 @@ export default function VaultPage() {
               setStatusFilter(undefined);
               setPage(1);
             }}
-            className={`rounded px-2 py-0.5 text-[11px] font-mono border transition-colors ${
+            className={`rounded px-2 py-0.5 text-[12px] font-mono border transition-colors ${
               !docTypeFilter && !statusFilter
                 ? "border-accent bg-accent/10 text-accent"
                 : "border-border text-muted-foreground hover:text-foreground"
@@ -413,7 +413,7 @@ export default function VaultPage() {
                 setStatusFilter("unresolved");
                 setPage(1);
               }}
-              className={`rounded px-2 py-0.5 text-[11px] font-mono border transition-colors ${
+              className={`rounded px-2 py-0.5 text-[12px] font-mono border transition-colors ${
                 statusFilter === "unresolved"
                   ? "border-gda-red bg-gda-red/10 text-gda-red"
                   : "border-gda-red/40 text-gda-red hover:bg-gda-red/10"
@@ -430,7 +430,7 @@ export default function VaultPage() {
                 setStatusFilter(undefined);
                 setPage(1);
               }}
-              className={`rounded px-2 py-0.5 text-[11px] font-mono border transition-colors ${
+              className={`rounded px-2 py-0.5 text-[12px] font-mono border transition-colors ${
                 docTypeFilter === b && !statusFilter
                   ? "border-accent bg-accent/10 text-accent"
                   : "border-border text-muted-foreground hover:text-foreground"
@@ -651,7 +651,7 @@ function WorkProductTable({
                       },
                     );
                   }}
-                  className={`text-[11px] font-mono border rounded px-2 py-0.5 cursor-pointer appearance-none bg-transparent pr-5 bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_4px_center] ${docTypeBadgeClass(doc.doc_type)}`}
+                  className={`text-[12px] font-mono border rounded px-2 py-0.5 cursor-pointer appearance-none bg-transparent pr-5 bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_4px_center] ${docTypeBadgeClass(doc.doc_type)}`}
                 >
                   {DOC_TYPE_OPTIONS.map((dt) => (
                     <option key={dt} value={dt}>
@@ -682,7 +682,7 @@ function WorkProductTable({
               </td>
               <td className="px-3 py-2">
                 {doc.regulatory_citation ? (
-                  <span className="rounded px-1.5 py-0.5 text-[11px] font-mono border border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan">
+                  <span className="rounded px-1.5 py-0.5 text-[12px] font-mono border border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan">
                     {doc.regulatory_citation}
                   </span>
                 ) : (
@@ -696,13 +696,13 @@ function WorkProductTable({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => onSelect(doc.id)}
-                    className="text-[11px] text-gda-cyan hover:text-gda-cyan/80 font-mono"
+                    className="text-[12px] text-gda-cyan hover:text-gda-cyan/80 font-mono"
                   >
                     Read
                   </button>
                   <button
                     onClick={() => onLink(doc.id)}
-                    className="text-[11px] text-muted-foreground hover:text-foreground font-mono"
+                    className="text-[12px] text-muted-foreground hover:text-foreground font-mono"
                   >
                     Link
                   </button>
@@ -721,7 +721,7 @@ function WorkProductTable({
                       });
                     }}
                     disabled={sendToSitrep.isPending && sendToSitrep.variables === doc.id}
-                    className="text-[11px] text-accent hover:text-accent/80 font-mono"
+                    className="text-[12px] text-accent hover:text-accent/80 font-mono"
                   >
                     {sendToSitrep.isPending && sendToSitrep.variables === doc.id
                       ? "Sending\u2026"
@@ -733,7 +733,7 @@ function WorkProductTable({
                         onError: () => setErrorMsg("Re-extraction failed. Try again."),
                       })}
                       disabled={reExtract.isPending}
-                      className="text-[11px] text-gda-amber hover:text-gda-amber/80 font-mono"
+                      className="text-[12px] text-gda-amber hover:text-gda-amber/80 font-mono"
                     >
                       {reExtract.isPending && reExtract.variables === doc.id ? "Extracting\u2026" : "Retry"}
                     </button>
@@ -744,7 +744,7 @@ function WorkProductTable({
                         onError: () => setErrorMsg("Dismiss failed. Try again."),
                       })}
                       disabled={dismiss.isPending}
-                      className="text-[11px] text-muted-foreground hover:text-foreground font-mono"
+                      className="text-[12px] text-muted-foreground hover:text-foreground font-mono"
                     >
                       {dismiss.isPending && dismiss.variables === doc.id ? "Clearing\u2026" : "Dismiss"}
                     </button>
@@ -752,7 +752,7 @@ function WorkProductTable({
                   {!doc.is_system_doc && (
                     <button
                       onClick={() => onDelete(doc)}
-                      className="text-[11px] text-gda-red hover:text-gda-red/80 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-[12px] text-gda-red hover:text-gda-red/80 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       Delete
                     </button>
@@ -859,7 +859,7 @@ function RegulatoryLibrary({ searchQuery }: { searchQuery: string }) {
                 </span>
                 <Badge
                   variant="outline"
-                  className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]"
+                  className="border-gda-cyan/30 text-gda-cyan font-mono text-[12px]"
                 >
                   {entries.length}
                 </Badge>
@@ -894,7 +894,7 @@ function RegulatoryLibrary({ searchQuery }: { searchQuery: string }) {
                         className="border-b border-border last:border-0 hover:bg-gda-panel/30 transition-colors"
                       >
                         <td className="px-4 py-2">
-                          <span className="font-mono text-gda-cyan text-[11px]">
+                          <span className="font-mono text-gda-cyan text-[12px]">
                             {entry.citation}
                           </span>
                         </td>
@@ -910,7 +910,7 @@ function RegulatoryLibrary({ searchQuery }: { searchQuery: string }) {
                               href={entry.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-gda-cyan hover:text-gda-cyan/80 font-mono text-[11px]"
+                              className="text-gda-cyan hover:text-gda-cyan/80 font-mono text-[12px]"
                             >
                               View Source ↗
                             </a>
@@ -1000,11 +1000,11 @@ function DocumentReaderDrawer({
                     {doc.filename}
                   </span>
                   <span
-                    className={`inline-block rounded px-2 py-0.5 text-[11px] font-mono border ${docTypeBadgeClass(doc.doc_type)}`}
+                    className={`inline-block rounded px-2 py-0.5 text-[12px] font-mono border ${docTypeBadgeClass(doc.doc_type)}`}
                   >
                     {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
                   </span>
-                  <span className="inline-block rounded px-2 py-0.5 text-[11px] font-mono border border-border text-muted-foreground">
+                  <span className="inline-block rounded px-2 py-0.5 text-[12px] font-mono border border-border text-muted-foreground">
                     {doc.doc_category === "regulatory"
                       ? "Regulatory"
                       : "Work Product"}
@@ -1012,14 +1012,14 @@ function DocumentReaderDrawer({
                   {doc.ai_summary && doc.ai_tags ? (
                     <span
                       title={`AI ingested \u00b7 ${(doc.ai_tags as string[]).length} tags`}
-                      className="inline-block rounded px-2 py-0.5 text-[11px] font-mono border border-gda-green/30 bg-gda-green/10 text-gda-green"
+                      className="inline-block rounded px-2 py-0.5 text-[12px] font-mono border border-gda-green/30 bg-gda-green/10 text-gda-green"
                     >
                       AI {"\u2713"}
                     </span>
                   ) : (
                     <span
                       title="AI pending"
-                      className="inline-block rounded px-2 py-0.5 text-[11px] font-mono border border-border text-muted-foreground"
+                      className="inline-block rounded px-2 py-0.5 text-[12px] font-mono border border-border text-muted-foreground"
                     >
                       AI {"\u231b"}
                     </span>
@@ -1061,7 +1061,7 @@ function DocumentReaderDrawer({
                     Regulatory Citations
                   </h3>
                   <div className="flex flex-wrap gap-1">
-                    <span className="rounded px-2 py-0.5 text-[11px] font-mono border border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan">
+                    <span className="rounded px-2 py-0.5 text-[12px] font-mono border border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan">
                       {doc.regulatory_citation}
                     </span>
                   </div>
@@ -1138,7 +1138,7 @@ function DocumentReaderDrawer({
                         </span>
                         <button
                           onClick={() => onLink(doc.id)}
-                          className="text-gda-cyan text-[11px] font-mono hover:underline"
+                          className="text-gda-cyan text-[12px] font-mono hover:underline"
                         >
                           Link
                         </button>
@@ -1163,7 +1163,7 @@ function DocumentReaderDrawer({
                         </span>
                         <button
                           onClick={() => onLink(doc.id)}
-                          className="text-gda-cyan text-[11px] font-mono hover:underline"
+                          className="text-gda-cyan text-[12px] font-mono hover:underline"
                         >
                           Link
                         </button>
@@ -1215,7 +1215,7 @@ function DocumentReaderDrawer({
                             className="border-b border-border last:border-0"
                           >
                             <td className="px-2 py-1">
-                              <span className="text-[11px] uppercase tracking-wide font-mono text-foreground">
+                              <span className="text-[12px] uppercase tracking-wide font-mono text-foreground">
                                 {a.action}
                               </span>
                             </td>
@@ -1245,7 +1245,7 @@ function DocumentReaderDrawer({
                       <button
                         onClick={() => reExtract.mutate(doc.id)}
                         disabled={reExtract.isPending}
-                        className="rounded border border-gda-amber/40 bg-gda-amber/10 px-3 py-1 text-[11px] font-mono text-gda-amber hover:bg-gda-amber/20 transition-colors disabled:opacity-50"
+                        className="rounded border border-gda-amber/40 bg-gda-amber/10 px-3 py-1 text-[12px] font-mono text-gda-amber hover:bg-gda-amber/20 transition-colors disabled:opacity-50"
                       >
                         {reExtract.isPending ? "Retrying\u2026" : "Retry Extraction"}
                       </button>
@@ -1254,7 +1254,7 @@ function DocumentReaderDrawer({
                       <button
                         onClick={() => dismiss.mutate(doc.id)}
                         disabled={dismiss.isPending}
-                        className="rounded border border-border px-3 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel transition-colors disabled:opacity-50"
+                        className="rounded border border-border px-3 py-1 text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel transition-colors disabled:opacity-50"
                       >
                         {dismiss.isPending ? "Clearing\u2026" : "Dismiss"}
                       </button>
@@ -1433,7 +1433,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
               </option>
             ))}
           </select>
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="text-[12px] text-muted-foreground mt-1">
             AI will still summarize and tag the document, but the bucket you
             choose here is final.
           </p>
@@ -1487,13 +1487,13 @@ function UploadModal({ onClose }: { onClose: () => void }) {
                   <p className="truncate font-mono text-xs text-foreground">
                     {q.file.name}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     {formatBytes(q.file.size)}
                     {q.message ? ` - ${q.message}` : ""}
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 font-mono text-[11px] ${
+                  className={`shrink-0 font-mono text-[12px] ${
                     q.status === "done"
                       ? "text-gda-green"
                       : q.status === "error"

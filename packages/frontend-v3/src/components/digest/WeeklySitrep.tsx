@@ -112,7 +112,7 @@ export default function WeeklySitrep() {
       ) : (
         <table className="w-full font-mono text-xs">
           <thead>
-            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border text-[12px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="#" field="sitrep_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Week Ending" field="week_ending" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Created" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
@@ -279,16 +279,16 @@ function SitrepItemsTable({ items }: { items: SitrepItem[] }) {
     <table className="w-full font-mono text-xs">
       <thead>
         <tr className="border-b border-border">
-          <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium w-8">
+          <th className="py-1.5 text-left text-[12px] uppercase tracking-wider text-muted-foreground font-medium w-8">
             #
           </th>
-          <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+          <th className="py-1.5 text-left text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
             Topic
           </th>
-          <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+          <th className="py-1.5 text-left text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
             Discussion
           </th>
-          <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+          <th className="py-1.5 text-left text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
             Action Items / Follow-Up
           </th>
         </tr>
@@ -302,7 +302,7 @@ function SitrepItemsTable({ items }: { items: SitrepItem[] }) {
               {item.source_document_id && (
                 <Link
                   href={`/vault?id=${item.source_document_id}`}
-                  className="ml-2 text-[11px] text-accent hover:underline font-normal"
+                  className="ml-2 text-[12px] text-accent hover:underline font-normal"
                 >
                   [doc]
                 </Link>

@@ -80,7 +80,7 @@ export function DriversTab({ captureId, plan }: DriversTabProps) {
       <DriverSection title="Pricing">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <span className="text-[11px] text-muted-foreground">Posture</span>
+            <span className="text-[12px] text-muted-foreground">Posture</span>
             <select
               value={pricingPosture}
               onChange={(e) => setPricingPosture(e.target.value)}
@@ -93,7 +93,7 @@ export function DriversTab({ captureId, plan }: DriversTabProps) {
             </select>
           </div>
           <div>
-            <span className="text-[11px] text-muted-foreground">Margin target (decimal, e.g. 0.08 = 8%)</span>
+            <span className="text-[12px] text-muted-foreground">Margin target (decimal, e.g. 0.08 = 8%)</span>
             <input
               type="number"
               step="0.01"
@@ -104,7 +104,7 @@ export function DriversTab({ captureId, plan }: DriversTabProps) {
           </div>
         </div>
         <div>
-          <span className="text-[11px] text-muted-foreground">PTW Estimate ($)</span>
+          <span className="text-[12px] text-muted-foreground">PTW Estimate ($)</span>
           <input
             type="number"
             value={ptwEstimate}
@@ -117,7 +117,7 @@ export function DriversTab({ captureId, plan }: DriversTabProps) {
       {/* Teaming */}
       <DriverSection title="Teaming">
         <div>
-          <span className="text-[11px] text-muted-foreground">Prime or Sub</span>
+          <span className="text-[12px] text-muted-foreground">Prime or Sub</span>
           <select
             value={primeOrSub}
             onChange={(e) => setPrimeOrSub(e.target.value)}
@@ -167,7 +167,7 @@ function ScoreInput({
 }) {
   return (
     <div>
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="text-[12px] text-muted-foreground">{label}</span>
       <input
         type="number"
         min={1}
@@ -192,7 +192,7 @@ function TextArea({
 }) {
   return (
     <div>
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="text-[12px] text-muted-foreground">{label}</span>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

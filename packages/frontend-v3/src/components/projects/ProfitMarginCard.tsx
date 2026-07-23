@@ -88,13 +88,13 @@ function ArcGauge({
           {value.toFixed(1)}%
         </text>
       </svg>
-      <span className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <span className="mt-1 text-[12px] uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       {target != null && (
         <span
           className={cn(
-            "text-[11px]",
+            "text-[12px]",
             atOrAbove ? "text-gda-green" : "text-gda-red",
           )}
         >
@@ -138,7 +138,7 @@ export function ProfitMarginCard({ project }: { project: ProjectFullRow }) {
   return (
     <div className="rounded border border-border bg-white p-4">
       <h3 className="mb-1 text-sm font-medium text-fin-ink">Profit Margin</h3>
-      <p className="mb-4 text-[11px] text-muted-foreground">
+      <p className="mb-4 text-[12px] text-muted-foreground">
         Period and YTD margin with target markers
       </p>
       <div className="flex items-center justify-center gap-8">

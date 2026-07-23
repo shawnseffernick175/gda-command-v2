@@ -76,7 +76,7 @@ export function LoginScreen() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
                   aria-pressed={showPassword}
                 >
                   {showPassword ? "Hide" : "Show"}
@@ -106,12 +106,12 @@ export function LoginScreen() {
               <button
                 type="button"
                 onClick={() => setShowResetHelp((v) => !v)}
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 Forgot password?
               </button>
               {showResetHelp && (
-                <p className="mt-2 text-[11px] text-muted-foreground">
+                <p className="mt-2 text-[12px] text-muted-foreground">
                   Passwords are managed by your administrator. Contact your GDA
                   Command admin to have your password reset.
                 </p>

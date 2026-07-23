@@ -47,7 +47,7 @@ export default function CollapsibleSection({
         onClick={toggle}
         className="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-gda-panel-alt"
       >
-        <h2 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+        <h2 className="font-mono text-[12px] font-bold text-muted-foreground uppercase tracking-widest">
           {title}
         </h2>
         <span

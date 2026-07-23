@@ -20,16 +20,16 @@ export function Kpi({
         className,
       )}
     >
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+      <p className="text-[12px] uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
       <p className="mt-1 text-xl font-semibold tabular-nums text-foreground leading-none">
         {value}
       </p>
       {subtitle ? (
-        <p className="mt-1 text-[11px] text-muted-foreground">{subtitle}</p>
+        <p className="mt-1 text-[12px] text-muted-foreground">{subtitle}</p>
       ) : (
-        <p className="mt-1 text-[11px] text-transparent select-none">{"\u00A0"}</p>
+        <p className="mt-1 text-[12px] text-transparent select-none">{"\u00A0"}</p>
       )}
     </div>
   );

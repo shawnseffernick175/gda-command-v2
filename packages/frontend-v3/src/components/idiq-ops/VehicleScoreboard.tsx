@@ -16,7 +16,7 @@ export function VehicleScoreboard({
 }: VehicleScoreboardProps) {
   return (
     <aside className="w-[260px] shrink-0 space-y-2 overflow-y-auto border-l border-border pl-4">
-      <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+      <h3 className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
         Vehicle Scoreboard
       </h3>
       {vehicles.map((v) => (
@@ -37,13 +37,13 @@ export function VehicleScoreboard({
             <span className="text-xs font-semibold text-foreground">
               {v.short_name}
             </span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               {v.agency}
             </span>
           </div>
 
           {v.contract_number && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground font-mono">
+            <p className="mt-0.5 text-[12px] text-muted-foreground font-mono">
               {v.contract_number}
               {v.ceiling_value
                 ? ` · $${formatCeiling(v.ceiling_value)}`
@@ -52,7 +52,7 @@ export function VehicleScoreboard({
           )}
 
           <div className="mt-2 border-t border-border pt-2 space-y-1">
-            <div className="flex justify-between text-[11px]">
+            <div className="flex justify-between text-[12px]">
               <span className="text-muted-foreground">Open TOs:</span>
               <span className="font-mono tabular-nums text-foreground">
                 {v.open_to_count}
@@ -64,28 +64,28 @@ export function VehicleScoreboard({
               </span>
             </div>
 
-            <div className="flex justify-between text-[11px]">
+            <div className="flex justify-between text-[12px]">
               <span className="text-muted-foreground">Last TO:</span>
               <span className="font-mono tabular-nums text-foreground">
                 {v.last_to_posted ? formatDate(v.last_to_posted) : "—"}
               </span>
             </div>
 
-            <div className="flex justify-between text-[11px]">
+            <div className="flex justify-between text-[12px]">
               <span className="text-muted-foreground">Next close:</span>
               <span className="font-mono tabular-nums text-foreground">
                 {v.next_close ? formatDate(v.next_close) : "—"}
               </span>
             </div>
 
-            <div className="flex justify-between text-[11px]">
+            <div className="flex justify-between text-[12px]">
               <span className="text-muted-foreground">Submitted YTD:</span>
               <span className="font-mono tabular-nums text-foreground">
                 {v.submitted_ytd}
               </span>
             </div>
 
-            <div className="flex justify-between text-[11px]">
+            <div className="flex justify-between text-[12px]">
               <span className="text-muted-foreground">Won LTM:</span>
               <span className="font-mono tabular-nums text-foreground">
                 {v.awarded_ltm}
@@ -117,7 +117,7 @@ function PollingStatus({
 }) {
   if (!source) {
     return (
-      <span className="text-[11px] text-muted-foreground italic">
+      <span className="text-[12px] text-muted-foreground italic">
         Manual ingest
       </span>
     );
@@ -130,7 +130,7 @@ function PollingStatus({
   return (
     <span
       className={cn(
-        "text-[11px]",
+        "text-[12px]",
         isFailed ? "text-red-600" : "text-muted-foreground",
       )}
     >

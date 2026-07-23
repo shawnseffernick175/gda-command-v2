@@ -65,7 +65,7 @@ export function ArContractMatrix() {
     <div className="space-y-4">
       {/* CY/FY toggle */}
       <div className="flex items-center justify-between">
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+        <p className="text-[12px] uppercase tracking-wider text-muted-foreground">
           Receivables by Contract — {data.period_label} YTD
         </p>
         <div className="flex rounded border border-border">
@@ -91,7 +91,7 @@ export function ArContractMatrix() {
       <div className="rounded border border-border overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <th className="px-3 py-2 text-left font-medium">Contract</th>
               {activeMonths.map((m) => (
                 <th key={m} className="px-3 py-2 text-right font-medium">{m}</th>

@@ -109,17 +109,17 @@ export function IngestionCoverageTab() {
     xAxis: {
       type: "category" as const,
       data: categories,
-      axisLabel: { fontSize: 11, color: "var(--color-fin-stone)" },
+      axisLabel: { fontSize: 12, color: "var(--color-fin-stone)" },
     },
     yAxis: {
       type: "value" as const,
-      axisLabel: { fontSize: 11, color: "var(--color-fin-stone)" },
+      axisLabel: { fontSize: 12, color: "var(--color-fin-stone)" },
     },
     series: [
       {
         type: "bar" as const,
         data: values.map((v, i) => ({ value: v, itemStyle: { color: colors[i] } })),
-        label: { show: true, position: "top" as const, fontSize: 11 },
+        label: { show: true, position: "top" as const, fontSize: 12 },
         barMaxWidth: 48,
       },
     ],
@@ -138,7 +138,7 @@ export function IngestionCoverageTab() {
 
       {/* Chart */}
       <div className="rounded border border-border bg-white p-4">
-        <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
           Document Ingestion Status
         </p>
         <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 220 }} notMerge />
@@ -148,7 +148,7 @@ export function IngestionCoverageTab() {
       <div className="rounded border border-border overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Doc ID" field="doc_id" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Filename" field="filename" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -171,7 +171,7 @@ export function IngestionCoverageTab() {
                 <td className="px-3 py-2 text-left">
                   <span
                     className={cn(
-                      "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium",
+                      "inline-block rounded px-1.5 py-0.5 text-[12px] font-medium",
                       STATUS_BADGE[doc.status],
                     )}
                   >

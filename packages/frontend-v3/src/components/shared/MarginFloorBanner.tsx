@@ -24,7 +24,7 @@ export function MarginFloorBanner({
           <p className="text-xs font-semibold text-gda-red">
             Margin Floor Violation
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-[12px] text-muted-foreground mt-0.5">
             Expected margin {marginCheck.margin_pct}% is below the {marginCheck.threshold}% minimum required for core lane pursuits.
             Source: {marginCheck.source}.
             Rule: <span className="font-mono">doctrine_rules_config.margin_floor_pct</span>
@@ -33,7 +33,7 @@ export function MarginFloorBanner({
         <button
           type="button"
           onClick={() => setShowOverride(true)}
-          className="shrink-0 rounded border border-border px-2.5 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:border-gda-green/40 transition-colors"
+          className="shrink-0 rounded border border-border px-2.5 py-1 text-[12px] font-mono text-muted-foreground hover:text-foreground hover:border-gda-green/40 transition-colors"
         >
           Override
         </button>

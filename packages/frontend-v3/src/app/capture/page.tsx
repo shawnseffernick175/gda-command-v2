@@ -234,7 +234,7 @@ function CaptureReviewDots({ opportunityId }: { opportunityId?: string }) {
   const { data: capture } = useCapture(opportunityId ?? "");
   const captureId = capture?.id;
   const { data } = useCaptureReviews(captureId);
-  if (!captureId || !data?.items) return <span className="text-[11px] text-muted-foreground">—</span>;
+  if (!captureId || !data?.items) return <span className="text-[12px] text-muted-foreground">—</span>;
   return <ReviewColorDots reviews={data.items} />;
 }
 
@@ -596,7 +596,7 @@ function ColorTeamWorkflow({ captureId }: { captureId: string }) {
                 } hover:bg-gda-panel`}
               >
                 <p className="font-mono text-xs font-medium">{STAGE_LABELS[stage]}</p>
-                <p className="mt-0.5 text-[11px]">
+                <p className="mt-0.5 text-[12px]">
                   {stageData?.status === "in_progress"
                     ? "In Progress"
                     : stageData?.status === "complete"
@@ -653,7 +653,7 @@ function StagePanel({
           <span className="font-mono text-xs font-bold text-foreground">
             {STAGE_FULL_LABELS[stage]}
           </span>
-          <Badge variant="outline" className="text-[11px]">
+          <Badge variant="outline" className="text-[12px]">
             {stageData.status}
           </Badge>
         </div>
@@ -691,13 +691,13 @@ function StagePanel({
                   className="flex items-start justify-between rounded border border-border bg-gda-bg-base px-2 py-1.5"
                 >
                   <div>
-                    <span className="text-[11px] text-muted-foreground">{ann.author}</span>
+                    <span className="text-[12px] text-muted-foreground">{ann.author}</span>
                     <p className="text-xs text-foreground whitespace-pre-wrap">{ann.body}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => deleteAnnotation.mutate({ stage, annotationId: ann.id })}
-                    className="ml-2 text-[11px] text-gda-red hover:underline"
+                    className="ml-2 text-[12px] text-gda-red hover:underline"
                   >
                     ×
                   </button>
@@ -740,7 +740,7 @@ function StagePanel({
             {takeSnapshot.isPending ? "Saving..." : "Take Snapshot"}
           </button>
           {stageData.snapshot_at && (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               Last snapshot: {new Date(stageData.snapshot_at).toLocaleString()}
             </span>
           )}
@@ -774,7 +774,7 @@ function StagePanel({
             <p className="text-xs text-muted-foreground italic">Analysis will run automatically when this stage is activated.</p>
           )}
           {stageData.ai_ran_at && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               Ran: {new Date(stageData.ai_ran_at).toLocaleString()}
             </p>
           )}
@@ -859,7 +859,7 @@ function StageAnalysisDisplay({ analysis }: { analysis: StageAnalysis }) {
         <span className="text-muted-foreground">Gate:</span>
         <Badge
           variant="outline"
-          className={`text-[11px] ${
+          className={`text-[12px] ${
             analysis.gate_recommendation === "go"
               ? "border-gda-green/40 text-gda-green"
               : analysis.gate_recommendation === "no_go"
@@ -986,7 +986,7 @@ function CaptureOutputGenerators({ captureId }: { captureId: string }) {
 
         {capturePlanDocs.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Previous Capture Plans</p>
+            <p className="text-[12px] text-muted-foreground uppercase tracking-wide">Previous Capture Plans</p>
             {capturePlanDocs.map((doc) => (
               <a
                 key={doc.id}
@@ -1007,7 +1007,7 @@ function CaptureOutputGenerators({ captureId }: { captureId: string }) {
 
         {winThemeDocs.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Previous Win Themes</p>
+            <p className="text-[12px] text-muted-foreground uppercase tracking-wide">Previous Win Themes</p>
             {winThemeDocs.map((doc) => (
               <a
                 key={doc.id}

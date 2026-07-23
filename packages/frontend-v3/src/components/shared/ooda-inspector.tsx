@@ -79,7 +79,7 @@ export function OodaInspector({
         );
       })}
       {ooda.data.model_used && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Model: {ooda.data.model_used} · {ooda.data.latency_ms}ms
         </p>
       )}

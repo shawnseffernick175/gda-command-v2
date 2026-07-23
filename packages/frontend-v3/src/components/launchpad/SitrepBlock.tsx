@@ -106,7 +106,7 @@ export default function SitrepBlock() {
 
         {documents.length > 0 && (
           <div className="mt-4 border-t border-border pt-3">
-            <h3 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
+            <h3 className="font-mono text-[12px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
               Attached Documents
             </h3>
             <ul className="space-y-1">

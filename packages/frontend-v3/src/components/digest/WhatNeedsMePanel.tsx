@@ -110,7 +110,7 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
       >
         <Badge
           variant="outline"
-          className={cn("text-[11px] shrink-0 w-[56px] justify-center", PRIORITY_COLORS[priority])}
+          className={cn("text-[12px] shrink-0 w-[56px] justify-center", PRIORITY_COLORS[priority])}
         >
           {priority}
         </Badge>
@@ -121,13 +121,13 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
           {item.title}
         </span>
         <span className={cn(
-          "text-[11px] shrink-0",
+          "text-[12px] shrink-0",
           overdue ? "text-[#A12C7B]" : "text-[#7A7974]"
         )}>
           {item.due_date ? formatDate(item.due_date) : ""}
         </span>
         <span className={cn(
-          "text-[11px] shrink-0 w-[80px] text-right",
+          "text-[12px] shrink-0 w-[80px] text-right",
           isPending ? "text-[#B45309]" : hasReadyDraft ? "text-[#01696F]" : "text-[#7A7974]"
         )}>
           {isPending && (
@@ -166,7 +166,7 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
                       { onSuccess: () => setEditing(false) },
                     );
                   }}
-                  className="text-[11px] px-2 py-0.5 rounded bg-[#01696F] text-white hover:bg-[#01696F]/90 transition-colors disabled:opacity-50"
+                  className="text-[12px] px-2 py-0.5 rounded bg-[#01696F] text-white hover:bg-[#01696F]/90 transition-colors disabled:opacity-50"
                 >
                   Save
                 </button>
@@ -176,7 +176,7 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
                     setEditing(false);
                     setEditText(item.draft_text ?? "");
                   }}
-                  className="text-[11px] px-2 py-0.5 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] transition-colors"
+                  className="text-[12px] px-2 py-0.5 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] transition-colors"
                 >
                   Cancel
                 </button>
@@ -208,7 +208,7 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
                       },
                     );
                   }}
-                  className="text-[11px] px-2 py-0.5 rounded bg-[#A12C7B] text-white hover:bg-[#A12C7B]/90 transition-colors disabled:opacity-50"
+                  className="text-[12px] px-2 py-0.5 rounded bg-[#A12C7B] text-white hover:bg-[#A12C7B]/90 transition-colors disabled:opacity-50"
                 >
                   Reject
                 </button>
@@ -218,7 +218,7 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
                     setRejectMode(false);
                     setRejectReason("");
                   }}
-                  className="text-[11px] px-2 py-0.5 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] transition-colors"
+                  className="text-[12px] px-2 py-0.5 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] transition-colors"
                 >
                   Cancel
                 </button>
@@ -233,14 +233,14 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
                 type="button"
                 disabled={approveMutation.isPending}
                 onClick={() => approveMutation.mutate({ id: item.id })}
-                className="text-[11px] px-2 py-0.5 rounded bg-[#01696F] text-white hover:bg-[#01696F]/90 transition-colors disabled:opacity-50"
+                className="text-[12px] px-2 py-0.5 rounded bg-[#01696F] text-white hover:bg-[#01696F]/90 transition-colors disabled:opacity-50"
               >
                 Approve
               </button>
               <button
                 type="button"
                 onClick={() => setRejectMode(true)}
-                className="text-[11px] px-2 py-0.5 rounded border border-[#A12C7B]/30 text-[#A12C7B] hover:bg-[#A12C7B]/10 transition-colors"
+                className="text-[12px] px-2 py-0.5 rounded border border-[#A12C7B]/30 text-[#A12C7B] hover:bg-[#A12C7B]/10 transition-colors"
               >
                 Reject
               </button>
@@ -250,7 +250,7 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
                   setEditText(item.draft_text ?? "");
                   setEditing(true);
                 }}
-                className="text-[11px] px-2 py-0.5 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] hover:border-[#01696F] transition-colors"
+                className="text-[12px] px-2 py-0.5 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] hover:border-[#01696F] transition-colors"
               >
                 Edit
               </button>
@@ -264,7 +264,7 @@ function WhatNeedsMeRow({ item }: { item: ActionItem }) {
                 <Link
                   key={idx}
                   href={ref.url}
-                  className="text-[11px] px-1 py-0.5 rounded bg-[#01696F]/10 text-[#01696F] border border-[#01696F]/20 hover:bg-[#01696F]/20 transition-colors"
+                  className="text-[12px] px-1 py-0.5 rounded bg-[#01696F]/10 text-[#01696F] border border-[#01696F]/20 hover:bg-[#01696F]/20 transition-colors"
                 >
                   {ref.title}
                 </Link>

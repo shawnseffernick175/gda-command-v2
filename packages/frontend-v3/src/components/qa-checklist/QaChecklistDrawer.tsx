@@ -107,10 +107,10 @@ function ChecklistRow({ item }: { item: QaChecklistItem }) {
     <div className="rounded border border-border bg-gda-panel p-3 space-y-2">
       {/* Top row: severity + page area + verified checkbox */}
       <div className="flex items-center gap-2">
-        <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-bold", severityClass)}>
+        <span className={cn("rounded px-1.5 py-0.5 text-[12px] font-bold", severityClass)}>
           {item.severity}
         </span>
-        <span className="text-[11px] font-medium text-muted-foreground truncate">
+        <span className="text-[12px] font-medium text-muted-foreground truncate">
           {item.page_area}
         </span>
         <span className="ml-auto flex items-center gap-1">
@@ -144,7 +144,7 @@ function ChecklistRow({ item }: { item: QaChecklistItem }) {
       <div className="flex flex-wrap items-center gap-1.5">
         <span
           className={cn(
-            "rounded border px-1.5 py-0.5 text-[11px] font-medium",
+            "rounded border px-1.5 py-0.5 text-[12px] font-medium",
             categoryClass,
           )}
         >
@@ -152,20 +152,20 @@ function ChecklistRow({ item }: { item: QaChecklistItem }) {
         </span>
         <span
           className={cn(
-            "rounded px-1.5 py-0.5 text-[11px] font-medium",
+            "rounded px-1.5 py-0.5 text-[12px] font-medium",
             statusClass,
           )}
         >
           {item.status.replace(/-/g, " ")}
         </span>
-        <span className="ml-auto text-[11px] text-muted-foreground">
+        <span className="ml-auto text-[12px] text-muted-foreground">
           {lastUpdated}
         </span>
       </div>
 
       {/* Links + evidence */}
       {(item.github_issue || item.github_pr || item.evidence_note) && (
-        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <div className="flex flex-wrap items-center gap-2 text-[12px]">
           {item.github_issue && (
             <a
               href={`https://github.com/shawnseffernick175/gda-command-v2/issues/${item.github_issue.replace("#", "")}`}

@@ -59,7 +59,7 @@ function SortSpan({
     >
       <span className="truncate">{label}</span>
       {indicator && (
-        <span className="font-mono text-[11px] leading-none">{indicator}</span>
+        <span className="font-mono text-[12px] leading-none">{indicator}</span>
       )}
     </button>
   );
@@ -383,7 +383,7 @@ function ActionItemRow({
         {/* Severity badge */}
         <Badge
           variant="outline"
-          className={cn("text-[11px] shrink-0 w-[72px] justify-center", PRIORITY_COLORS[priority])}
+          className={cn("text-[12px] shrink-0 w-[72px] justify-center", PRIORITY_COLORS[priority])}
         >
           {priority}
         </Badge>
@@ -391,7 +391,7 @@ function ActionItemRow({
         {/* Source type badge */}
         <Badge
           variant="outline"
-          className={cn("text-[11px] shrink-0 w-[72px] justify-center", DOCTRINE_SOURCE_COLORS[doctrineSource])}
+          className={cn("text-[12px] shrink-0 w-[72px] justify-center", DOCTRINE_SOURCE_COLORS[doctrineSource])}
         >
           {DOCTRINE_SOURCE_LABELS[doctrineSource]}
         </Badge>
@@ -441,7 +441,7 @@ function ActionItemRow({
         <Badge
           variant="outline"
           className={cn(
-            "text-[11px] shrink-0 w-[72px] justify-center",
+            "text-[12px] shrink-0 w-[72px] justify-center",
             overdue
               ? "border-[#A12C7B]/30 text-[#A12C7B]"
               : item.status === "done"
@@ -510,7 +510,7 @@ function AiDraftSidePanel({ item }: { item: ActionItem }) {
           </span>
         </div>
         {item.draft_generated_at && (
-          <span className="text-[11px] text-[#7A7974]">
+          <span className="text-[12px] text-[#7A7974]">
             Generated {formatDate(item.draft_generated_at)}
           </span>
         )}
@@ -642,13 +642,13 @@ function AiDraftSidePanel({ item }: { item: ActionItem }) {
       {/* R1 evidence citations */}
       {item.draft_evidence_ids && item.draft_evidence_ids.length > 0 && (
         <div className="space-y-1">
-          <span className="text-[11px] text-[#7A7974] uppercase tracking-wider">Sources</span>
+          <span className="text-[12px] text-[#7A7974] uppercase tracking-wider">Sources</span>
           <div className="flex flex-wrap gap-1">
             {item.draft_evidence_ids.map((ref, idx) => (
               <Link
                 key={idx}
                 href={ref.url}
-                className="text-[11px] px-1.5 py-0.5 rounded bg-[#01696F]/10 text-[#01696F] border border-[#01696F]/20 hover:bg-[#01696F]/20 transition-colors"
+                className="text-[12px] px-1.5 py-0.5 rounded bg-[#01696F]/10 text-[#01696F] border border-[#01696F]/20 hover:bg-[#01696F]/20 transition-colors"
               >
                 {ref.title}
               </Link>
@@ -660,7 +660,7 @@ function AiDraftSidePanel({ item }: { item: ActionItem }) {
       {/* Legacy drafts section */}
       {item.drafts && item.drafts.length > 0 && (
         <div className="space-y-1 border-t border-[#D4D1CA]/30 pt-2">
-          <span className="text-[11px] text-[#7A7974] uppercase tracking-wider">Additional Drafts</span>
+          <span className="text-[12px] text-[#7A7974] uppercase tracking-wider">Additional Drafts</span>
           <div className="flex gap-1.5 mb-1">
             {DRAFT_KINDS.map((kind) => (
               <button
@@ -695,7 +695,7 @@ function LegacyDraftRow({ draft }: { draft: ActionItemDraft }) {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 w-full text-left"
       >
-        <Badge variant="outline" className="text-[11px] shrink-0">
+        <Badge variant="outline" className="text-[12px] shrink-0">
           {draft.kind}
         </Badge>
         <DraftStatusChip status={draft.status} />
@@ -722,14 +722,14 @@ function DraftStatusChip({
 }) {
   if (status === "generating") {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-[#B45309]">
+      <span className="inline-flex items-center gap-1 text-[12px] text-[#B45309]">
         <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#B45309] border-t-transparent" />
         generating
       </span>
     );
   }
   if (status === "failed") {
-    return <span className="text-[11px] text-[#A12C7B]">failed</span>;
+    return <span className="text-[12px] text-[#A12C7B]">failed</span>;
   }
-  return <span className="text-[11px] text-[#01696F]">done</span>;
+  return <span className="text-[12px] text-[#01696F]">done</span>;
 }

@@ -83,26 +83,26 @@ export function AiModelCostTable() {
         <div className="flex items-center gap-1">
           {WINS.map(([v, l]) => (
             <button key={v} type="button" onClick={() => setWin(v)} className={cn(
-              "rounded border px-2.5 py-1 text-[11px] font-mono",
+              "rounded border px-2.5 py-1 text-[12px] font-mono",
               win === v ? "border-gda-cyan bg-gda-cyan/10 text-gda-cyan" : "border-border text-muted-foreground",
             )}>{l}</button>
           ))}
         </div>
         <div className="flex items-center gap-3">
           {data?.generated_at && (
-            <span className="text-[11px] text-muted-foreground font-mono">
+            <span className="text-[12px] text-muted-foreground font-mono">
               Updated {new Date(data.generated_at).toLocaleTimeString()}
             </span>
           )}
           <button type="button" onClick={() => refetch()} disabled={isFetching} className={cn(
-            "rounded border border-border px-2.5 py-1 text-[11px] font-mono text-muted-foreground",
+            "rounded border border-border px-2.5 py-1 text-[12px] font-mono text-muted-foreground",
             isFetching && "opacity-50",
           )}>Refresh</button>
         </div>
       </div>
 
       <div className="rounded border border-border bg-gda-bg-base px-3 py-2">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Anthropic cost metering fix in progress (#964); those rows may show $0.00.
         </p>
       </div>
@@ -115,7 +115,7 @@ export function AiModelCostTable() {
         <div className="rounded border border-border overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wide text-muted-foreground">
                 {COLS.map((c) => (
                   <th key={c.k} className={cn(H, c.r ? "text-right" : "text-left")} onClick={() => onSort(c.k)}>
                     {c.h}{sk === c.k && <span className="ml-1">{sd === "asc" ? "↑" : "↓"}</span>}

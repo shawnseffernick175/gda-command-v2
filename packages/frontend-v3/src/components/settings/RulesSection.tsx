@@ -38,7 +38,7 @@ function NumberEditor({ value, onSave, saving }: { value: number; onSave: (v: nu
           type="button"
           onClick={() => { onSave(draft); setDirty(false); }}
           disabled={saving}
-          className="rounded border border-gda-green bg-gda-green/10 px-2 py-0.5 text-[11px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+          className="rounded border border-gda-green bg-gda-green/10 px-2 py-0.5 text-[12px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
         >
           Save
         </button>
@@ -79,7 +79,7 @@ function ChipEditor({ value, onSave, saving }: { value: string[]; onSave: (v: st
             <button
               type="button"
               onClick={() => removeItem(item)}
-              className="text-muted-foreground hover:text-gda-red text-[11px]"
+              className="text-muted-foreground hover:text-gda-red text-[12px]"
             >
               x
             </button>
@@ -99,7 +99,7 @@ function ChipEditor({ value, onSave, saving }: { value: string[]; onSave: (v: st
           type="button"
           onClick={addItem}
           disabled={!newItem.trim()}
-          className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-gda-bg-base disabled:opacity-50"
+          className="rounded border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-gda-bg-base disabled:opacity-50"
         >
           + Add
         </button>
@@ -109,7 +109,7 @@ function ChipEditor({ value, onSave, saving }: { value: string[]; onSave: (v: st
           type="button"
           onClick={() => { onSave(items); setDirty(false); }}
           disabled={saving}
-          className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[11px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+          className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[12px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
         >
           Save
         </button>
@@ -150,7 +150,7 @@ function MultiSelectEditor({ value, onSave, saving }: { value: string[]; onSave:
           type="button"
           onClick={() => { onSave(selected); setDirty(false); }}
           disabled={saving}
-          className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[11px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+          className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[12px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
         >
           Save
         </button>
@@ -181,7 +181,7 @@ function ThresholdsEditor({
       <div className="flex items-center gap-4">
         {(["weak", "moderate", "strong"] as const).map((field) => (
           <div key={field} className="flex items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground capitalize">{field}</span>
+            <span className="text-[12px] text-muted-foreground capitalize">{field}</span>
             <input
               type="number"
               min={0}
@@ -192,14 +192,14 @@ function ThresholdsEditor({
             />
           </div>
         ))}
-        <span className="text-[11px] text-muted-foreground">/ 40</span>
+        <span className="text-[12px] text-muted-foreground">/ 40</span>
       </div>
       {dirty && (
         <button
           type="button"
           onClick={() => { onSave(draft); setDirty(false); }}
           disabled={saving}
-          className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[11px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+          className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[12px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
         >
           Save
         </button>
@@ -271,7 +271,7 @@ export function RulesSection({ rules }: { rules: DoctrineConfigRow[] }) {
           <div key={def.key} className="rounded border border-border bg-gda-bg-base px-4 py-3 space-y-2">
             <div>
               <p className="text-xs font-medium text-foreground">{def.label}</p>
-              <p className="text-[11px] text-muted-foreground">{def.description}</p>
+              <p className="text-[12px] text-muted-foreground">{def.description}</p>
             </div>
             {renderEditor(def)}
           </div>
@@ -280,17 +280,17 @@ export function RulesSection({ rules }: { rules: DoctrineConfigRow[] }) {
 
       {/* Advanced: raw JSON view */}
       <details className="pt-2">
-        <summary className="text-[11px] font-mono text-muted-foreground cursor-pointer hover:text-foreground">
+        <summary className="text-[12px] font-mono text-muted-foreground cursor-pointer hover:text-foreground">
           Advanced — raw JSON
         </summary>
         <div className="mt-2 space-y-2">
           {rules.map((row) => (
             <div key={row.key} className="rounded border border-border bg-gda-bg-base px-3 py-2">
-              <p className="font-mono text-[11px] text-foreground">{row.key}</p>
-              <pre className="font-mono text-[11px] text-muted-foreground mt-1 whitespace-pre-wrap break-words">
+              <p className="font-mono text-[12px] text-foreground">{row.key}</p>
+              <pre className="font-mono text-[12px] text-muted-foreground mt-1 whitespace-pre-wrap break-words">
                 {JSON.stringify(row.value, null, 2)}
               </pre>
-              <p className="text-[11px] text-muted-foreground/50 mt-1">
+              <p className="text-[12px] text-muted-foreground/50 mt-1">
                 Updated {new Date(row.updated_at).toLocaleString()}
               </p>
             </div>

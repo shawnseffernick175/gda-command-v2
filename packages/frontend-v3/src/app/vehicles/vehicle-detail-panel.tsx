@@ -109,7 +109,7 @@ export default function VehicleDetailPanel({
         >
           <span
             className={cn(
-              "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold",
+              "inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-semibold",
               data.extraction_confidence === "high" &&
                 "border border-gda-green/30 text-gda-green bg-gda-green/10",
               data.extraction_confidence === "medium" &&
@@ -165,7 +165,7 @@ export default function VehicleDetailPanel({
         >
           <span
             className={cn(
-              "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold",
+              "inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-semibold",
               isActive && "border border-gda-green/30 text-gda-green bg-gda-green/10",
               isExpired && "bg-critical text-white",
               !isActive && !isExpired && "border border-border text-muted-foreground",

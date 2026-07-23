@@ -58,7 +58,7 @@ export default function LaunchpadPage() {
 
       {/* Day-1 Banners */}
       <section>
-        <h2 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+        <h2 className="font-mono text-[12px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
           Day-1 Banners
         </h2>
         <Day1Banners />
@@ -67,7 +67,7 @@ export default function LaunchpadPage() {
       {/* Daily News */}
       <section>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+          <h2 className="font-mono text-[12px] font-bold text-muted-foreground uppercase tracking-widest">
             Daily News
           </h2>
           <label className="flex items-center gap-1.5 cursor-pointer">
@@ -77,7 +77,7 @@ export default function LaunchpadPage() {
               onChange={(e) => setShowExcluded(e.target.checked)}
               className="accent-gda-cyan h-3 w-3"
             />
-            <span className="font-mono text-[11px] text-muted-foreground">
+            <span className="font-mono text-[12px] text-muted-foreground">
               Show excluded items
             </span>
           </label>
@@ -118,7 +118,7 @@ export default function LaunchpadPage() {
 
       {/* What Needs Me Today */}
       <section>
-        <h2 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+        <h2 className="font-mono text-[12px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
           What Needs Me Today
         </h2>
         <WhatNeedsMePanel />
@@ -126,7 +126,7 @@ export default function LaunchpadPage() {
 
       {/* Door Summaries */}
       <section>
-        <h2 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+        <h2 className="font-mono text-[12px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
           Door Summaries
         </h2>
         <DoorSummaries />

@@ -44,7 +44,7 @@ export function WheelhouseNaicsPanel() {
       {/* Add form */}
       <div className="flex items-end gap-2 flex-wrap">
         <div>
-          <label className="block text-[11px] font-mono text-muted-foreground mb-1">NAICS Code</label>
+          <label className="block text-[12px] font-mono text-muted-foreground mb-1">NAICS Code</label>
           <input
             type="text"
             value={newCode}
@@ -54,7 +54,7 @@ export function WheelhouseNaicsPanel() {
           />
         </div>
         <div>
-          <label className="block text-[11px] font-mono text-muted-foreground mb-1">Label</label>
+          <label className="block text-[12px] font-mono text-muted-foreground mb-1">Label</label>
           <input
             type="text"
             value={newLabel}
@@ -64,7 +64,7 @@ export function WheelhouseNaicsPanel() {
           />
         </div>
         <div>
-          <label className="block text-[11px] font-mono text-muted-foreground mb-1">Reason</label>
+          <label className="block text-[12px] font-mono text-muted-foreground mb-1">Reason</label>
           <input
             type="text"
             value={newReason}
@@ -91,7 +91,7 @@ export function WheelhouseNaicsPanel() {
         </div>
       ) : activeItems.length > 0 ? (
         <div className="space-y-1">
-          <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider mb-1">
+          <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider mb-1">
             Active ({activeItems.length})
           </p>
           {activeItems.map((n) => (
@@ -105,13 +105,13 @@ export function WheelhouseNaicsPanel() {
               <span className="text-xs text-foreground flex-1 min-w-0 truncate">
                 {n.label ?? "—"}
               </span>
-              <span className="text-[11px] text-muted-foreground italic shrink-0">
+              <span className="text-[12px] text-muted-foreground italic shrink-0">
                 {n.reason ?? ""}
               </span>
               <button
                 onClick={() => removeNaics.mutate(n.naics)}
                 disabled={removeNaics.isPending}
-                className="text-[11px] font-mono text-muted-foreground hover:text-gda-red transition-colors shrink-0"
+                className="text-[12px] font-mono text-muted-foreground hover:text-gda-red transition-colors shrink-0"
               >
                 Remove
               </button>
@@ -125,7 +125,7 @@ export function WheelhouseNaicsPanel() {
       {/* Inactive codes */}
       {inactiveItems.length > 0 && (
         <div className="space-y-1 pt-2">
-          <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider mb-1">
+          <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider mb-1">
             Inactive ({inactiveItems.length})
           </p>
           {inactiveItems.map((n) => (
@@ -142,7 +142,7 @@ export function WheelhouseNaicsPanel() {
               <button
                 onClick={() => addNaics.mutate({ naics: n.naics, label: n.label ?? undefined, reason: n.reason ?? undefined })}
                 disabled={addNaics.isPending}
-                className="text-[11px] font-mono text-gda-cyan hover:underline shrink-0"
+                className="text-[12px] font-mono text-gda-cyan hover:underline shrink-0"
               >
                 Re-activate
               </button>

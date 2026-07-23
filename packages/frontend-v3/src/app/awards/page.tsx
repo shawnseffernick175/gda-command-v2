@@ -366,7 +366,7 @@ function KpiChip({
       )}>
         {value !== undefined ? value.toLocaleString() : "—"}
       </span>
-      <span className="block text-[11px] font-mono text-muted-foreground mt-0.5">
+      <span className="block text-[12px] font-mono text-muted-foreground mt-0.5">
         {label}
       </span>
     </button>
@@ -439,10 +439,10 @@ function AwardCard({
             {award.piid ?? award.recipient_name ?? "Unknown"}
           </p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               {award.incumbent_name ?? award.recipient_name ?? "Unknown Awardee"}
             </span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               {award.agency ?? "Unknown Agency"}
               {award.contracting_office ? `, ${award.contracting_office}` : ""}
             </span>
@@ -451,7 +451,7 @@ function AwardCard({
       </div>
 
       {/* Row 2: $, PoP, days, NAICS, contract type */}
-      <div className="flex items-center gap-3 flex-wrap text-[11px] font-mono">
+      <div className="flex items-center gap-3 flex-wrap text-[12px] font-mono">
         <span className="text-foreground tabular-nums">
           {formatMoney(award.total_value ?? award.awarded_amount)}
         </span>
@@ -474,7 +474,7 @@ function AwardCard({
       </div>
 
       {/* Row 3: Threat + vehicle fit */}
-      <div className="flex items-center gap-3 text-[11px]">
+      <div className="flex items-center gap-3 text-[12px]">
         {threat && (
           <span className="font-mono">
             THREAT: <span className={cn("font-bold", threat.className)}>{threat.label}</span>
@@ -482,7 +482,7 @@ function AwardCard({
         )}
         {award.award_analysis?.recommended_action && (
           <span className={cn(
-            "rounded border px-1.5 py-0.5 font-mono text-[10px]",
+            "rounded border px-1.5 py-0.5 font-mono text-[12px]",
             award.award_analysis.recommended_action === "Pursue Re-Compete"
               ? "bg-gda-green/10 text-gda-green border-gda-green/30"
               : award.award_analysis.recommended_action === "Monitor"
@@ -516,21 +516,21 @@ function AwardCard({
           <button
             onClick={handlePursue}
             disabled={pursue.isPending}
-            className="rounded border border-gda-cyan/40 bg-gda-cyan/10 px-2 py-0.5 text-[11px] font-mono text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50 transition-colors"
+            className="rounded border border-gda-cyan/40 bg-gda-cyan/10 px-2 py-0.5 text-[12px] font-mono text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50 transition-colors"
           >
             {pursue.isPending ? "…" : "+ Add to Capture"}
           </button>
         ) : (
           <button
             onClick={() => router.push(`/opportunities?id=${award.linked_opportunity_id}`)}
-            className="text-[11px] font-mono text-gda-green hover:underline"
+            className="text-[12px] font-mono text-gda-green hover:underline"
           >
             Pursuing
           </button>
         )}
         <button
           onClick={onDetail}
-          className="text-[11px] font-mono text-gda-cyan hover:underline"
+          className="text-[12px] font-mono text-gda-cyan hover:underline"
         >
           Detail
         </button>
@@ -540,7 +540,7 @@ function AwardCard({
               e.stopPropagation();
               onDismiss();
             }}
-            className="text-[11px] font-mono text-muted-foreground hover:text-gda-red transition-colors"
+            className="text-[12px] font-mono text-muted-foreground hover:text-gda-red transition-colors"
           >
             Not Interested
           </button>
@@ -550,7 +550,7 @@ function AwardCard({
               e.stopPropagation();
               undismiss.mutate(award.id);
             }}
-            className="text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+            className="text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
           >
             Undo Dismiss
           </button>

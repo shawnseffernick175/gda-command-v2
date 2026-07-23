@@ -33,7 +33,7 @@ export function ScoreTooltip({
       {children}
       <button
         type="button"
-        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[11px] text-muted-foreground hover:bg-gda-panel"
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[12px] text-muted-foreground hover:bg-gda-panel"
         aria-label={`Explain ${label}`}
       >
         ?

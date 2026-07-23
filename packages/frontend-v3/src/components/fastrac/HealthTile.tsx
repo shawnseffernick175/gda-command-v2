@@ -12,9 +12,9 @@ const STATUS_STYLE: Record<FTSourceStat["status"], { label: string; className: s
 function HealthStat({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="rounded border border-border bg-gda-panel/40 p-3">
-      <p className="text-[11px] font-mono uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[12px] font-mono uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 font-mono text-lg font-bold text-foreground">{value}</p>
-      {sub ? <p className="text-[11px] text-muted-foreground">{sub}</p> : null}
+      {sub ? <p className="text-[12px] text-muted-foreground">{sub}</p> : null}
     </div>
   );
 }
@@ -29,10 +29,10 @@ export function HealthTile() {
   const { data, isLoading, isError } = useFTHealth();
 
   if (isLoading) {
-    return <p className="text-[11px] text-muted-foreground">Loading FasTrac health…</p>;
+    return <p className="text-[12px] text-muted-foreground">Loading FasTrac health…</p>;
   }
   if (isError || !data) {
-    return <p className="text-[11px] text-red-400">FasTrac health unavailable.</p>;
+    return <p className="text-[12px] text-red-400">FasTrac health unavailable.</p>;
   }
 
   const { pipelines, sources, matches } = data;
@@ -63,16 +63,16 @@ export function HealthTile() {
       </div>
 
       <div>
-        <p className="mb-2 text-[11px] font-mono font-semibold uppercase tracking-wide text-foreground/80">
+        <p className="mb-2 text-[12px] font-mono font-semibold uppercase tracking-wide text-foreground/80">
           Source adapters ({sources.length})
         </p>
         {sources.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             No signals ingested yet — no adapter has produced data.
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[11px]">
+            <table className="w-full text-[12px]">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
                   <th className="py-1.5 pr-3 font-mono font-medium">Source</th>
@@ -94,7 +94,7 @@ export function HealthTile() {
                     <td className="py-1.5">
                       <span
                         className={cn(
-                          "rounded border px-1.5 py-0.5 font-mono text-[11px] uppercase",
+                          "rounded border px-1.5 py-0.5 font-mono text-[12px] uppercase",
                           STATUS_STYLE[s.status].className,
                         )}
                       >

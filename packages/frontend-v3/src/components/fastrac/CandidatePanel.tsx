@@ -6,7 +6,7 @@ import { EvidencePanel } from "./EvidencePanel";
 
 function Tag({ label }: { label: string }) {
   return (
-    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[12px] font-mono text-muted-foreground">
       {label}
     </span>
   );
@@ -16,7 +16,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value * 100);
   return (
     <div className="space-y-0.5">
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+      <div className="flex items-center justify-between text-[12px] text-muted-foreground">
         <span>{label}</span>
         <span className="font-mono text-foreground">{pct}%</span>
       </div>
@@ -53,7 +53,7 @@ function MiniMatchCard({
     <div className="rounded border border-border bg-gda-panel p-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+          <p className="text-[12px] text-muted-foreground uppercase tracking-wide mb-0.5">
             {anchorIsNeed ? "Solution" : "Need"}
           </p>
           {counterUrl ? (
@@ -70,7 +70,7 @@ function MiniMatchCard({
               {counterTitle}
             </p>
           )}
-          <p className="text-[11px] text-gda-cyan mt-0.5">{counterSource}</p>
+          <p className="text-[12px] text-gda-cyan mt-0.5">{counterSource}</p>
         </div>
 
         <div className="flex flex-col items-center shrink-0">
@@ -96,7 +96,7 @@ function MiniMatchCard({
       </div>
 
       {candidate.recommended_vehicle && (
-        <p className="text-[11px] text-gda-green">
+        <p className="text-[12px] text-gda-green">
           {candidate.recommended_vehicle}
         </p>
       )}
@@ -121,7 +121,7 @@ function MiniMatchCard({
         <button
           onClick={onPromote}
           disabled={promoteLoading}
-          className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[11px] font-mono font-medium text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
+          className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[12px] font-mono font-medium text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
         >
           {promoteLoading ? "Saving…" : "Save as Match"}
         </button>
@@ -156,7 +156,7 @@ export function CandidatePanel({
       <div className="relative w-full max-w-lg bg-gda-bg-deep border-l border-border overflow-y-auto">
         <div className="sticky top-0 z-10 bg-gda-bg-deep border-b border-border px-4 py-3 flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+            <p className="text-[12px] text-muted-foreground uppercase tracking-wide">
               {anchorIsNeed ? "Solutions for" : "Needs for"}
             </p>
             <p className="text-xs font-semibold text-foreground mt-0.5 line-clamp-1">
@@ -177,7 +177,7 @@ export function CandidatePanel({
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="h-32 animate-pulse rounded bg-gda-bg-base" />
               ))}
-              <p className="text-[11px] text-muted-foreground text-center animate-pulse">
+              <p className="text-[12px] text-muted-foreground text-center animate-pulse">
                 Computing matches…
               </p>
             </div>
@@ -187,7 +187,7 @@ export function CandidatePanel({
             </p>
           ) : (
             <>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 Top {candidates.length} ranked {anchorIsNeed ? "solutions" : "needs"}:
               </p>
               {candidates.map((c) => (

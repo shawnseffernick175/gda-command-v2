@@ -81,25 +81,25 @@ function PursuitTable({ items }: { items: IdiqPursuitItem[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-gda-panel">
-            <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 text-left text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
               Vehicle / Pursuit
             </th>
-            <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 text-left text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
               Agency
             </th>
-            <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 text-left text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
               Stage
             </th>
-            <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 text-right text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
               Value
             </th>
-            <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 text-right text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
               Pwin
             </th>
-            <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 text-left text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
               Owner
             </th>
-            <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 text-left text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
               Due
             </th>
           </tr>
@@ -115,7 +115,7 @@ function PursuitTable({ items }: { items: IdiqPursuitItem[] }) {
                   {item.opportunity_title}
                 </span>
                 {item.solicitation_number && (
-                  <span className="ml-2 text-[11px] text-muted-foreground">
+                  <span className="ml-2 text-[12px] text-muted-foreground">
                     {item.solicitation_number}
                   </span>
                 )}
@@ -124,7 +124,7 @@ function PursuitTable({ items }: { items: IdiqPursuitItem[] }) {
                 {item.opportunity_agency ?? "\u2014"}
               </td>
               <td className="px-3 py-2.5">
-                <span className="inline-block rounded border border-border px-2 py-0.5 text-[11px] font-medium text-foreground">
+                <span className="inline-block rounded border border-border px-2 py-0.5 text-[12px] font-medium text-foreground">
                   {stageLabel(item.stage)}
                 </span>
               </td>
