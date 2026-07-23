@@ -168,7 +168,9 @@ jobs:
           # Budget raised from 475→700 to accommodate ECharts (canonical chart
           # library, see aesthetics_canonical_v1.md §Forbidden). G1 requires
           # executive charts on every Financial Bible tab.
-          MAX_MAIN_KB=700
+          # 700→710: next 16.2.7→16.2.11 security patch adds ~3KB (703KB); small
+          # headroom so a required security bump isn't blocked by the budget.
+          MAX_MAIN_KB=710
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
