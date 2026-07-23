@@ -900,11 +900,15 @@ Return JSON exactly matching this schema:
 
 function buildFinancialAnalyzePrompt(input: FinancialAnalyzeInput): string {
   const fmt = (v: number | null, unit: string) => v !== null ? `${v.toLocaleString()}${unit}` : 'not yet ingested';
+  // Enriched fields (optional) let the model distinguish gross vs operating margin.
+  const ext = input as unknown as { gross_margin_pct?: number | null; operating_margin_pct?: number | null; direct_costs?: number | null };
   const lines = [
     `YTD Revenue: ${fmt(input.ytd_revenue, '')}`,
-    `YTD Expenses: ${fmt(input.ytd_expenses, '')}`,
-    `YTD Profit: ${fmt(input.ytd_profit, '')}`,
-    `Margin: ${fmt(input.margin, '%')}`,
+    `YTD Direct Costs: ${fmt(ext.direct_costs ?? null, '')}`,
+    `YTD Expenses (all costs): ${fmt(input.ytd_expenses, '')}`,
+    `YTD Operating Profit (EBIT): ${fmt(input.ytd_profit, '')}`,
+    `Gross Margin (revenue less direct costs only): ${fmt(ext.gross_margin_pct ?? null, '%')}`,
+    `Operating Margin / ROS (EBIT / revenue, after all costs): ${fmt(ext.operating_margin_pct ?? input.margin ?? null, '%')}`,
     `Funded Backlog: ${fmt(input.funded_backlog, '')}`,
   ];
   if (input.contracts.length > 0) {
