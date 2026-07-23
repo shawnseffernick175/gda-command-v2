@@ -14,7 +14,7 @@ export type ScoreType =
   | "pipeline_value"
   | "orders"
   | "sales"
-  | "ebit"
+  | "operating_income"
   | "gross_margin"
   | "ros"
   | "funded_backlog"
@@ -353,10 +353,10 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
     ),
   },
 
-  /* ── 10. KPI: EBIT ──────────────────────────────────────────── */
-  ebit: {
+  /* ── 10. KPI: Operating Income ──────────────────────────────── */
+  operating_income: {
     description: (pm) =>
-      `Earnings before interest and taxes (operating profit) for the ${pm === "FY" ? "fiscal year" : "calendar year"} to date.`,
+      `Operating Income (Gross Profit − Total Cost of Operations) for the ${pm === "FY" ? "fiscal year" : "calendar year"} to date.`,
     renderFormula: (_, pm) => (
       <p>
         <span className="font-mono">SUM(actual_ebit)</span> over{" "}
@@ -415,17 +415,17 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
       `Return on Sales (operating margin) for the ${pm === "FY" ? "fiscal year" : "calendar year"} to date.`,
     renderFormula: () => (
       <p>
-        <span className="font-mono">ROS = (EBIT / Sales) \u00d7 100</span>,
+        <span className="font-mono">ROS = (Operating Income / Sales) \u00d7 100</span>,
         shown as a %; returns 0 when sales = 0; color-coded (green {"\u2265"} 0, red {"<"} 0).
       </p>
     ),
     renderDataSources: () => (
       <ul className="space-y-0.5">
         <Bullet>
-          Derived from EBIT and Sales (no direct table read)
+          Derived from Operating Income and Sales (no direct table read)
         </Bullet>
         <Bullet>
-          EBIT source: <span className="font-mono">financial_actuals.actual_ebit</span>
+          Operating Income source: <span className="font-mono">financial_actuals.actual_ebit</span>
         </Bullet>
         <Bullet>
           Sales source: <span className="font-mono">financial_actuals.actual_sales</span>
