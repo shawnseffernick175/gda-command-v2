@@ -208,17 +208,8 @@ export default function FinancialsPage() {
               AI Analyze
             </button>
 
-            <div
-              className={cn(
-                "flex items-center gap-2",
-                !yearControlsActive && "opacity-40",
-              )}
-              title={
-                yearControlsActive
-                  ? undefined
-                  : "Year selection applies only to AOP Plan and AOP Execution"
-              }
-            >
+            {yearControlsActive && (
+            <div className="flex items-center gap-2">
               <div className="flex rounded border border-border">
                 {(["FY", "CY"] as CalendarMode[]).map((mode) => (
                   <button
@@ -258,6 +249,7 @@ export default function FinancialsPage() {
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
 
