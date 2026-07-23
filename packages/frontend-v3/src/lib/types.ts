@@ -596,6 +596,7 @@ export interface ApRow {
   due_date: string | null;
   amount: number;
   age_bucket: string | null;
+  status: string | null;
   source_doc_id: number | null;
 }
 

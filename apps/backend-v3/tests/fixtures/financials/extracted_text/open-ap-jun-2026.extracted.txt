@@ -1,0 +1,173 @@
+## Sheet: Detail
+Vendor Name | Voucher | Current
+Status | Invoice | Invoice
+Date | Due
+Date | Current | 1 to 30 | 31 to 60 | 61 to 90 | Over 90 | Total
+Account: 200-001 - Accounts Payable
+Organization: 1.01 - Envision
+Advent Technologies, LLC - ADV0001
+ | 7671 | HOLD | 452 |  |  | 37500 | 0 | 0 | 0 | 0 | 37500
+ | Subtotal for Advent Technologies, LLC:  |  |  |  |  | 37500 | 0 | 0 | 0 | 0 | 37500
+Aflac - AFL0006
+ | 7690 | PAID | 234284 |  |  | 461.08 | 0 | 0 | 0 | 0 | 461.08
+ | Subtotal for Aflac:  |  |  |  |  | 461.08 | 0 | 0 | 0 | 0 | 461.08
+Alliance Consulting - ALL0002
+ | 7662 | PAID | PEO028 |  |  | 21460.32 | 0 | 0 | 0 | 0 | 21460.32
+ | 7727 | HOLD | PEO029 |  |  | 21278.4 | 0 | 0 | 0 | 0 | 21278.4
+ | Subtotal for Alliance Consulting:  |  |  |  |  | 42738.72 | 0 | 0 | 0 | 0 | 42738.72
+American Express - AME0009
+ | 7757 | PPHOLD | 9-01001-05/26 |  |  | 0 | 8347.91 | 0 | 0 | 0 | 8347.91
+ | Subtotal for American Express:  |  |  |  |  | 0 | 8347.91 | 0 | 0 | 0 | 8347.91
+BD Squared LLC - BDS0252
+ | 7426 | HOLD | 8856 |  |  | 0 | 0 | 0 | 3250 | 0 | 3250
+ | 7542 | HOLD | 8977 |  |  | 0 | 0 | 3250 | 0 | 0 | 3250
+ | Subtotal for BD Squared LLC:  |  |  |  |  | 0 | 0 | 3250 | 3250 | 0 | 6500
+Christopher Robbins - 000328
+ | 7709 | PAID | 16JUNE2026TRVL |  |  | 177.87 | 0 | 0 | 0 | 0 | 177.87
+ | Subtotal for Christopher Robbins:  |  |  |  |  | 177.87 | 0 | 0 | 0 | 0 | 177.87
+Covington & Burling, LLP - COV0034
+ | 6910 | PPHOLD | 61158923 |  |  | 0 | 0 | 0 | 0 | 101320.98 | 101320.98
+ | 7291 | HOLD | 61173416 |  |  | 0 | 0 | 0 | 0 | 1900 | 1900
+ | 7408 | HOLD | 61170893-12/25 |  |  | 0 | 0 | 0 | 0 | 16781.83 | 16781.83
+ | 7421 | HOLD | 61179078 |  |  | 0 | 0 | 0 | 19332 | 0 | 19332
+ | 7592 | HOLD | 61183212 |  |  | 0 | 0 | 7569 | 0 | 0 | 7569
+ | 7764 | HOLD | PROTEST CREDIT |  |  | -88933 | 0 | 0 | 0 | 0 | -88933
+ | Subtotal for Covington & Burling, LLP:  |  |  |  |  | -88933 | 0 | 7569 | 19332 | 120002.81 | 57970.81
+DAS, LLC - DAS0001
+ | 7666 | PAID | INV-2408 |  |  | 11648.73 | 0 | 0 | 0 | 0 | 11648.73
+ | 7733 | HOLD | 30JUNE2026 |  |  | 13410.05 | 0 | 0 | 0 | 0 | 13410.05
+ | Subtotal for DAS, LLC:  |  |  |  |  | 25058.78 | 0 | 0 | 0 | 0 | 25058.78
+Dimitar Babov - DIM0262
+ | 7735 | PAID | 124 |  |  | 13800 | 0 | 0 | 0 | 0 | 13800
+ | Subtotal for Dimitar Babov:  |  |  |  |  | 13800 | 0 | 0 | 0 | 0 | 13800
+Expeditionary Energy, LLC - EXE0001
+ | 7653 | HOLD | I210070 |  |  | 10320 | 0 | 0 | 0 | 0 | 10320
+ | Subtotal for Expeditionary Energy, LLC:  |  |  |  |  | 10320 | 0 | 0 | 0 | 0 | 10320
+Galvion LTD - GAL0001
+ | 7530 | HOLD |  |  |  | 0 | 0 | 1000000 | 0 | 0 | 1000000
+ | Subtotal for Galvion LTD:  |  |  |  |  | 0 | 0 | 1000000 | 0 | 0 | 1000000
+Gateway Cable Company - GAT0002
+ | 7718 | HOLD | 120950 |  |  | 15751.55 | 0 | 0 | 0 | 0 | 15751.55
+ | Subtotal for Gateway Cable Company:  |  |  |  |  | 15751.55 | 0 | 0 | 0 | 0 | 15751.55
+General Techincal Service - GTS0001
+ | 7647 | HOLD | INV-8364 |  |  | 39688.54 | 0 | 0 | 0 | 0 | 39688.54
+ | 7714 | HOLD | INV-8391 |  |  | 40700.32 | 0 | 0 | 0 | 0 | 40700.32
+ | 7719 | HOLD | 8389 |  |  | 598.03 | 0 | 0 | 0 | 0 | 598.03
+ | Subtotal for General Techincal Service:  |  |  |  |  | 80986.89 | 0 | 0 | 0 | 0 | 80986.89
+GSA FAS AAS - GSA0001
+ | 7462 | PPHOLD | MARCAF |  |  | 0 | 0 | 0 | 30.73 | 0 | 30.73
+ | 7579 | HOLD | APRCAF |  |  | 0 | 0 | 278.62 | 0 | 0 | 278.62
+ | 7669 | HOLD | OY2MAYCAF |  |  | 68.53 | 0 | 0 | 0 | 0 | 68.53
+ | 7674 | HOLD | OY3MAYCAF |  |  | 133.75 | 0 | 0 | 0 | 0 | 133.75
+ | 7723 | HOLD | JUNECAF |  |  | 246.17 | 0 | 0 | 0 | 0 | 246.17
+ | Subtotal for GSA FAS AAS:  |  |  |  |  | 448.45 | 0 | 278.62 | 30.73 | 0 | 757.8
+HSA Bank - HSA0001
+ | 7701 | PAID | JUNE 2026 |  |  | 3041.97 | 0 | 0 | 0 | 0 | 3041.97
+ | Subtotal for HSA Bank:  |  |  |  |  | 3041.97 | 0 | 0 | 0 | 0 | 3041.97
+immixTechnology, Inc. - IMI0286
+ | 7728 | HOLD | 170933 |  |  | 8840.28 | 0 | 0 | 0 | 0 | 8840.28
+ | Subtotal for immixTechnology, Inc.:  |  |  |  |  | 8840.28 | 0 | 0 | 0 | 0 | 8840.28
+Inventus Power - INV0001
+ | 7706 | HOLD | 26IN500544 |  |  | 55708.42 | 0 | 0 | 0 | 0 | 55708.42
+ | Subtotal for Inventus Power:  |  |  |  |  | 55708.42 | 0 | 0 | 0 | 0 | 55708.42
+Jennifer Carr - JEN0260
+ | 7737 | PAID | 06/30/26 |  |  | 1280 | 0 | 0 | 0 | 0 | 1280
+ | Subtotal for Jennifer Carr:  |  |  |  |  | 1280 | 0 | 0 | 0 | 0 | 1280
+JHT, INC - JHT001
+ | 7659 | HOLD | INV-44367 |  |  | 14787.58 | 0 | 0 | 0 | 0 | 14787.58
+ | 7672 | HOLD | INV-44363 |  |  | 53131.69 | 0 | 0 | 0 | 0 | 53131.69
+ | 7715 | HOLD | INV-45126 |  |  | 85669.77 | 0 | 0 | 0 | 0 | 85669.77
+ | Subtotal for JHT, INC:  |  |  |  |  | 153589.04 | 0 | 0 | 0 | 0 | 153589.04
+Jonathan Carr - 000154
+ | 7693 | PAID | 24JUNETRVL |  |  | 177.68 | 0 | 0 | 0 | 0 | 177.68
+ | Subtotal for Jonathan Carr:  |  |  |  |  | 177.68 | 0 | 0 | 0 | 0 | 177.68
+Joseph K Lu - 000402
+ | 7692 | PAID | 24JUNETRL |  |  | 149.03 | 0 | 0 | 0 | 0 | 149.03
+ | Subtotal for Joseph K Lu:  |  |  |  |  | 149.03 | 0 | 0 | 0 | 0 | 149.03
+Luna Meacham - 000307
+ | 7691 | PAID | 24JUNETRVL |  |  | 55.5 | 0 | 0 | 0 | 0 | 55.5
+ | Subtotal for Luna Meacham:  |  |  |  |  | 55.5 | 0 | 0 | 0 | 0 | 55.5
+MACCOR - MAC0001
+ | 7751 | HOLD | 17915 |  |  | 219910 | 0 | 0 | 0 | 0 | 219910
+ | Subtotal for MACCOR:  |  |  |  |  | 219910 | 0 | 0 | 0 | 0 | 219910
+MADC Associates LLC - MAD0001
+ | 7694 | PAID | 0004 |  |  | 6035.75 | 0 | 0 | 0 | 0 | 6035.75
+ | Subtotal for MADC Associates LLC:  |  |  |  |  | 6035.75 | 0 | 0 | 0 | 0 | 6035.75
+Manufacturers Serv Assoc - MAN0078
+ | 7763 | HOLD | 1658 |  |  | 1600 | 0 | 0 | 0 | 0 | 1600
+ | Subtotal for Manufacturers Serv Assoc:  |  |  |  |  | 1600 | 0 | 0 | 0 | 0 | 1600
+Merrill Trusted Solutions - MER0001
+ | 7664 | PAID | EMTS-31 |  |  | 31969.5 | 0 | 0 | 0 | 0 | 31969.5
+ | 7730 | HOLD | EMTS-32 |  |  | 33781.11 | 0 | 0 | 0 | 0 | 33781.11
+ | Subtotal for Merrill Trusted Solutions:  |  |  |  |  | 65750.61 | 0 | 0 | 0 | 0 | 65750.61
+Michael Veluz - MIC0082
+ | 7705 | PAID | 47QRCA-2026-06 |  |  | 10920 | 0 | 0 | 0 | 0 | 10920
+ | Subtotal for Michael Veluz:  |  |  |  |  | 10920 | 0 | 0 | 0 | 0 | 10920
+Mr. Bruce Hillner - BRU0275
+ | 7734 | PAID | 91 |  |  | 4425 | 0 | 0 | 0 | 0 | 4425
+ | Subtotal for Mr. Bruce Hillner:  |  |  |  |  | 4425 | 0 | 0 | 0 | 0 | 4425
+Mr. Jay Yudof - JAY0001
+ | 7736 | PAID | 06/30/26 |  |  | 1681.5 | 0 | 0 | 0 | 0 | 1681.5
+ | Subtotal for Mr. Jay Yudof:  |  |  |  |  | 1681.5 | 0 | 0 | 0 | 0 | 1681.5
+Mutual of Omaha - MUT0283
+ | 7639 | PAID | 002103694370 |  |  | 0 | 6211.34 | 0 | 0 | 0 | 6211.34
+ | Subtotal for Mutual of Omaha:  |  |  |  |  | 0 | 6211.34 | 0 | 0 | 0 | 6211.34
+MV Defense LLC - MVD0001
+ | 7645 | HOLD | 1087 |  |  | 33272.85 | 0 | 0 | 0 | 0 | 33272.85
+ | 7712 | HOLD | 1088 |  |  | 25033 | 0 | 0 | 0 | 0 | 25033
+ | 7713 | HOLD | 1089 |  |  | 230445 | 0 | 0 | 0 | 0 | 230445
+ | Subtotal for MV Defense LLC:  |  |  |  |  | 288750.85 | 0 | 0 | 0 | 0 | 288750.85
+Navitas Systems - NAV001
+ | 7389 | HOLD | 18718 |  |  | 0 | 0 | 0 | 500000 | 0 | 500000
+ | 7574 | HOLD | 18939 |  |  | 0 | 0 | 100000 | 0 | 0 | 100000
+ | Subtotal for Navitas Systems:  |  |  |  |  | 0 | 0 | 100000 | 500000 | 0 | 600000
+Ocean Computer Group - OCE0253
+ | 7538 | PAID | 300323G |  |  | 0 | 0 | 768.02 | 0 | 0 | 768.02
+ | 7539 | PAID | 300342G |  |  | 0 | 0 | 141.82 | 0 | 0 | 141.82
+ | 7629 | HOLD | 300604G |  |  | 0 | 768.02 | 0 | 0 | 0 | 768.02
+ | 7630 | HOLD | 300615G |  |  | 0 | 141.82 | 0 | 0 | 0 | 141.82
+ | 7631 | HOLD | 300578G |  |  | 0 | 21.66 | 0 | 0 | 0 | 21.66
+ | 7675 | HOLD | 300673M |  |  | 4233.01 | 0 | 0 | 0 | 0 | 4233.01
+ | 7698 | HOLD | 300879G |  |  | 138.8 | 0 | 0 | 0 | 0 | 138.8
+ | 7699 | HOLD | 300927G |  |  | 21.66 | 0 | 0 | 0 | 0 | 21.66
+ | 7717 | HOLD | 299400G |  |  | 153.89 | 0 | 0 | 0 | 0 | 153.89
+ | 7740 | HOLD | 300988G |  |  | 789.96 | 0 | 0 | 0 | 0 | 789.96
+ | 7758 | HOLD | 299949G |  |  | 4606.2 | 0 | 0 | 0 | 0 | 4606.2
+ | Subtotal for Ocean Computer Group:  |  |  |  |  | 9943.52 | 931.4999999999999 | 909.8399999999999 | 0 | 0 | 11784.86
+Parsons Government Svc - PAR0001
+ | 7661 | HOLD | 2017968 |  |  | 258848.37 | 0 | 0 | 0 | 0 | 258848.37
+ | 7739 | HOLD | 0002022535 |  |  | 206997.41 | 0 | 0 | 0 | 0 | 206997.41
+ | Subtotal for Parsons Government Svc:  |  |  |  |  | 465845.78 | 0 | 0 | 0 | 0 | 465845.78
+Sev1 Tech, LLC - SEV0001
+ | 7665 | PAID | SOL-1327 |  |  | 45550.56 | 0 | 0 | 0 | 0 | 45550.56
+ | 7731 | HOLD | SOL-1328 |  |  | 55246.56 | 0 | 0 | 0 | 0 | 55246.56
+ | Subtotal for Sev1 Tech, LLC:  |  |  |  |  | 100797.12 | 0 | 0 | 0 | 0 | 100797.12
+Solari Creative - SOL0115
+ | 7668 | PAID | 12041 |  |  | 0 | 119740.98 | 0 | 0 | 0 | 119740.98
+ | 7725 | HOLD | 12077 |  |  | 128956.61 | 0 | 0 | 0 | 0 | 128956.61
+ | Subtotal for Solari Creative:  |  |  |  |  | 128956.61 | 119740.98 | 0 | 0 | 0 | 248697.59
+South 8 Technologies, Inc - SOU0001
+ | 7532 | HOLD | 234-IN |  |  | 0 | 0 | 800000 | 0 | 0 | 800000
+ | 7646 | HOLD | 240-IN |  |  | 175000 | 0 | 0 | 0 | 0 | 175000
+ | 7708 | HOLD | 79 |  |  | 122742 | 0 | 0 | 0 | 0 | 122742
+ | 7726 | HOLD | 0000249-IN |  |  | 164000 | 0 | 0 | 0 | 0 | 164000
+ | Subtotal for South 8 Technologies, Inc:  |  |  |  |  | 461742 | 0 | 800000 | 0 | 0 | 1261742
+Survice Engineering Co. - SUR0001
+ | 7710 | HOLD | INV-13116 |  |  | 2254.71 | 0 | 0 | 0 | 0 | 2254.71
+ | Subtotal for Survice Engineering Co.:  |  |  |  |  | 2254.71 | 0 | 0 | 0 | 0 | 2254.71
+The Hartford - THE0137
+ | 7700 | PAID | 17254913-06/26 |  |  | 2873.69 | 0 | 0 | 0 | 0 | 2873.69
+ | Subtotal for The Hartford:  |  |  |  |  | 2873.69 | 0 | 0 | 0 | 0 | 2873.69
+University of NC  - UNC0001
+ | 7711 | HOLD | 557802-2-1 |  |  | 55822.26 | 0 | 0 | 0 | 0 | 55822.26
+ | Subtotal for University of NC :  |  |  |  |  | 55822.26 | 0 | 0 | 0 | 0 | 55822.26
+Valor Tactics - VAL0001
+ | 7648 | HOLD | 1005 |  |  | 3629.34 | 0 | 0 | 0 | 0 | 3629.34
+ | 7707 | HOLD | 1006 |  |  | 2639.52 | 0 | 0 | 0 | 0 | 2639.52
+ | Subtotal for Valor Tactics:  |  |  |  |  | 6268.860000000001 | 0 | 0 | 0 | 0 | 6268.860000000001
+Wendy Merz - WEN238
+ | 7729 | PAID | 70 |  |  | 9877.8 | 0 | 0 | 0 | 0 | 9877.8
+ | Subtotal for Wendy Merz:  |  |  |  |  | 9877.8 | 0 | 0 | 0 | 0 | 9877.8
+ | Subtotal for 1.01:  |  |  |  |  | 2204608.3199999994 | 135231.72999999998 | 1912007.4600000002 | 522612.73 | 120002.81 | 4894463.05
+ | Subtotal for 200-001:  |  |  |  |  | 2204608.3199999994 | 135231.72999999998 | 1912007.4600000002 | 522612.73 | 120002.81 | 4894463.05
+ | Report Total: |  |  |  |  | 2204608.3199999994 | 135231.72999999998 | 1912007.4600000002 | 522612.73 | 120002.81 | 4894463.05

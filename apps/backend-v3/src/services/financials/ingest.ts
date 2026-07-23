@@ -593,6 +593,37 @@ export async function ingestSieRows(
 }
 
 // ---------------------------------------------------------------------------
+// Aging-batch plausibility guard (F-625 accuracy)
+// ---------------------------------------------------------------------------
+
+/**
+ * Deterministic sanity check for a parsed AP/AR batch before it becomes a
+ * Financial Bible value. A healthy Open-AP / Aged-AR extract carries real
+ * dollars on most rows; a batch of many rows that are (almost) all zero — or one
+ * that nets to ~$0 — is the fingerprint of a mis-parsed or mis-routed document
+ * (e.g. a Balance Sheet fed to the AP parser, or a wrapped-header parse that lost
+ * the amount column, which is exactly how June AP became $463 across 72 rows).
+ * Returns a human-facing warning when the batch looks implausible, else null.
+ * The caller surfaces it as NEEDS_REVIEW so a bad parse is flagged for a human
+ * instead of silently overwriting good numbers.
+ */
+export function assessAgingBatch(
+  label: 'AP' | 'AR',
+  rows: { amount: number }[],
+): string | null {
+  if (rows.length < 5) return null;
+  const nonZero = rows.filter((r) => Number.isFinite(r.amount) && r.amount !== 0).length;
+  const total = rows.reduce((s, r) => s + (Number.isFinite(r.amount) ? r.amount : 0), 0);
+  if (nonZero / rows.length < 0.5) {
+    return `${label} plausibility: ${rows.length - nonZero} of ${rows.length} parsed rows have a zero amount — likely a mis-parsed or mis-routed document; review before trusting.`;
+  }
+  if (Math.abs(total) < 1) {
+    return `${label} plausibility: ${rows.length} parsed rows net to ~$0 — likely a mis-parsed document; review before trusting.`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Accounts Payable (Open AP) ingest (F-625)
 // ---------------------------------------------------------------------------
 
@@ -609,20 +640,21 @@ export async function ingestApRows(
       await pool.query(
         `INSERT INTO ap_actuals
            (period, fiscal_year, quarter, vendor_name, invoice_number,
-            invoice_date, due_date, amount, age_bucket, source, source_doc_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'open_ap', $10)
+            invoice_date, due_date, amount, age_bucket, status, source, source_doc_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open_ap', $11)
          ON CONFLICT (source, period, vendor_name, COALESCE(invoice_number, ''))
          DO UPDATE SET
            invoice_date = EXCLUDED.invoice_date,
            due_date = EXCLUDED.due_date,
            amount = EXCLUDED.amount,
            age_bucket = EXCLUDED.age_bucket,
+           status = EXCLUDED.status,
            source_doc_id = EXCLUDED.source_doc_id`,
         [
           row.period, row.fiscal_year, row.quarter,
           row.vendor_name, row.invoice_number,
           row.invoice_date, row.due_date,
-          row.amount, row.age_bucket,
+          row.amount, row.age_bucket, row.status ?? null,
           sourceDocId ?? null,
         ],
       );

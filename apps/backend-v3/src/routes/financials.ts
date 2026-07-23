@@ -620,7 +620,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     noStore(reply);
     const { rows } = await pool.query(
       `SELECT id, period, fiscal_year, quarter, vendor_name, invoice_number,
-              invoice_date, due_date, amount, age_bucket, source_doc_id, created_at
+              invoice_date, due_date, amount, age_bucket, status, source_doc_id, created_at
        FROM ap_actuals
        ORDER BY fiscal_year DESC, quarter DESC, period DESC, vendor_name`,
     );
@@ -635,6 +635,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       due_date: (r.due_date as string) ?? null,
       amount: Number(r.amount),
       age_bucket: (r.age_bucket as string) ?? null,
+      status: (r.status as string) ?? null,
       source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
     }));
     return reply.send(successEnvelope({

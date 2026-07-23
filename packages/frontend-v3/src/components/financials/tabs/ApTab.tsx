@@ -17,8 +17,19 @@ const AP_SORT_COLS: ColumnSortConfig[] = [
   { field: "invoice_number", type: "string" },
   { field: "amount", type: "number" },
   { field: "age_bucket", type: "string" },
+  { field: "status", type: "string" },
   { field: "due_date", type: "date" },
 ];
+
+// Payment-status semantics from the Open AP report: HOLD is withheld cash (risk),
+// PPHOLD is a partial/pending hold (watch), PAID/other is cleared (healthy).
+function statusColor(status: string): string {
+  const s = status.toUpperCase();
+  if (s === "HOLD") return "var(--color-fin-chart-red)";
+  if (s === "PPHOLD") return "var(--color-fin-chart-orange)";
+  if (s === "PAID") return "var(--color-fin-chart-green)";
+  return "var(--color-fin-stone)";
+}
 
 export function ApTab() {
   const { data, isLoading } = useApData();
@@ -60,6 +71,19 @@ export function ApTab() {
   const overdueAmt = bucketEntries
     .filter(([b]) => isOverdue(b))
     .reduce((s, [, amt]) => s + amt, 0);
+
+  // Payment status (HOLD / PAID / PPHOLD) — only present once a doc is
+  // re-ingested through the fixed parser; older rows carry null status.
+  const statusMap = new Map<string, number>();
+  let statusRowCount = 0;
+  for (const r of items) {
+    if (r.status == null) continue;
+    statusRowCount++;
+    statusMap.set(r.status, (statusMap.get(r.status) ?? 0) + r.amount);
+  }
+  const hasStatus = statusRowCount > 0;
+  const statusEntries = [...statusMap.entries()].sort((a, b) => b[1] - a[1]);
+  const holdAmt = statusMap.get("HOLD") ?? 0;
 
   // Vendor concentration
   const byVendor = new Map<string, number>();
@@ -156,15 +180,58 @@ export function ApTab() {
     ],
   };
 
+  const statusDonut = {
+    tooltip: {
+      trigger: "item" as const,
+      formatter: (p: { name: string; value: number; percent: number; marker: string }) =>
+        `${p.marker} ${p.name}: ${formatMoneyFull(p.value)} (${p.percent.toFixed(1)}%)`,
+    },
+    legend: {
+      bottom: 0,
+      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+    },
+    series: [
+      {
+        type: "pie" as const,
+        radius: ["45%", "70%"],
+        center: ["50%", "44%"],
+        data: statusEntries.map(([status, amt]) => ({
+          name: status,
+          value: amt,
+          itemStyle: { color: statusColor(status) },
+        })),
+        label: {
+          color: "var(--color-fin-stone)",
+          fontSize: 11,
+          formatter: (p: { name: string; percent: number }) => `${p.name} ${p.percent.toFixed(0)}%`,
+        },
+      },
+    ],
+  };
+
   return (
     <div className="space-y-6">
       {/* Summary tiles */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Total Payables" value={formatMoney(total)} subtitle={`${items.length} open items`} />
         <Kpi label="Current" value={formatMoney(currentAmt)} subtitle={`${total ? ((currentAmt / total) * 100).toFixed(1) : "0"}% of AP`} />
-        <Kpi label="Past Due" value={formatMoney(overdueAmt)} subtitle={`${total ? ((overdueAmt / total) * 100).toFixed(1) : "0"}% of AP`} />
+        {hasStatus ? (
+          <Kpi label="On HOLD" value={formatMoney(holdAmt)} subtitle={`${total ? ((holdAmt / total) * 100).toFixed(1) : "0"}% of AP withheld`} />
+        ) : (
+          <Kpi label="Past Due" value={formatMoney(overdueAmt)} subtitle={`${total ? ((overdueAmt / total) * 100).toFixed(1) : "0"}% of AP`} />
+        )}
         <Kpi label="Top Vendor" value={formatMoney(topVendors[0]?.[1] ?? 0)} subtitle={topVendors[0]?.[0] ?? "—"} />
       </div>
+
+      {/* Payment status breakdown (real, when ingested) */}
+      {hasStatus && (
+        <div className="rounded border border-border bg-card p-4">
+          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+            Open Payables by Payment Status
+          </p>
+          <ReactEChartsCore echarts={echarts} option={statusDonut} style={{ height: 260 }} notMerge />
+        </div>
+      )}
 
       {/* Aging + vendor concentration */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -197,6 +264,9 @@ export function ApTab() {
               <SortableHeader label="Invoice #" field="invoice_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Amount" field="amount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
               <SortableHeader label="Age Bucket" field="age_bucket" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              {hasStatus && (
+                <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              )}
               <SortableHeader label="Due Date" field="due_date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
@@ -208,6 +278,9 @@ export function ApTab() {
                 <td className="px-3 py-2 text-left text-muted-foreground">{r.invoice_number ?? "—"}</td>
                 <td className="px-3 py-2 text-right text-foreground tabular-nums">{formatMoneyFull(r.amount)}</td>
                 <td className="px-3 py-2 text-left text-muted-foreground">{r.age_bucket ?? "—"}</td>
+                {hasStatus && (
+                  <td className="px-3 py-2 text-left text-muted-foreground">{r.status ?? "—"}</td>
+                )}
                 <td className="px-3 py-2 text-left text-muted-foreground">{r.due_date ?? "—"}</td>
               </tr>
             ))}
@@ -219,7 +292,7 @@ export function ApTab() {
         table="ap_actuals"
         rowCount={items.length}
         period={periodLabel}
-        note="payment status (HOLD/PAID) not in ingest — pending backend field"
+        note={hasStatus ? undefined : "payment status (HOLD/PAID) shown once the Open AP report is re-ingested"}
       />
     </div>
   );

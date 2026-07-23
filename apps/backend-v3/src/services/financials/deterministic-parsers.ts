@@ -523,6 +523,143 @@ export function parseProjectRevenueSummary(
 // Parser: 188 Open AP Report — sheet "Detail", 293 rows × 12 cols → ap_actuals
 // ---------------------------------------------------------------------------
 
+/** True for a cell that is empty or a plain (possibly negative / parenthesised) number. */
+function isApNumericCell(v: string): boolean {
+  const t = (v || '').replace(/_x000D_/gi, '').trim();
+  if (t === '') return true;
+  return /^\(?-?[\d,]*\.?\d+\)?$/.test(t.replace(/[$\s]/g, ''));
+}
+
+/** True for a strictly numeric (non-empty) cell. */
+function isApRealNumber(v: string): boolean {
+  const t = (v || '').replace(/_x000D_/gi, '').trim();
+  if (t === '') return false;
+  return /^\(?-?[\d,]*\.?\d+\)?$/.test(t.replace(/[$\s]/g, ''));
+}
+
+const AP_AGING_LABELS = ['Current', '1 to 30', '31 to 60', '61 to 90', 'Over 90'] as const;
+
+/**
+ * Deterministic parser for the Deltek "Open A/P Report" columnar layout as it
+ * arrives in vault extracted_text: pipe-delimited rows whose trailing six cells
+ * are the aging grid (Current | 1-30 | 31-60 | 61-90 | Over 90 | Total). Vendor
+ * names sit on their own pipe-less line above each vendor's voucher rows.
+ *
+ * WHY THIS PATH EXISTS: the multi-line-wrapped header (each header cell carries
+ * embedded newlines, so ExcelJS emits "Vendor Name | Voucher | Current",
+ * "Status | Invoice | Invoice", "Date | Due", "Date | Current | 1 to 30 | ...")
+ * defeats buildColumnMap — the amount/status/aging columns never map, so the
+ * generic loop below fell back to a positional guess and, worse, dropped every
+ * voucher whose vendor line it skipped as "too short". That produced the June
+ * $463 / all-zero garbage. This path reads the columns POSITIONALLY from the
+ * regular numeric tail, so it does not depend on the broken header at all, and
+ * it keeps the sign of credit vouchers (a protest credit is a real negative that
+ * must net down the vendor total — Math.abs would overstate it).
+ */
+function parseOpenApColumnar(
+  lines: string[],
+  periodInfo: { period: string; fiscal_year: number; quarter: number },
+): ApExtractOutput['rows'] | null {
+  const usesPipes = lines.some((l) => l.includes('|'));
+  if (!usesPipes) return null;
+
+  const rows: ApExtractOutput['rows'] = [];
+  let currentVendor = '';
+  let sawColumnarRow = false;
+
+  const parseDateStr = (raw: string): string | null => {
+    if (!raw) return null;
+    const iso = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return raw.trim().slice(0, 10);
+    const us = raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (us) {
+      const yr = us[3].length === 2 ? `20${us[3]}` : us[3];
+      return `${yr}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
+    }
+    return null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/_x000D_/gi, '');
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // A pipe-less line inside a pipe-delimited report is a group/vendor header.
+    if (!line.includes('|')) {
+      if (/^account\s*:/i.test(trimmed)) continue;
+      if (/^organization\s*:/i.test(trimmed)) continue;
+      if (/^(subtotal|grand\s+total|report\s+total|total)\b/i.test(trimmed)) continue;
+      if (/^vendor\s+name\b/i.test(trimmed) || /^status\b/i.test(trimmed) || /^date\b/i.test(trimmed)) continue;
+      currentVendor = trimmed;
+      continue;
+    }
+
+    const cols = line.split('|').map((c) => c.replace(/_x000D_/gi, '').trim());
+    if (cols.some((c) => /^subtotal\s+for/i.test(c))) continue;
+    if (cols.some((c) => /^(grand\s+total|report\s+total)/i.test(c))) continue;
+    if (cols.some((c) => /^account\s*:/i.test(c) || /^organization\s*:/i.test(c))) continue;
+
+    // Data row signature: at least 8 columns whose trailing 6 form the numeric
+    // aging grid, with a real number in the final (Total) column.
+    if (cols.length < 8) continue;
+    const tail = cols.slice(-6);
+    if (tail.filter((c) => isApNumericCell(c)).length < 5) continue;
+    if (!isApRealNumber(cols[cols.length - 1])) continue;
+
+    sawColumnarRow = true;
+
+    // Status is the first purely-alphabetic token after the leading blank cell
+    // (voucher/invoice carry digits, so they never match).
+    let statusIdx = -1;
+    for (let ci = 1; ci < Math.min(cols.length - 6, 6); ci++) {
+      if (/^[A-Za-z]{2,12}$/.test(cols[ci])) {
+        statusIdx = ci;
+        break;
+      }
+    }
+    const status = statusIdx >= 0 ? cols[statusIdx].toUpperCase() : null;
+    const voucher = (statusIdx > 1 ? cols[statusIdx - 1] : cols[1]) || '';
+    const invoice = (statusIdx >= 0 ? cols[statusIdx + 1] : cols[2]) || '';
+    const invoiceDate = parseDateStr(statusIdx >= 0 ? cols[statusIdx + 2] || '' : '');
+    const dueDate = parseDateStr(statusIdx >= 0 ? cols[statusIdx + 3] || '' : '');
+
+    const total = parseNum(cols[cols.length - 1]);
+
+    // Aging bucket = the non-zero aging column (the five cells before Total).
+    const agingVals = cols.slice(-6, -1).map((c) => parseNum(c));
+    let bucketIdx = -1;
+    let bestAbs = 0;
+    for (let k = 0; k < agingVals.length; k++) {
+      const a = Math.abs(agingVals[k]);
+      if (a > bestAbs) {
+        bestAbs = a;
+        bucketIdx = k;
+      }
+    }
+    const ageBucket = bucketIdx >= 0 ? AP_AGING_LABELS[bucketIdx] : null;
+
+    const vendorName = currentVendor || (statusIdx > 1 ? '' : cols[0]) || '';
+    if (!vendorName) continue;
+    if (total === 0 && !voucher && !invoice) continue;
+
+    rows.push({
+      period: periodInfo.period,
+      fiscal_year: periodInfo.fiscal_year,
+      quarter: periodInfo.quarter,
+      vendor_name: vendorName,
+      invoice_number: invoice || voucher || null,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      amount: total,
+      age_bucket: ageBucket,
+      status,
+    });
+  }
+
+  if (!sawColumnarRow || rows.length === 0) return null;
+  return rows;
+}
+
 export function parseOpenAp(
   extractedText: string,
   filename: string,
@@ -554,6 +691,18 @@ export function parseOpenAp(
   if (!periodInfo) {
     logger.warn({ filename }, 'AP deterministic: cannot infer period from filename');
     return null;
+  }
+
+  // Preferred path: the Deltek Open A/P columnar layout, read positionally from
+  // the numeric aging tail so the multi-line-wrapped header cannot break it.
+  const columnarRows = parseOpenApColumnar(lines, periodInfo);
+  if (columnarRows && columnarRows.length > 0) {
+    return {
+      is_ap: true,
+      rows: columnarRows,
+      notes: `Deterministic parser (columnar): extracted ${columnarRows.length} AP rows from ${filename}`,
+      model_used: 'deterministic',
+    };
   }
 
   // Find header row - strip _x000D_ when searching; handle varied month formats
@@ -653,8 +802,9 @@ export function parseOpenAp(
     invoiceDate = parseDateStr(invoiceDateRaw);
     dueDate = parseDateStr(dueDateRaw);
 
-    // Determine age bucket
-    const ageBucket = getCol(cols, colMap, 'status', 'current status', 'age', 'aging', 'age bucket') || null;
+    // Determine age bucket / status
+    const ageBucket = getCol(cols, colMap, 'age', 'aging', 'age bucket') || null;
+    const statusRaw = getCol(cols, colMap, 'status', 'current status') || null;
 
     rows.push({
       period: periodInfo.period,
@@ -664,8 +814,9 @@ export function parseOpenAp(
       invoice_number: invoiceNum || voucherNum || null,
       invoice_date: invoiceDate,
       due_date: dueDate,
-      amount: Math.abs(amount),
+      amount,
       age_bucket: ageBucket,
+      status: statusRaw ? statusRaw.toUpperCase() : null,
     });
   }
 

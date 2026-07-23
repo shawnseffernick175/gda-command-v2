@@ -758,7 +758,7 @@ IMPORTANT FORMAT NOTES for this specific file:
 - "Subtotal for <vendor>" rows are summaries — SKIP them.
 - Only include individual voucher/invoice line items.
 
-Each row is a vendor payable. Fields: vendor_name (carried from the group vendor row above), invoice_number (the invoice or voucher number, null if not shown), invoice_date (YYYY-MM-DD or null), due_date (YYYY-MM-DD or null), amount (positive $), age_bucket (e.g. "Current", "1-30", "31-60", "61-90", "Over 90", or null).
+Each row is a vendor payable. Fields: vendor_name (carried from the group vendor row above), invoice_number (the invoice or voucher number, null if not shown), invoice_date (YYYY-MM-DD or null), due_date (YYYY-MM-DD or null), amount (the row Total; KEEP the sign — a negative/credit voucher stays negative), age_bucket (which aging column is non-zero: "Current", "1-30", "31-60", "61-90", "Over 90", or null), status (the payment Status column verbatim, e.g. "HOLD", "PAID", "PPHOLD", or null).
 
 Do NOT include total/summary/subtotal rows.
 
@@ -775,7 +775,8 @@ Return JSON exactly matching this schema:
       "invoice_date": "2026-04-15" or null,
       "due_date": "2026-05-15" or null,
       "amount": 12500.00,
-      "age_bucket": "Current" or null
+      "age_bucket": "Current" or null,
+      "status": "HOLD" or null
     }
   ],
   "notes": "brief extraction notes",

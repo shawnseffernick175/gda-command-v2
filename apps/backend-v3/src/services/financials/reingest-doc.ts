@@ -28,6 +28,7 @@ import {
   ingestArRows,
   ingestTrialBalanceRows,
   ingestProjectRevenueRows,
+  assessAgingBatch,
 } from './ingest.js';
 import {
   parseAgedAr,
@@ -120,17 +121,21 @@ export function classifyFinancialDoc(
     (/proj.*revenue|revenue.*summary|full.?proj/i.test(fn) ||
       (/revenue project/.test(headNorm) && /\bitd\b/.test(headNorm)));
 
-  const is_ar =
-    /aged.?ar|accounts?.?receivable|\bar\b/i.test(fn) ||
-    (/customer/.test(headNorm) &&
-      /invoice/.test(headNorm) &&
-      /(due date|31 to 60|61 to 90|over 90|current)/.test(headNorm));
-
   const is_trial_balance =
     /trial.?balance|trail.?balance/i.test(fn) ||
     (/account/.test(headNorm) &&
       /beginning balance/.test(headNorm) &&
       /ending balance/.test(headNorm));
+
+  // A Balance Sheet is recognised by filename OR by its own structural markers
+  // (the "As of ... Assets ... Liabilities & Equity" spine), NOT by the mere
+  // presence of the phrase "balance sheet" or "accounts payable" — those appear
+  // as LINE ITEMS inside statements that are not balance sheets.
+  const is_balance_sheet =
+    /balance.?sheet/i.test(fn) ||
+    /balance.?sheet/i.test(head) ||
+    (/liabilities & equity/.test(headNorm) &&
+      /total (current )?assets/.test(headNorm));
 
   const is_sie =
     /\bsie\b|statement.?of.?indirect|trend.?rate|trend.?sie/i.test(fn) ||
@@ -138,17 +143,29 @@ export function classifyFinancialDoc(
     ((/pool number/.test(headNorm) || /pool name/.test(headNorm)) &&
       (/wrap rate/.test(headNorm) || /trend rate/.test(headNorm) || /\bact\b/.test(headNorm)));
 
-  const is_ap =
+  // AR / AP are recognised by an AP/AR-report FILENAME or by the report's own
+  // structural header signature (AR: customer + invoice + aging; AP: vendor +
+  // voucher). They are NOT inferred from the bare phrases "accounts receivable"
+  // / "accounts payable", which occur as line items in every Balance Sheet and
+  // Trial Balance — that loose match is exactly what routed the June Balance
+  // Sheet into ap_actuals. A Balance Sheet / Trial Balance is never an AR/AP
+  // report, so those types hard-suppress AR/AP.
+  const rawIsAr =
+    /aged.?ar|accounts?.?receivable/i.test(fn) ||
+    (/customer/.test(headNorm) &&
+      /invoice/.test(headNorm) &&
+      /(due date|31 to 60|61 to 90|over 90|current)/.test(headNorm));
+  const is_ar = rawIsAr && !is_balance_sheet && !is_trial_balance;
+
+  const rawIsAp =
     /\bap\b|accounts?.?payable|open.?ap/i.test(fn) ||
-    /accounts?.?payable|open.?ap|\bap\b/i.test(head) ||
     (/vendor/.test(headNorm) && /voucher/.test(headNorm));
+  const is_ap = rawIsAp && !is_balance_sheet && !is_trial_balance;
 
   const is_cost_detail =
     /tgt.?vs.?act|target.?vs.?actual|cost.?detail|gl.?detail|ytd.?gl/i.test(fn) ||
     /cost.?detail|gl.?detail/i.test(head) ||
     /proj classification/.test(headNorm);
-
-  const is_balance_sheet = /balance.?sheet/i.test(fn) || /balance.?sheet/i.test(head);
 
   // Trended Income Statement structural fingerprint (content, not filename): an
   // "Account Name | Jan | Feb | Mar | ..." month grid together with the Total
@@ -272,6 +289,20 @@ export async function reingestFinancialDoc(params: {
   // types suppress the generic P&L parser so non-P&L docs are never fed to
   // financial_statement_extract (which would reject every row as "implausible").
   const cls = classifyFinancialDoc(filename, extractedText, docType);
+
+  // Dedup guard: the aging/grid tabular reports (AP / AR / Trial Balance /
+  // Project Revenue) are frequently uploaded as BOTH a machine-readable .xlsx
+  // and a rendered .pdf of the same report+period. The .xlsx is the authoritative
+  // structured source; the .pdf re-flows columns and parses unreliably, and when
+  // both are ingested their rows do not collide on the natural key (parse
+  // variance in names/invoice numbers), so the period DOUBLE-COUNTS — this is
+  // what made June AR read ~$6.3M instead of $3.18M and fed the mis-parsed June
+  // AP .pdf. For these four types we skip the .pdf and defer to the .xlsx,
+  // flagging it as NEEDS_REVIEW so a period that only has a PDF is surfaced (and
+  // can be re-uploaded as .xlsx) rather than silently corrupting the totals.
+  const isPdf = /\.pdf$/i.test(filename);
+  const skipTabularPdf =
+    isPdf && (cls.is_ap || cls.is_ar || cls.is_trial_balance || cls.is_project_revenue);
 
   // --- Parser 0: Trended Income Statement / Trended Balance Sheet ---
   // This runs FIRST and is the authoritative, reconcilable source for per-month
@@ -413,11 +444,17 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 5: AP (Open Accounts Payable) ---
-  if (cls.is_ap && !skipParsers.includes('ap_extract')) {
+  if (cls.is_ap && skipTabularPdf) {
+    result.parse_warnings.push(
+      'ap_extract: skipped PDF of a tabular AP report — the .xlsx is authoritative; upload/keep the .xlsx for accurate ingest.',
+    );
+  } else if (cls.is_ap && !skipParsers.includes('ap_extract')) {
     try {
       // Try deterministic AP parser first (handles _x000D_ headers and grouped vendors)
       const detAp = parseOpenAp(extractedText, filename);
       if (detAp && detAp.rows.length > 0) {
+        const warn = assessAgingBatch('AP', detAp.rows);
+        if (warn) result.parse_warnings.push(warn);
         result.parsers_run.push('ap_extract (deterministic)');
         result.ap = await ingestApRows(detAp.rows, docId);
         if (result.ap > 0) result.any_ingested = true;
@@ -429,6 +466,8 @@ export async function reingestFinancialDoc(params: {
         });
         result.parsers_run.push('ap_extract');
         if (apResult.ok && apResult.output.is_ap && apResult.output.rows.length > 0) {
+          const warn = assessAgingBatch('AP', apResult.output.rows);
+          if (warn) result.parse_warnings.push(warn);
           result.ap = await ingestApRows(apResult.output.rows, docId);
           if (result.ap > 0) result.any_ingested = true;
         } else {
@@ -442,11 +481,17 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 6: AR (Aged Accounts Receivable) ---
-  if (cls.is_ar && !skipParsers.includes('ar_extract')) {
+  if (cls.is_ar && skipTabularPdf) {
+    result.parse_warnings.push(
+      'ar_extract: skipped PDF of a tabular AR report — the .xlsx is authoritative; upload/keep the .xlsx for accurate ingest.',
+    );
+  } else if (cls.is_ar && !skipParsers.includes('ar_extract')) {
     try {
       // Try deterministic AR parser first (handles grouped customer rows)
       const detAr = parseAgedAr(extractedText, filename);
       if (detAr && detAr.rows.length > 0) {
+        const warn = assessAgingBatch('AR', detAr.rows);
+        if (warn) result.parse_warnings.push(warn);
         result.parsers_run.push('ar_extract (deterministic)');
         result.ar = await ingestArRows(detAr.rows, docId);
         if (result.ar > 0) result.any_ingested = true;
@@ -458,6 +503,8 @@ export async function reingestFinancialDoc(params: {
         });
         result.parsers_run.push('ar_extract');
         if (arResult.ok && arResult.output.is_ar && arResult.output.rows.length > 0) {
+          const warn = assessAgingBatch('AR', arResult.output.rows);
+          if (warn) result.parse_warnings.push(warn);
           result.ar = await ingestArRows(arResult.output.rows, docId);
           if (result.ar > 0) result.any_ingested = true;
         } else {
@@ -471,7 +518,11 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 7: Trial Balance ---
-  if (cls.is_trial_balance && !skipParsers.includes('trial_balance_extract')) {
+  if (cls.is_trial_balance && skipTabularPdf) {
+    result.parse_warnings.push(
+      'trial_balance_extract: skipped PDF of a tabular Trial Balance — the .xlsx is authoritative; upload/keep the .xlsx for accurate ingest.',
+    );
+  } else if (cls.is_trial_balance && !skipParsers.includes('trial_balance_extract')) {
     try {
       // Try deterministic TB parser first (handles Beginning/Prior/Current/Ending format)
       const detTb = parseTrialBalance(extractedText, filename);
@@ -500,7 +551,11 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 8: Project Revenue Summary ---
-  if (cls.is_project_revenue && !skipParsers.includes('project_revenue_extract')) {
+  if (cls.is_project_revenue && skipTabularPdf) {
+    result.parse_warnings.push(
+      'project_revenue_extract: skipped PDF of a tabular Project Revenue report — the .xlsx is authoritative; upload/keep the .xlsx for accurate ingest.',
+    );
+  } else if (cls.is_project_revenue && !skipParsers.includes('project_revenue_extract')) {
     try {
       // Try deterministic parser first (handles 29-col ITD format)
       const detPr = parseProjectRevenueSummary(extractedText, filename);
