@@ -517,7 +517,7 @@ export function P2FinancialsTab() {
                         format="money"
                         className={
                           row.variance > 0
-                            ? "text-gda-green-muted"
+                            ? "text-gda-green"
                             : row.variance < 0
                               ? "text-gda-red"
                               : undefined

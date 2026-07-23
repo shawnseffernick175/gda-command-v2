@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+import { DeltaValue } from "@/components/financials/primitives/DeltaValue";
 
 const COST_DRILL_COLS: ColumnSortConfig[] = [
   { field: "cost_element", type: "string" },
@@ -149,7 +150,7 @@ export function PeriodDrillDrawer({
                               "px-3 py-1.5 text-right tabular-nums",
                               r.variance_amount > 0
                                 ? "text-gda-red"
-                                : "text-gda-green-muted",
+                                : "text-gda-green",
                             )}
                           >
                             {formatMoney(r.variance_amount)}
@@ -371,19 +372,8 @@ function VarianceTable({
                     ? formatMoney(r.plan)
                     : `${r.plan.toFixed(1)}%`}
                 </td>
-                <td
-                  className={cn(
-                    "px-3 py-2 text-right tabular-nums",
-                    variance === null
-                      ? "text-muted-foreground"
-                      : variance >= 0
-                        ? "text-gda-green-muted"
-                        : "text-gda-red",
-                  )}
-                >
-                  {variance !== null
-                    ? `${variance >= 0 ? "+" : ""}${variance.toFixed(1)}%`
-                    : "—"}
+                <td className="px-3 py-2 text-right">
+                  <DeltaValue value={variance} showArrow={false} />
                 </td>
               </tr>
             );

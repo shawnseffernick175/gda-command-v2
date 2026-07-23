@@ -177,7 +177,7 @@ export function IndirectExpensePanel() {
                     className={`px-3 py-2 text-right tabular-nums ${
                       variance > 0
                         ? "text-gda-red"
-                        : "text-gda-green-muted"
+                        : "text-gda-green"
                     }`}
                   >
                     {formatMoney(variance)}

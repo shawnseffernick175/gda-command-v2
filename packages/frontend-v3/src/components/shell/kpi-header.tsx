@@ -113,7 +113,7 @@ export function KpiHeader() {
                       className={cn(
                         "text-base font-bold tabular-nums",
                         tile.colorCoded
-                          ? (value != null && value >= 0 ? "text-gda-green-muted" : "text-gda-red")
+                          ? (value != null && value >= 0 ? "text-gda-green" : "text-gda-red")
                           : "text-foreground",
                       )}
                     >

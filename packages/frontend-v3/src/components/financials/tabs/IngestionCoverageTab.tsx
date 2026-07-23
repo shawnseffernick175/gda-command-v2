@@ -27,7 +27,7 @@ const STATUS_LABEL: Record<IngestionCoverageStatus, string> = {
 const STATUS_BADGE: Record<IngestionCoverageStatus, string> = {
   ingested: "bg-gda-green/15 text-gda-green",
   skipped_duplicate: "border border-border bg-gda-panel text-muted-foreground",
-  not_ingested: "bg-red-400/15 text-red-400",
+  not_ingested: "bg-gda-red/15 text-gda-red",
   extraction_failed: "bg-amber-400/15 text-amber-400",
 };
 
