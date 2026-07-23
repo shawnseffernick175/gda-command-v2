@@ -14,15 +14,9 @@ async def web_search(inp: WebSearchInput) -> WebSearchOutput:
         return await _tavily_search(inp)
     if PERPLEXITY_API_KEY:
         return await _perplexity_search(inp)
-    return WebSearchOutput(
-        results=[
-            WebResult(
-                title="Web search unavailable",
-                url="https://docs.gda-command.internal/config",
-                snippet="Neither PERPLEXITY_API_KEY nor TAVILY_API_KEY configured.",
-            )
-        ]
-    )
+    # No search provider configured: return no results rather than a synthetic
+    # result with a fabricated URL (R1 — every surfaced source must be real).
+    return WebSearchOutput(results=[])
 
 
 async def _tavily_search(inp: WebSearchInput) -> WebSearchOutput:
