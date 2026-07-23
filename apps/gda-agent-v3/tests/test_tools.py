@@ -270,9 +270,8 @@ class TestWebSearch:
         monkeypatch.setattr(ws, "TAVILY_API_KEY", "")
         monkeypatch.setattr(ws, "PERPLEXITY_API_KEY", "")
         result = await web_search(WebSearchInput(query="test"))
-        assert len(result.results) == 1
-        assert "unavailable" in result.results[0].title.lower()
-        assert result.results[0].url
+        # No provider configured → no results, and never a fabricated URL (R1).
+        assert result.results == []
 
     @respx.mock
     async def test_web_search_tavily(self, monkeypatch):
