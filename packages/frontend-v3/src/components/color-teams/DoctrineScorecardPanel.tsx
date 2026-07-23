@@ -22,6 +22,7 @@ export function DoctrineScorecardPanel({
   return (
     <div className="space-y-3">
       {/* Doctrine Alignment Scorecard */}
+      {doctrineScores.length > 0 && (
       <div className="rounded border border-border bg-gda-panel p-4">
         <h4 className="mb-3 text-sm font-semibold text-gda-green">
           Doctrine Alignment Scorecard
@@ -57,6 +58,7 @@ export function DoctrineScorecardPanel({
           })}
         </div>
       </div>
+      )}
 
       {/* Margin Gauge */}
       {marginCheck && (

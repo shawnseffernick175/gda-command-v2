@@ -68,7 +68,7 @@ function run(overrides: Partial<ColorTeamRunRow> = {}): ColorTeamRunRow {
   };
 }
 
-const DOC = { id: 'doc-1', filename: 'proposal.pdf', storage_path: '/tmp/proposal.pdf' };
+const DOC = { id: 'doc-1', filename: 'proposal.pdf', storage_path: 'proposal.pdf' };
 
 function okReview(findings: unknown[]) {
   return { ok: true, output: { findings }, model_used: 'mock', latency_ms: 1, trace_id: 't' };
@@ -101,6 +101,21 @@ describe('runColorTeamAnalysis — document handling', () => {
     parseFileMock.mockRejectedValue(new Error('bad pdf'));
     const pool = makePool({ document: DOC });
     await expect(runColorTeamAnalysis(asPool(pool), run())).rejects.toThrow(/could not be read/i);
+  });
+
+  it('refuses to read a document path outside the allowed root (no arbitrary file read)', async () => {
+    parseFileMock.mockResolvedValue({ text: 'root:x:0:0' });
+    const pool = makePool({ document: { id: 'doc-1', filename: 'passwd', storage_path: '/etc/passwd' } });
+    await expect(runColorTeamAnalysis(asPool(pool), run())).rejects.toThrow(/not permitted/i);
+    // The escaping path must never reach the parser.
+    expect(parseFileMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a traversal path that escapes the root', async () => {
+    parseFileMock.mockResolvedValue({ text: 'secret' });
+    const pool = makePool({ document: { id: 'doc-1', filename: 's', storage_path: '../../../../etc/shadow' } });
+    await expect(runColorTeamAnalysis(asPool(pool), run())).rejects.toThrow(/not permitted/i);
+    expect(parseFileMock).not.toHaveBeenCalled();
   });
 });
 

@@ -83,4 +83,10 @@ export const config = {
   // ships, runs must NOT fabricate findings; leave this false so the runner
   // reports an honest "unavailable" state instead of inventing margins/scores.
   colorTeamAgentRuntimeEnabled: envBool('COLOR_TEAM_AGENT_RUNTIME_ENABLED', false),
+
+  // Root directory that Color Team document reads are confined to. A document's
+  // stored path is resolved against this root and rejected if it escapes it, so
+  // a client-supplied storage_path (e.g. `/etc/passwd` or `../../secrets`)
+  // cannot be read off disk.
+  colorTeamDocumentRoot: resolve(env('COLOR_TEAM_DOCUMENT_ROOT', 'data/color-team-docs')),
 } as const;

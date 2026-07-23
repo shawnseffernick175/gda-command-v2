@@ -15,7 +15,9 @@
  * doctrine inputs yield explicit unavailable states, never zeros or a pass.
  */
 
+import { resolve, sep } from 'node:path';
 import type { Pool as PgPool } from 'pg';
+import { config } from '../../config/index.js';
 import { llmRouter } from '../../lib/llm-router.js';
 import { parseFile } from '../rag/parser.js';
 import { evaluateDoctrineDetail } from '../doctrine/evaluate.js';
@@ -183,9 +185,37 @@ async function fetchDocument(pool: PgPool, id: string): Promise<DocumentLite | n
   return res.rows[0] ?? null;
 }
 
+/**
+ * Confine a stored document path to the configured document root. `storage_path`
+ * is client-supplied at upload time, so an unconfined read would allow arbitrary
+ * local file disclosure (e.g. `/etc/passwd`, `../../secrets`). The path is
+ * resolved against the root and rejected unless it stays inside it.
+ */
+function resolveDocumentPath(storagePath: string): string {
+  const root = config.colorTeamDocumentRoot;
+  const resolved = resolve(root, storagePath);
+  if (resolved !== root && !resolved.startsWith(root + sep)) {
+    throw new Error('outside document root');
+  }
+  return resolved;
+}
+
 async function extractDocumentText(doc: DocumentLite): Promise<string> {
+  let path: string;
   try {
-    const parsed = await parseFile(doc.storage_path);
+    path = resolveDocumentPath(doc.storage_path);
+  } catch {
+    logger.error(
+      { docId: doc.id, storagePath: doc.storage_path, root: config.colorTeamDocumentRoot },
+      'Color team document path is outside the allowed document root — refusing to read'
+    );
+    throw new Error(
+      `Uploaded document path is not permitted (${doc.filename}) — no findings generated`
+    );
+  }
+
+  try {
+    const parsed = await parseFile(path);
     return parsed.text ?? '';
   } catch (err) {
     logger.error({ err, docId: doc.id, storagePath: doc.storage_path }, 'Color team document parse failed');
