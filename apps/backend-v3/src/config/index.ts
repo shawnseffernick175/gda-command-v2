@@ -19,6 +19,12 @@ function envInt(key: string, fallback: number): number {
   return n;
 }
 
+function envBool(key: string, fallback = false): boolean {
+  const raw = process.env[key];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  return raw.trim().toLowerCase() === 'true';
+}
+
 function loadGitSha(): string {
   if (process.env['GIT_SHA']) return process.env['GIT_SHA'];
   try {
@@ -72,4 +78,9 @@ export const config = {
   fpdsApiBaseUrl: env('FPDS_API_BASE_URL', 'https://www.fpds.gov/ezsearch/fpdsportal'),
 
   samApiKey: env('SAM_API_KEY', '') || env('SAM_GOV_API_KEY', ''),
+
+  // Color Team analysis (F-300 Agent Runtime). Until a real analysis engine
+  // ships, runs must NOT fabricate findings; leave this false so the runner
+  // reports an honest "unavailable" state instead of inventing margins/scores.
+  colorTeamAgentRuntimeEnabled: envBool('COLOR_TEAM_AGENT_RUNTIME_ENABLED', false),
 } as const;

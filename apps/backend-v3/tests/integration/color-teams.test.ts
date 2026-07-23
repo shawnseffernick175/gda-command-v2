@@ -152,7 +152,7 @@ describe('Color Team Reviews API', () => {
 
   describe('GET /v3/color-teams/runs/:id', () => {
     it('returns run status and finding counts', async () => {
-      // Wait briefly for async run to complete (stub is fast)
+      // Wait briefly for the async run to settle.
       await new Promise((r) => setTimeout(r, 500));
 
       const res = await app.inject({
@@ -163,7 +163,9 @@ describe('Color Team Reviews API', () => {
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.payload);
       expect(body.data.id).toBe(runId);
-      expect(['queued', 'running', 'complete']).toContain(body.data.status);
+      // With the F-300 Agent Runtime disabled (default), a run must not
+      // fabricate findings — it settles into an honest error state.
+      expect(['queued', 'running', 'error']).toContain(body.data.status);
     });
 
     it('returns 404 for unknown run', async () => {
@@ -177,8 +179,7 @@ describe('Color Team Reviews API', () => {
   });
 
   describe('GET /v3/color-teams/runs/:id/findings', () => {
-    it('returns findings for the run', async () => {
-      // Wait for run to complete
+    it('generates NO findings when the agent runtime is disabled', async () => {
       await waitForRunComplete(runId);
 
       const res = await app.inject({
@@ -188,21 +189,8 @@ describe('Color Team Reviews API', () => {
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.payload);
-      expect(body.data.findings.length).toBeGreaterThan(0);
-      findingId = String(body.data.findings[0].id);
-    });
-
-    it('filters by color', async () => {
-      const res = await app.inject({
-        method: 'GET',
-        url: `/v3/color-teams/runs/${runId}/findings?color=green`,
-        headers: authHeader(),
-      });
-      expect(res.statusCode).toBe(200);
-      const body = JSON.parse(res.payload);
-      for (const f of body.data.findings) {
-        expect(f.color).toBe('green');
-      }
+      // Fabricated findings are never persisted (R1).
+      expect(body.data.findings.length).toBe(0);
     });
 
     it('rejects invalid color filter', async () => {
@@ -214,26 +202,32 @@ describe('Color Team Reviews API', () => {
       expect(res.statusCode).toBe(400);
     });
 
-    it('green findings include doctrine_score, margin_check, exclusion_hits', async () => {
+    it('run ends in an honest error state (no fabricated analysis)', async () => {
       const res = await app.inject({
         method: 'GET',
-        url: `/v3/color-teams/runs/${runId}/findings?color=green`,
+        url: `/v3/color-teams/runs/${runId}`,
         headers: authHeader(),
       });
       const body = JSON.parse(res.payload);
-      const greenFindings = body.data.findings;
-      const doctrineF = greenFindings.find((f: { doctrine_score: unknown }) => f.doctrine_score);
-      expect(doctrineF).toBeDefined();
-      expect(doctrineF.doctrine_score).toHaveLength(8);
-      expect(doctrineF.margin_check).toBeDefined();
-      expect(doctrineF.margin_check.pass).toBe(false);
-      expect(doctrineF.margin_check.projected_margin).toBe(6.5);
-      expect(doctrineF.margin_check.floor).toBe(8);
-      expect(doctrineF.exclusion_hits).toContain('EXCL-004');
+      expect(body.data.status).toBe('error');
+      expect(String(body.data.error_message)).toMatch(/not yet available|F-300/i);
+      expect(body.data.finding_counts).toEqual([]);
     });
   });
 
   describe('POST /v3/color-teams/findings/:id/to-action-item', () => {
+    // The runtime is disabled, so no findings exist; insert one directly to
+    // exercise the finding→action-item endpoint (independent of the runner).
+    beforeAll(async () => {
+      const inserted = await pool.query<{ id: string }>(
+        `INSERT INTO color_team_findings (run_id, color, severity, section_ref, finding, citations)
+         VALUES ($1, 'green', 'warning', 'Section L', 'Manual finding for endpoint test', '[]'::jsonb)
+         RETURNING id`,
+        [runId]
+      );
+      findingId = String(inserted.rows[0]!.id);
+    });
+
     it('creates an action item from a finding', async () => {
       const res = await app.inject({
         method: 'POST',
