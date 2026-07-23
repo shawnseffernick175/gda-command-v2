@@ -6,8 +6,8 @@
  */
 
 import type { Pool as PgPool } from 'pg';
+import { config } from '../../config/index.js';
 import { logger } from '../../lib/logger.js';
-import { DOCTRINE_PRINCIPLES } from './prompts.js';
 import type {
   ColorTeamColor,
   ColorTeamRunRow,
@@ -308,8 +308,16 @@ export async function getRunFindingCounts(
   return res.rows.map((r) => ({ color: r.color, count: parseInt(r.count, 10) }));
 }
 
-// ─── Stub agent runner (pre F-300) ──────────────────────────────────────────
+// ─── Agent runner ───────────────────────────────────────────────────────────
 
+/**
+ * Execute a color team run. Real analysis is provided by the F-300 Agent
+ * Runtime. Until that ships, we must NOT fabricate findings (invented margins,
+ * doctrine scores, exclusion codes, placeholder citations) that look real —
+ * doing so violates R1 (every data point must have a searchable source) and
+ * risks executive decisions on fake numbers. When the runtime is unavailable
+ * the run terminates in an honest `error` state with no findings.
+ */
 export async function executeColorTeamRun(
   pool: PgPool,
   runId: string
@@ -320,71 +328,29 @@ export async function executeColorTeamRun(
     return;
   }
 
+  if (!config.colorTeamAgentRuntimeEnabled) {
+    logger.warn({ runId }, 'Color team run requested but F-300 Agent Runtime is not enabled');
+    await updateRunStatus(
+      pool,
+      runId,
+      'error',
+      'Color Team analysis is not yet available — the F-300 Agent Runtime is not enabled. ' +
+        'No findings were generated (findings are never fabricated).'
+    );
+    return;
+  }
+
   await updateRunStatus(pool, runId, 'running');
 
   try {
-    for (const color of run.colors) {
-      if (!isValidColor(color)) continue;
-      await generateStubFindings(pool, runId, color);
-    }
-    await updateRunStatus(pool, runId, 'complete');
+    // F-300 Agent Runtime integration lands here. Until then this branch is
+    // unreachable in production (guarded by the flag above) so no fabricated
+    // findings are ever persisted.
+    throw new Error('F-300 Agent Runtime execution is not implemented');
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     logger.error({ err, runId }, 'Color team run failed');
     await updateRunStatus(pool, runId, 'error', msg);
-  }
-}
-
-async function generateStubFindings(
-  pool: PgPool,
-  runId: string,
-  color: ColorTeamColor
-): Promise<void> {
-  const baseFinding = {
-    run_id: runId,
-    color,
-    citations: [{ source: 'Stub analysis', url: '#', grade: 'C' as const }],
-  };
-
-  await insertFinding(pool, {
-    ...baseFinding,
-    severity: 'info',
-    section_ref: 'General',
-    finding: `[${color.toUpperCase()} STUB] Document structure reviewed — awaiting F-300 Agent Runtime for full analysis.`,
-    recommended_fix: 'Enable F-300 Cognition Layer for production-grade analysis.',
-  });
-
-  await insertFinding(pool, {
-    ...baseFinding,
-    severity: 'warning',
-    section_ref: 'Section L',
-    finding: `[${color.toUpperCase()} STUB] Potential compliance gap identified — stub finding pending real agent analysis.`,
-    recommended_fix: 'Cross-reference against Section L/M requirements when F-300 is live.',
-  });
-
-  if (color === 'green') {
-    const doctrineScore: DoctrineScoreRow[] = DOCTRINE_PRINCIPLES.map((p) => ({
-      principle: p,
-      score: 75,
-      detail: `Stub score for ${p} — awaiting F-303 Doctrine Rules Engine.`,
-    }));
-
-    const marginCheck: MarginCheck = {
-      projected_margin: 6.5,
-      floor: 8,
-      pass: false,
-    };
-
-    await insertFinding(pool, {
-      ...baseFinding,
-      severity: 'critical',
-      section_ref: 'Pricing',
-      finding: '[GREEN STUB] Projected margin (6.5%) is below the 8% floor. Executive override required.',
-      recommended_fix: 'Review labor mix and pricing strategy. Margin must meet or exceed 8% floor.',
-      doctrine_score: doctrineScore,
-      exclusion_hits: ['EXCL-004'],
-      margin_check: marginCheck,
-    });
   }
 }
 
