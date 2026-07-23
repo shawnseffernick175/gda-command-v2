@@ -22,7 +22,7 @@ export function MyOpenReviews({ onResumeReview }: MyOpenReviewsProps) {
   if (isLoading) {
     return (
       <div className="rounded border border-border bg-gda-bg-base p-4">
-        <div className="h-6 w-48 animate-pulse rounded bg-gda-panel" />
+        <div className="h-6 w-48 animate-pulse rounded bg-gda-skeleton" />
       </div>
     );
   }

@@ -40,7 +40,7 @@ export function ArTab() {
   }, [items, sortBy, sortDir]);
 
   if (isLoading) {
-    return <div className="h-48 animate-pulse rounded bg-gda-panel" />;
+    return <div className="h-48 animate-pulse rounded bg-gda-skeleton" />;
   }
 
   if (items.length === 0) {

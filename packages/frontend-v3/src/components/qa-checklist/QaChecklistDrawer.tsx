@@ -82,7 +82,7 @@ function SkeletonRows() {
   return (
     <div className="space-y-3">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="animate-pulse space-y-2 rounded border border-border bg-gda-panel p-3">
+        <div key={i} className="animate-pulse space-y-2 rounded border border-border bg-gda-skeleton p-3">
           <div className="h-3 w-3/4 rounded bg-gda-panel-alt" />
           <div className="h-2 w-1/2 rounded bg-gda-panel-alt" />
         </div>

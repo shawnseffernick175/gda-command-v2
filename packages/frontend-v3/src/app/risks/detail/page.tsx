@@ -331,7 +331,7 @@ function RiskDetailInner() {
 
 export default function RiskDetailPage() {
   return (
-    <Suspense fallback={<div className="p-6 animate-pulse"><div className="h-6 bg-gda-panel rounded w-1/3" /></div>}>
+    <Suspense fallback={<div className="p-6 animate-pulse"><div className="h-6 bg-gda-skeleton rounded w-1/3" /></div>}>
       <RiskDetailInner />
     </Suspense>
   );

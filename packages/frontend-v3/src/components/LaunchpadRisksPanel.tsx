@@ -49,7 +49,7 @@ export function LaunchpadRisksPanel() {
 
   if (isLoading) {
     return (
-      <div className="rounded border border-border bg-gda-panel p-4 space-y-3 animate-pulse">
+      <div className="rounded border border-border bg-gda-skeleton p-4 space-y-3 animate-pulse">
         <div className="h-4 bg-gda-bg-base rounded w-1/3" />
         <div className="h-10 bg-gda-bg-base rounded" />
         <div className="h-10 bg-gda-bg-base rounded" />

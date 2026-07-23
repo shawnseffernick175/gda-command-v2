@@ -38,7 +38,7 @@ export function AiAnalyzeModal({
               <p className="text-sm text-muted-foreground">
                 Analyzing financial data...
               </p>
-              <div className="h-32 animate-pulse rounded bg-gda-panel" />
+              <div className="h-32 animate-pulse rounded bg-gda-skeleton" />
             </div>
           ) : analysis ? (
             <>

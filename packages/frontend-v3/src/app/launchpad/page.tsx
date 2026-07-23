@@ -86,7 +86,7 @@ export default function LaunchpadPage() {
         {newsLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }, (_, i) => (
-              <div key={i} className="rounded border border-border bg-gda-panel p-3 h-20 animate-pulse" />
+              <div key={i} className="rounded border border-border bg-gda-skeleton p-3 h-20 animate-pulse" />
             ))}
           </div>
         ) : quietMorning ? (

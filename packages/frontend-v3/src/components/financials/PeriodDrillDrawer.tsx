@@ -72,7 +72,7 @@ export function PeriodDrillDrawer({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="h-32 animate-pulse rounded bg-gda-panel" />
+          <div className="h-32 animate-pulse rounded bg-gda-skeleton" />
         ) : data ? (
           <div className="space-y-4">
             {data.actuals.length > 0 && (

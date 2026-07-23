@@ -38,7 +38,7 @@ const KPI_TILES: KpiTile[] = [
 ];
 
 function Divider() {
-  return <div className="h-7 w-px shrink-0 bg-gray-200" />;
+  return <div className="h-7 w-px shrink-0 bg-border" />;
 }
 
 export function KpiHeader() {
@@ -63,7 +63,7 @@ export function KpiHeader() {
             "px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded transition-colors",
             mode === "CY"
               ? "bg-fin-navy text-white"
-              : "text-gray-400 hover:text-gray-200",
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           CY
@@ -74,12 +74,12 @@ export function KpiHeader() {
             "px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded transition-colors",
             mode === "FY"
               ? "bg-fin-navy text-white"
-              : "text-gray-400 hover:text-gray-200",
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           FY
         </button>
-        <span className="ml-1 text-[11px] text-white whitespace-nowrap">
+        <span className="ml-1 text-[11px] text-foreground whitespace-nowrap">
           {data?.period ?? (mode === "CY" ? "CY to date" : "FY to date")}
         </span>
       </div>
@@ -99,18 +99,18 @@ export function KpiHeader() {
                   href="/financials"
                   className="text-center whitespace-nowrap hover:opacity-80 transition-opacity"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[1px] text-white">
+                  <div className="text-[11px] font-semibold uppercase tracking-[1px] text-foreground">
                     {tile.label}
                   </div>
                   {isLoading ? (
-                    <div className="h-5 w-14 animate-pulse rounded bg-gda-panel mt-0.5" />
+                    <div className="h-5 w-14 animate-pulse rounded bg-gda-skeleton mt-0.5" />
                   ) : (
                     <div
                       className={cn(
                         "text-base font-bold tabular-nums",
                         tile.colorCoded
                           ? (value != null && value >= 0 ? "text-gda-green-muted" : "text-gda-red")
-                          : "text-white",
+                          : "text-foreground",
                       )}
                     >
                       {value != null ? tile.format(value) : "\u2014"}
