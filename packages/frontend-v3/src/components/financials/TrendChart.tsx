@@ -116,7 +116,7 @@ export function TrendChart({
       format: formatMoney,
     },
     {
-      label: "EBIT",
+      label: "Operating Income",
       values: spark.map((i) => i.ebit),
       max: maxEbit,
       color: "var(--color-gda-amber)",
@@ -164,7 +164,7 @@ export function TrendChart({
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Orders" field="orders" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-cyan" />
               <SortableHeader label="Sales" field="sales" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-green" />
-              <SortableHeader label="EBIT" field="ebit" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Operating Income" field="ebit" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Gross Margin" field="gross_margin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Return on Sales" field="ros" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>

@@ -278,7 +278,7 @@ function MetricsRow({
           </p>
         </div>
         <div>
-          <span className="text-[12px] text-muted-foreground">EBIT</span>
+          <span className="text-[12px] text-muted-foreground">Operating Income</span>
           <p
             className={cn(
               "tabular-nums",
@@ -330,7 +330,7 @@ function VarianceTable({
   const rows = [
     { label: "Orders", actual: actuals.orders, plan: plan.orders, isMoney: true },
     { label: "Sales", actual: actuals.sales, plan: plan.sales, isMoney: true },
-    { label: "EBIT", actual: actuals.ebit, plan: plan.ebit, isMoney: true },
+    { label: "Operating Income", actual: actuals.ebit, plan: plan.ebit, isMoney: true },
     {
       label: "Gross Margin",
       actual: actuals.gross_margin,

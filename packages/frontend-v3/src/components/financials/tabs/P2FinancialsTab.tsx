@@ -87,7 +87,7 @@ const STATEMENT_ROWS: StatementRowDef[] = [
   { kind: "separator", label: "" },
 
   // ── Operating Income ──
-  { kind: "summary", label: "EBIT (Operating Income)", key: "ebit", format: "money" },
+  { kind: "summary", label: "Operating Income", key: "ebit", format: "money" },
   { kind: "detail", label: "Return on Sales %", key: "ros_pct", format: "percent", indent: 1 },
 
   { kind: "separator", label: "" },

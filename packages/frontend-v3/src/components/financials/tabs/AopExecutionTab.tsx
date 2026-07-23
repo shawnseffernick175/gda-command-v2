@@ -279,7 +279,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
           ))}
           <p className="text-[12px] text-muted-foreground italic">
             Actual above plan is favorable (green). Dollar lines (Orders, Sales,
-            EBIT) come from your annual AOP plan divided flat monthly (annual
+            Operating Income) come from your annual AOP plan divided flat monthly (annual
             {" \u00f7 "}12); percentage lines (GM, ROS) apply the same plan value
             each month. Blank months await actuals.
           </p>
