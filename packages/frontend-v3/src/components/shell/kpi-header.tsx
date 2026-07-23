@@ -30,9 +30,9 @@ interface KpiTile {
 const KPI_TILES: KpiTile[] = [
   { label: "ORDERS", key: "orders", scoreType: "orders", colorCoded: false, format: formatMoney },
   { label: "SALES", key: "sales", scoreType: "sales", colorCoded: false, format: formatMoney },
+  { label: "OPERATING INCOME", key: "ebit", scoreType: "operating_income", colorCoded: true, format: formatMoney },
   { label: "GM", key: "gross_margin", scoreType: "gross_margin", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
   { label: "ROS", key: "ros", scoreType: "ros", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
-  { label: "EBIT", key: "ebit", scoreType: "ebit", colorCoded: true, format: formatMoney },
   { label: "FUNDED BACKLOG", key: "funded_backlog", scoreType: "funded_backlog", colorCoded: false, format: formatMoney },
   { label: "BACKLOG", key: "backlog", scoreType: "backlog", colorCoded: false, format: formatMoney },
 ];
