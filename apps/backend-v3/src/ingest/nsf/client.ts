@@ -109,24 +109,31 @@ export interface NSFFetchOptions {
   limit?: number;
 }
 
-export async function fetchNSFAwards(opts: NSFFetchOptions): Promise<NSFAwardRaw[]> {
-  const { since, until, limit } = opts;
-  const keywords = opts.keywords ?? (NSF_KEYWORDS as unknown as string[]);
-  const cap = limit ?? MAX_RECORDS;
-
-  const keywordParam = keywords.join(' OR ');
-  const startDateStart = formatMMDDYYYY(since);
-  const startDateEnd = formatMMDDYYYY(until);
-
-  const allResults: NSFAwardRaw[] = [];
+/**
+ * Fetch all award pages for a single keyword within the award-date window.
+ * NSF's `keyword` boolean query only reliably honors up to ~3 OR clauses (4+
+ * silently returns 0), so we query one keyword at a time and dedupe upstream
+ * rather than OR-joining the whole keyword set into one request.
+ */
+async function fetchAwardsForKeyword(
+  keyword: string,
+  dateStart: string,
+  dateEnd: string,
+  cap: number,
+): Promise<NSFAwardRaw[]> {
+  const results: NSFAwardRaw[] = [];
   let offset = 1; // NSF uses 1-based offset
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const params = new URLSearchParams({
-      keyword: keywordParam,
-      startDateStart,
-      startDateEnd,
+      keyword,
+      // Filter on award *date* (when the award was made), not startDate:
+      // startDate is the future project start (often months out), so a recent
+      // window over startDate matches almost nothing. dateStart/dateEnd is the
+      // "recently awarded" window that yields live early-signal data.
+      dateStart,
+      dateEnd,
       printFields: PRINT_FIELDS,
       rpp: String(RPP),
       offset: String(offset),
@@ -135,25 +142,53 @@ export async function fetchNSFAwards(opts: NSFFetchOptions): Promise<NSFAwardRaw
     const url = `${BASE_URL}?${params.toString()}`;
 
     logger.info(
-      { source: 'nsf', offset, startDateStart, startDateEnd },
+      { source: 'nsf', keyword, offset, dateStart, dateEnd },
       'nsf_ingest_fetch',
     );
 
     const resp = await fetchWithRetry(url);
     const awards = resp.response?.award ?? [];
-
-    allResults.push(...awards);
+    results.push(...awards);
 
     logger.info(
-      { source: 'nsf', offset, count: awards.length, total: allResults.length },
+      { source: 'nsf', keyword, offset, count: awards.length },
       'nsf_ingest_page',
     );
 
-    if (awards.length < RPP || allResults.length >= cap) break;
+    if (awards.length < RPP || results.length >= cap) break;
 
     offset += RPP;
     await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS));
   }
 
-  return allResults.slice(0, cap);
+  return results;
+}
+
+export async function fetchNSFAwards(opts: NSFFetchOptions): Promise<NSFAwardRaw[]> {
+  const { since, until, limit } = opts;
+  const keywords = opts.keywords ?? (NSF_KEYWORDS as unknown as string[]);
+  const cap = limit ?? MAX_RECORDS;
+
+  const dateStart = formatMMDDYYYY(since);
+  const dateEnd = formatMMDDYYYY(until);
+
+  // De-dupe across keywords by award id (an award can match multiple keywords).
+  const byId = new Map<string, NSFAwardRaw>();
+
+  for (const keyword of keywords) {
+    if (byId.size >= cap) break;
+    const awards = await fetchAwardsForKeyword(keyword, dateStart, dateEnd, cap);
+    for (const award of awards) {
+      const id = award.id?.trim();
+      if (id && !byId.has(id)) byId.set(id, award);
+    }
+    await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS));
+  }
+
+  logger.info(
+    { source: 'nsf', keywords: keywords.length, unique: byId.size },
+    'nsf_ingest_aggregate',
+  );
+
+  return Array.from(byId.values()).slice(0, cap);
 }

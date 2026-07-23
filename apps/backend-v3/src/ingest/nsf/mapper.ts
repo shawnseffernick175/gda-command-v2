@@ -62,7 +62,10 @@ export function mapNSFAward(
     set_aside: null,
     place_of_performance: trimOrNull(raw.awardeeStateCode) ?? null,
     response_due_at: null,
-    posted_at: parseDateMMDDYYYY(raw.startDate),
+    // Use the award date (when the award was made) as posted_at; startDate is
+    // the future project start, which misrepresents recency. Fall back to
+    // startDate only if the award date is absent.
+    posted_at: parseDateMMDDYYYY(raw.date) ?? parseDateMMDDYYYY(raw.startDate),
     description: trimOrNull(raw.abstractText) ?? null,
     data_source: 'nsf',
     tags: ['fast_track', 'signal', 'nsf', 'research'],

@@ -2,10 +2,11 @@
  * Shared feature flag for the early-signal research feeds
  * (nsf, arxiv, nih, sbir, dod_rss).
  *
- * These connectors produce no data any product read-path consumes, do not
- * feed the RAG index, and only generate scheduled no-op jobs plus health-panel
- * noise. They are disabled by default and gated behind a single env flag so the
- * prior behavior is fully restorable. See GitHub issue #1132.
+ * Lane-relevant rows from these feeds now sync into the FasTrac technology
+ * pipeline (see ingest/fastrac/tech_sync.ts, added in #1169), so they are no
+ * longer pure noise. The master flag stays off by default so the feeds are
+ * opt-in per environment; per-feed gates below allow finer control. Original
+ * context: GitHub issue #1132.
  */
 export function isResearchFeedsEnabled(): boolean {
   return process.env['RESEARCH_FEEDS_ENABLED'] === 'true';
@@ -22,13 +23,14 @@ export function isArxivIngestEnabled(): boolean {
 }
 
 /**
- * Per-feed gate for NSF. Defaults OFF: the NSF Awards API is queried by award
- * *start date* within a 7-day lookback (see ingest/nsf/job.ts + client.ts), and
- * award start dates rarely fall inside a recent 7-day window, so the feed
- * reliably returns 0 records — it only adds scheduled no-op runs and
- * health-panel noise. Set `ENABLE_NSF_INGEST=true` to re-enable once the query
- * window is corrected to fix the zero-result behavior.
+ * Per-feed gate for NSF. Defaults ON (when research feeds are enabled). The
+ * feed previously returned 0 records because it queried award *start date*
+ * (a future project-start, rarely inside a recent window) and OR-joined all 8
+ * keywords into one request (NSF silently returns 0 for 4+ OR clauses). Both
+ * are fixed in client.ts: it now filters on award `date` and queries one
+ * keyword at a time, yielding ~100 real defense/tech awards per week. Set
+ * `ENABLE_NSF_INGEST=false` to disable just NSF.
  */
 export function isNsfIngestEnabled(): boolean {
-  return process.env['ENABLE_NSF_INGEST'] === 'true';
+  return process.env['ENABLE_NSF_INGEST'] !== 'false';
 }
