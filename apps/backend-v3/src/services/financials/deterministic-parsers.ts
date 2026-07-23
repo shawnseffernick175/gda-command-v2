@@ -601,10 +601,29 @@ function parseOpenApColumnar(
 
     // Data row signature: at least 8 columns whose trailing 6 form the numeric
     // aging grid, with a real number in the final (Total) column.
-    if (cols.length < 8) continue;
     const tail = cols.slice(-6);
-    if (tail.filter((c) => isApNumericCell(c)).length < 5) continue;
-    if (!isApRealNumber(cols[cols.length - 1])) continue;
+    const isDataRow =
+      cols.length >= 8 &&
+      tail.filter((c) => isApNumericCell(c)).length >= 5 &&
+      isApRealNumber(cols[cols.length - 1]);
+
+    if (!isDataRow) {
+      // Some months emit the vendor group header as a multi-column row
+      // ("ACR Technical Services - ACR0001 |  | ACR Technical Services ...")
+      // instead of a bare pipe-less cell. Capture the vendor from column 0 so
+      // its voucher rows are attributed correctly; skip header/label rows.
+      const label = cols[0];
+      if (
+        label &&
+        /[A-Za-z]/.test(label) &&
+        !/^(vendor\s+name|status|date|current|invoice|voucher|due|account|organization|subtotal|grand\s+total|report\s+total|total|1\s+to\s+30|31\s+to\s+60|61\s+to\s+90|over\s+90)\b/i.test(
+          label,
+        )
+      ) {
+        currentVendor = label;
+      }
+      continue;
+    }
 
     sawColumnarRow = true;
 

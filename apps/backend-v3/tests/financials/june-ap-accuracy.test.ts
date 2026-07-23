@@ -60,6 +60,34 @@ describe('parseOpenAp — June Open AP columnar layout (wrapped header)', () => 
   });
 });
 
+describe('parseOpenAp — Jan Open AP (multi-column vendor-group header)', () => {
+  // Jan–Mar emit the vendor group header as a MULTI-COLUMN row
+  // ("ACR Technical Services - ACR0001 |  | ACR Technical Services ...") rather
+  // than the bare pipe-less cell June/May use. The columnar parser must capture
+  // the vendor from column 0 of that row, or every voucher loses its vendor and
+  // is dropped. Ground truth (Balance Sheet Jan AP line): $3,784,518.71.
+  let apText: string;
+
+  beforeAll(() => {
+    apText = readFileSync(join(EXTRACTED_TEXT_DIR, 'open-ap-jan-2026.extracted.txt'), 'utf-8');
+  });
+
+  it('reconciles to the Balance Sheet Jan AP total of $3,784,518.71', () => {
+    const out = parseOpenAp(apText, 'Open AP Report JAN-2026.xlsx');
+    expect(out).not.toBeNull();
+    expect(out!.is_ap).toBe(true);
+    const total = out!.rows.reduce((s, r) => s + r.amount, 0);
+    expect(total).toBeCloseTo(3784518.71, 2);
+  });
+
+  it('attributes every voucher to a vendor despite the multi-column header', () => {
+    const out = parseOpenAp(apText, 'Open AP Report JAN-2026.xlsx')!;
+    expect(out.rows.length).toBeGreaterThan(100);
+    expect(out.rows.every((r) => r.vendor_name.length > 0)).toBe(true);
+    expect(out.rows.some((r) => /ACR Technical Services/i.test(r.vendor_name))).toBe(true);
+  });
+});
+
 describe('classifyFinancialDoc — AP routing no longer misfires on line items', () => {
   // The June Balance Sheet PDF: "Accounts Payable" appears as a LINE ITEM, which
   // previously tripped the loose is_ap head match and routed it into ap_actuals.
