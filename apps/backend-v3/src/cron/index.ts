@@ -50,9 +50,16 @@ import { runIntakeAssessment } from '../services/assessment/index.js';
 import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { runFastracMatchGeneration } from '../services/fastrac/match_generator.js';
 import { pool } from '../lib/db.js';
-import { isResearchFeedsEnabled } from '../ingest/framework/research-feeds.js';
+import {
+  isResearchFeedsEnabled,
+  isArxivIngestEnabled,
+  isNsfIngestEnabled,
+} from '../ingest/framework/research-feeds.js';
 
 const researchFeedsEnabled = isResearchFeedsEnabled();
+// Per-feed sub-gates (only meaningful when research feeds are enabled).
+const arxivEnabled = researchFeedsEnabled && isArxivIngestEnabled();
+const nsfEnabled = researchFeedsEnabled && isNsfIngestEnabled();
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
 const grantsGovEnabled = process.env.ENABLE_GRANTS_GOV_INGEST !== 'false';
@@ -76,10 +83,14 @@ const JOBS: CronJob[] = [
         ...(sbirEnabled
           ? [{ sourceKey: 'sbir', schedule: '0 9 * * *', label: 'DoD SBIR/STTR open topics via DSIP (daily 05:00 ET)' }]
           : []),
-        { sourceKey: 'nsf', schedule: '0 8 * * *', label: 'NSF research awards ingest (daily 04:00 ET)' },
+        ...(nsfEnabled
+          ? [{ sourceKey: 'nsf', schedule: '0 8 * * *', label: 'NSF research awards ingest (daily 04:00 ET)' }]
+          : []),
         { sourceKey: 'dod_rss', schedule: '30 22 * * *', label: 'DoD contract announcements RSS ingest (daily 18:30 ET, after 5pm ET feed publish)' },
         { sourceKey: 'nih', schedule: '0 7 * * 1', label: 'NIH RePORTER research awards ingest (weekly Mon 03:00 ET)' },
-        { sourceKey: 'arxiv', schedule: '0 6 * * 1', label: 'arXiv defense/tech papers ingest (weekly Mon 02:00 ET)' },
+        ...(arxivEnabled
+          ? [{ sourceKey: 'arxiv', schedule: '0 6 * * 1', label: 'arXiv defense/tech papers ingest (weekly Mon 02:00 ET)' }]
+          : []),
       ]
     : []),
   ...(govwinEnabled
@@ -152,6 +163,16 @@ export function startCronScheduler(): void {
       { flag: 'RESEARCH_FEEDS_ENABLED', sources: ['nsf', 'arxiv', 'nih', 'sbir', 'dod_rss'] },
       '[cron] research feeds disabled — no jobs scheduled',
     );
+  } else {
+    if (!arxivEnabled) {
+      logger.info({ flag: 'ENABLE_ARXIV_INGEST' }, '[cron] arxiv.weekly skipped — per-feed gate off (default on)');
+    }
+    if (!nsfEnabled) {
+      logger.info(
+        { flag: 'ENABLE_NSF_INGEST' },
+        '[cron] nsf skipped — per-feed gate off (default off; NSF returns 0 records, see research-feeds.ts)',
+      );
+    }
   }
   if (!fastracArmyEnabled) {
     logger.info({ flag: 'ENABLE_FASTRAC_ARMY_INGEST' }, '[cron] fastrac-army.daily skipped — gated behind env flag (default on)');
