@@ -8,6 +8,7 @@ import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
+import { FinSourceStrip } from "@/components/financials/FinSourceStrip";
 
 const PR_SORT_COLS: ColumnSortConfig[] = [
   { field: "period", type: "period" },
@@ -53,74 +54,140 @@ export function ProjectRevenueTab() {
   const totalProfit = items.reduce((s, r) => s + r.profit, 0);
   const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
-  const top5 = [...items].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  // All projects by revenue (retain every project — no top-N truncation)
+  const ranked = [...items].sort((a, b) => b.revenue - a.revenue);
 
-  const chartOption = {
+  const periods = [...new Set(items.map((r) => r.period))];
+  const periodLabel = periods.length === 1 ? periods[0] : `${periods.length} periods`;
+
+  // Revenue by project — horizontal bars scale to project count without crush.
+  const revByProject = {
     tooltip: {
       trigger: "axis" as const,
       axisPointer: { type: "shadow" as const },
-      formatter: (params: Array<{ seriesName: string; value: number; marker: string }>) =>
-        params.map((p) => `${p.marker} ${p.seriesName}: ${formatMoneyFull(p.value)}`).join("<br/>"),
+      formatter: (params: Array<{ name: string; value: number; marker: string }>) =>
+        params
+          .map(
+            (p) =>
+              `${p.marker} ${p.name}: ${formatMoneyFull(p.value)} (${
+                totalRevenue ? ((p.value / totalRevenue) * 100).toFixed(1) : "0"
+              }%)`,
+          )
+          .join("<br/>"),
     },
-    legend: {
-      data: ["Revenue", "Cost", "Profit"],
-      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
-    },
-    grid: { left: 60, right: 16, top: 32, bottom: 48 },
+    grid: { left: 8, right: 64, top: 8, bottom: 8, containLabel: true },
     xAxis: {
-      type: "category" as const,
-      data: top5.map((r) => r.project_name.length > 18 ? r.project_name.slice(0, 16) + "…" : r.project_name),
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, rotate: 15 },
-      axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
+      type: "value" as const,
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, formatter: (v: number) => formatMoney(v) },
+      splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
     },
     yAxis: {
-      type: "value" as const,
-      axisLabel: {
-        color: "var(--color-fin-stone)",
-        fontSize: 11,
-        formatter: (v: number) => formatMoney(v),
-      },
-      splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
+      type: "category" as const,
+      inverse: true,
+      data: ranked.map((r) => (r.project_name.length > 28 ? r.project_name.slice(0, 26) + "…" : r.project_name)),
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10 },
+      axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     series: [
       {
-        name: "Revenue",
         type: "bar" as const,
-        data: top5.map((r) => r.revenue),
-        itemStyle: { color: "var(--color-gda-green)" },
+        data: ranked.map((r) => r.revenue),
+        itemStyle: { color: "var(--color-fin-chart-navy)" },
+        label: {
+          show: true,
+          position: "right" as const,
+          fontSize: 10,
+          color: "var(--color-fin-stone)",
+          formatter: (p: { value: number }) => formatMoney(p.value),
+        },
       },
+    ],
+  };
+
+  // Margin by project — only projects whose margin the source actually provides.
+  const withMargin = ranked.filter((r) => r.margin_pct != null);
+  const marginChart = {
+    tooltip: {
+      trigger: "axis" as const,
+      axisPointer: { type: "shadow" as const },
+      formatter: (params: Array<{ name: string; value: number; marker: string }>) =>
+        params.map((p) => `${p.marker} ${p.name}: ${p.value.toFixed(1)}%`).join("<br/>"),
+    },
+    grid: { left: 8, right: 48, top: 8, bottom: 8, containLabel: true },
+    xAxis: {
+      type: "value" as const,
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, formatter: (v: number) => `${v}%` },
+      splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
+    },
+    yAxis: {
+      type: "category" as const,
+      inverse: true,
+      data: withMargin.map((r) => (r.project_name.length > 28 ? r.project_name.slice(0, 26) + "…" : r.project_name)),
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10 },
+      axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
+    },
+    series: [
       {
-        name: "Cost",
         type: "bar" as const,
-        data: top5.map((r) => r.cost),
-        itemStyle: { color: "var(--color-fin-amber)" },
-      },
-      {
-        name: "Profit",
-        type: "bar" as const,
-        data: top5.map((r) => r.profit),
-        itemStyle: { color: "var(--color-fin-navy)" },
+        data: withMargin.map((r) => ({
+          value: r.margin_pct as number,
+          itemStyle: {
+            color:
+              (r.margin_pct as number) < 0
+                ? "var(--color-fin-chart-red)"
+                : (r.margin_pct as number) < 8
+                  ? "var(--color-fin-chart-orange)"
+                  : "var(--color-fin-chart-green)",
+          },
+        })),
+        label: {
+          show: true,
+          position: "right" as const,
+          fontSize: 10,
+          color: "var(--color-fin-stone)",
+          formatter: (p: { value: number }) => `${p.value.toFixed(1)}%`,
+        },
       },
     ],
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* KPI tiles */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Kpi label="Total Revenue" value={formatMoney(totalRevenue)} subtitle={`${items.length} projects`} />
         <Kpi label="Total Cost" value={formatMoney(totalCost)} />
         <Kpi label="Total Profit" value={formatMoney(totalProfit)} />
-        <Kpi label="Avg Margin" value={`${avgMargin.toFixed(1)}%`} />
+        <Kpi label="Avg Margin" value={`${avgMargin.toFixed(1)}%`} subtitle="weighted by revenue" />
       </div>
 
-      {/* Chart */}
-      <div className="rounded border border-border bg-white p-4">
+      {/* Revenue by project — all projects */}
+      <div className="rounded border border-border bg-card p-4">
         <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-          Top 5 Projects by Revenue
+          Revenue by Project — all {ranked.length} projects
         </p>
-        <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 260 }} notMerge />
+        <ReactEChartsCore
+          echarts={echarts}
+          option={revByProject}
+          style={{ height: Math.max(200, ranked.length * 22) }}
+          notMerge
+        />
       </div>
+
+      {/* Margin by project */}
+      {withMargin.length > 0 && (
+        <div className="rounded border border-border bg-card p-4">
+          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+            Margin by Project (red &lt;0% · amber &lt;8% · green ≥8%)
+          </p>
+          <ReactEChartsCore
+            echarts={echarts}
+            option={marginChart}
+            style={{ height: Math.max(160, withMargin.length * 22) }}
+            notMerge
+          />
+        </div>
+      )}
 
       {/* Table with sticky header + sortable columns */}
       <div className="rounded border border-border overflow-x-auto max-h-[480px] overflow-y-auto">
@@ -153,6 +220,13 @@ export function ProjectRevenueTab() {
           </tbody>
         </table>
       </div>
+
+      <FinSourceStrip
+        table="project_revenue_actuals"
+        rowCount={items.length}
+        period={periodLabel}
+        note="contract-type / Gov-vs-Commercial split not in ingest — see Income Statement"
+      />
     </div>
   );
 }

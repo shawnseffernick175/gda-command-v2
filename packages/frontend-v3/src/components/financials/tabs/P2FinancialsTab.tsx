@@ -238,68 +238,106 @@ export function P2FinancialsTab() {
         <Kpi
           label="Funded Backlog"
           value={"\u2014"}
-          subtitle="From balance sheet / AR aging"
+          subtitle="Not available — needs funded-value source"
         />
         <Kpi
           label="DSO"
           value={"\u2014"}
-          subtitle="Requires AR detail"
+          subtitle="Not available — needs AR aging + revenue link"
         />
       </div>
 
-      {/* Revenue Trend Chart */}
+      {/* Revenue Trend Chart — dual axis: $ (bars) left, % margin (lines) right */}
       {months.length > 0 && (
-        <div className="rounded border border-border bg-white p-4">
+        <div className="rounded border border-border bg-card p-4">
           <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-            Revenue & Profit Trend
+            Revenue & Profitability Trend
           </p>
           <ReactEChartsCore
             echarts={echarts}
-            style={{ height: 240 }}
+            style={{ height: 260 }}
             notMerge
             option={{
               tooltip: {
                 trigger: "axis" as const,
                 axisPointer: { type: "cross" as const },
+                formatter: (
+                  params: Array<{ seriesName: string; value: number; marker: string; axisValue: string }>,
+                ) => {
+                  const header = params[0]?.axisValue ?? "";
+                  const lines = params.map((p) =>
+                    p.seriesName.includes("%")
+                      ? `${p.marker} ${p.seriesName}: ${p.value.toFixed(1)}%`
+                      : `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}`,
+                  );
+                  return [header, ...lines].join("<br/>");
+                },
               },
               legend: {
-                data: ["Revenue", "Gross Profit", "EBIT"],
+                data: ["Revenue", "Gross Profit", "Gross Margin %", "Return on Sales %"],
                 textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
               },
-              grid: { left: 60, right: 16, top: 32, bottom: 32 },
+              grid: { left: 60, right: 56, top: 32, bottom: 32 },
               xAxis: {
                 type: "category" as const,
                 data: months.map((m) => shortPeriod(m.period)),
                 axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
                 axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
               },
-              yAxis: {
-                type: "value" as const,
-                axisLabel: {
-                  color: "var(--color-fin-stone)",
-                  fontSize: 11,
-                  formatter: (v: number) => formatMoney(v),
+              yAxis: [
+                {
+                  type: "value" as const,
+                  name: "$",
+                  nameTextStyle: { color: "var(--color-fin-stone)", fontSize: 10 },
+                  axisLabel: {
+                    color: "var(--color-fin-stone)",
+                    fontSize: 11,
+                    formatter: (v: number) => formatMoney(v),
+                  },
+                  splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
                 },
-                splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
-              },
+                {
+                  type: "value" as const,
+                  name: "%",
+                  nameTextStyle: { color: "var(--color-fin-stone)", fontSize: 10 },
+                  axisLabel: {
+                    color: "var(--color-fin-stone)",
+                    fontSize: 11,
+                    formatter: (v: number) => `${v}%`,
+                  },
+                  splitLine: { show: false },
+                },
+              ],
               series: [
                 {
                   name: "Revenue",
                   type: "bar" as const,
+                  yAxisIndex: 0,
                   data: months.map((m) => m.revenue),
-                  itemStyle: { color: "var(--color-fin-navy)" },
+                  itemStyle: { color: "var(--color-fin-chart-navy)" },
                 },
                 {
                   name: "Gross Profit",
-                  type: "line" as const,
+                  type: "bar" as const,
+                  yAxisIndex: 0,
                   data: months.map((m) => m.gross_profit),
+                  itemStyle: { color: "var(--color-fin-chart-green)" },
+                },
+                {
+                  name: "Gross Margin %",
+                  type: "line" as const,
+                  yAxisIndex: 1,
+                  smooth: true,
+                  data: months.map((m) => m.gross_margin_pct),
                   lineStyle: { color: "var(--color-gda-green)" },
                   itemStyle: { color: "var(--color-gda-green)" },
                 },
                 {
-                  name: "EBIT",
+                  name: "Return on Sales %",
                   type: "line" as const,
-                  data: months.map((m) => m.ebit),
+                  yAxisIndex: 1,
+                  smooth: true,
+                  data: months.map((m) => m.ros_pct),
                   lineStyle: { color: "var(--color-fin-plum)" },
                   itemStyle: { color: "var(--color-fin-plum)" },
                 },
