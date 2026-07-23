@@ -162,7 +162,7 @@ export function ColorTeamsContent() {
                   }`}
                 >
                   <span className="block truncate font-medium">{d.filename}</span>
-                  <span className="text-[11px] text-muted-foreground">{d.doc_type}</span>
+                  <span className="text-[12px] text-muted-foreground">{d.doc_type}</span>
                 </button>
               ))}
             </div>
@@ -186,7 +186,7 @@ export function ColorTeamsContent() {
                     }`}
                   >
                     <span className="block font-mono">Run #{r.id}</span>
-                    <span className="text-[11px]">
+                    <span className="text-[12px]">
                       {r.status} {"\u00B7"} {r.colors.length} colors
                     </span>
                   </button>

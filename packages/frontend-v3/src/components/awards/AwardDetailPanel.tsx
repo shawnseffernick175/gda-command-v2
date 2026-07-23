@@ -162,14 +162,14 @@ export function AwardDetailPanel({
                 <div className="space-y-3">
                   {/* So What */}
                   <div className="space-y-1">
-                    <span className="text-[11px] font-mono text-muted-foreground uppercase">So What</span>
+                    <span className="text-[12px] font-mono text-muted-foreground uppercase">So What</span>
                     <p className="text-xs text-foreground leading-relaxed">{analysis.so_what}</p>
                   </div>
 
                   {/* Threat Level */}
                   {analysis.threat_level && (
                     <div className="space-y-1">
-                      <span className="text-[11px] font-mono text-muted-foreground uppercase">Threat Level</span>
+                      <span className="text-[12px] font-mono text-muted-foreground uppercase">Threat Level</span>
                       <p className={cn("text-xs font-bold", getThreatColor(analysis.threat_level))}>
                         {analysis.threat_level}
                       </p>
@@ -179,7 +179,7 @@ export function AwardDetailPanel({
                   {/* Win Rationale */}
                   {analysis.win_rationale && (
                     <div className="space-y-1">
-                      <span className="text-[11px] font-mono text-muted-foreground uppercase">Win Rationale</span>
+                      <span className="text-[12px] font-mono text-muted-foreground uppercase">Win Rationale</span>
                       <p className="text-xs text-foreground/80">{analysis.win_rationale}</p>
                     </div>
                   )}
@@ -187,7 +187,7 @@ export function AwardDetailPanel({
                   {/* Recompete Assessment */}
                   {analysis.recompete_assessment && (
                     <div className="space-y-1">
-                      <span className="text-[11px] font-mono text-muted-foreground uppercase">Recompete Assessment</span>
+                      <span className="text-[12px] font-mono text-muted-foreground uppercase">Recompete Assessment</span>
                       <p className="text-xs text-foreground/80">{analysis.recompete_assessment}</p>
                     </div>
                   )}
@@ -195,7 +195,7 @@ export function AwardDetailPanel({
                   {/* Envision Angle */}
                   {analysis.envision_angle && (
                     <div className="space-y-1">
-                      <span className="text-[11px] font-mono text-muted-foreground uppercase">Envision Angle</span>
+                      <span className="text-[12px] font-mono text-muted-foreground uppercase">Envision Angle</span>
                       <p className="text-xs text-foreground/80">{analysis.envision_angle}</p>
                     </div>
                   )}
@@ -203,7 +203,7 @@ export function AwardDetailPanel({
                   {/* Agency Signal */}
                   {analysis.agency_signal && (
                     <div className="space-y-1">
-                      <span className="text-[11px] font-mono text-muted-foreground uppercase">Agency Signal</span>
+                      <span className="text-[12px] font-mono text-muted-foreground uppercase">Agency Signal</span>
                       <p className="text-xs text-foreground/80">{analysis.agency_signal}</p>
                     </div>
                   )}
@@ -214,7 +214,7 @@ export function AwardDetailPanel({
                       <Badge
                         variant="outline"
                         className={cn(
-                          "text-[11px] font-mono font-bold",
+                          "text-[12px] font-mono font-bold",
                           analysis.recommended_action === "Pursue Re-Compete"
                             ? "bg-gda-green/10 text-gda-green border-gda-green/40"
                             : analysis.recommended_action === "Monitor"
@@ -246,7 +246,7 @@ export function AwardDetailPanel({
                   {award.vehicle_fit.map((v) => (
                     <span
                       key={v.short_name}
-                      className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-0.5 text-[11px] font-mono text-gda-cyan"
+                      className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-0.5 text-[12px] font-mono text-gda-cyan"
                     >
                       {v.short_name}
                     </span>
@@ -294,7 +294,7 @@ export function AwardDetailPanel({
                 href={usaspendingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[11px] font-mono text-gda-cyan hover:underline"
+                className="text-[12px] font-mono text-gda-cyan hover:underline"
               >
                 View on USAspending
               </a>

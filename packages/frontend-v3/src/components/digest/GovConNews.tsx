@@ -45,14 +45,14 @@ export default function GovConNews() {
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-[11px] font-semibold text-foreground hover:text-gda-cyan hover:underline leading-tight block"
+              className="font-mono text-[12px] font-semibold text-foreground hover:text-gda-cyan hover:underline leading-tight block"
             >
               {item.title}
             </a>
-            <p className="font-mono text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+            <p className="font-mono text-[12px] text-muted-foreground leading-relaxed line-clamp-2">
               {item.blurb}
             </p>
-            <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2 font-mono text-[12px] text-muted-foreground">
               <span>{item.source_name}</span>
               <span>{formatNewsDate(item.published_at)}</span>
               {!item.is_wheelhouse && (

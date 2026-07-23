@@ -35,7 +35,7 @@ export function ScoreExplain({
           <button
             type="button"
             className={cn(
-              "inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[11px] text-muted-foreground hover:bg-gda-panel cursor-pointer",
+              "inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[12px] text-muted-foreground hover:bg-gda-panel cursor-pointer",
               className,
             )}
             aria-label={`Explain ${label}`}
@@ -58,7 +58,7 @@ export function ScoreExplain({
 
             <div className="mt-2 space-y-2">
               <div>
-                <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
+                <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wide">
                   Definition
                 </p>
                 <p className="mt-0.5 text-foreground leading-relaxed">
@@ -67,7 +67,7 @@ export function ScoreExplain({
               </div>
 
               <div>
-                <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
+                <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wide">
                   Calculation Method
                 </p>
                 <div className="mt-0.5 text-foreground leading-relaxed">
@@ -77,7 +77,7 @@ export function ScoreExplain({
 
               {explainer.renderDataSources && (
                 <div>
-                  <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
+                  <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wide">
                     Input Data
                   </p>
                   <div className="mt-0.5 text-foreground leading-relaxed">
@@ -88,7 +88,7 @@ export function ScoreExplain({
 
               {inputs && explainer.renderInputs && (
                 <div>
-                  <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
+                  <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wide">
                     For this item
                   </p>
                   <div className="mt-0.5 text-foreground leading-relaxed">

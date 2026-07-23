@@ -69,11 +69,11 @@ function MetricCell({
 }) {
   return (
     <div>
-      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="text-[12px] text-muted-foreground">{label}</p>
       <p className="text-base font-bold text-foreground tabular-nums">
         {value}
       </p>
-      <div className="flex items-center gap-1.5 text-[11px]">
+      <div className="flex items-center gap-1.5 text-[12px]">
         {plan !== null && (
           <span className="text-muted-foreground">Plan: {plan}</span>
         )}

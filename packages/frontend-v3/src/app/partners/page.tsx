@@ -79,14 +79,14 @@ function PartnerCard({ partner }: { partner: PartnerListItem }) {
             <div className="flex items-center gap-2">
               <Badge
                 variant="outline"
-                className={cn("text-[11px] font-mono", OU_COLORS[partner.ou])}
+                className={cn("text-[12px] font-mono", OU_COLORS[partner.ou])}
               >
                 {OU_LABELS[partner.ou]}
               </Badge>
               {partner.is_stale && (
                 <Badge
                   variant="outline"
-                  className="border-gda-amber text-gda-amber text-[11px] font-mono"
+                  className="border-gda-amber text-gda-amber text-[12px] font-mono"
                 >
                   STALE
                 </Badge>
@@ -100,7 +100,7 @@ function PartnerCard({ partner }: { partner: PartnerListItem }) {
           </p>
 
           <div className="space-y-1">
-            <span className="font-mono text-[11px] uppercase text-muted-foreground">
+            <span className="font-mono text-[12px] uppercase text-muted-foreground">
               Certifications
             </span>
             <div className="flex flex-wrap gap-1">
@@ -108,7 +108,7 @@ function PartnerCard({ partner }: { partner: PartnerListItem }) {
                 <Badge
                   key={cert}
                   variant="outline"
-                  className="border-border text-[11px] font-mono text-foreground"
+                  className="border-border text-[12px] font-mono text-foreground"
                 >
                   {cert}
                 </Badge>
@@ -117,7 +117,7 @@ function PartnerCard({ partner }: { partner: PartnerListItem }) {
           </div>
 
           <div className="space-y-1">
-            <span className="font-mono text-[11px] uppercase text-muted-foreground">
+            <span className="font-mono text-[12px] uppercase text-muted-foreground">
               Agencies of Strength
             </span>
             <p className="text-xs text-foreground font-mono">
@@ -125,7 +125,7 @@ function PartnerCard({ partner }: { partner: PartnerListItem }) {
             </p>
           </div>
 
-          <p className="text-[11px] text-muted-foreground font-mono">
+          <p className="text-[12px] text-muted-foreground font-mono">
             Last reviewed: {new Date(partner.last_reviewed_at).toLocaleDateString()}
           </p>
         </CardContent>

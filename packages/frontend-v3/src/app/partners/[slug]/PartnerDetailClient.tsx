@@ -58,14 +58,14 @@ export function PartnerDetailClient() {
         </h1>
         <Badge
           variant="outline"
-          className={cn("text-[11px] font-mono", OU_COLORS[partner.ou])}
+          className={cn("text-[12px] font-mono", OU_COLORS[partner.ou])}
         >
           {OU_LABELS[partner.ou]}
         </Badge>
         {partner.is_stale && (
           <Badge
             variant="outline"
-            className="border-gda-amber text-gda-amber text-[11px] font-mono"
+            className="border-gda-amber text-gda-amber text-[12px] font-mono"
           >
             STALE — last reviewed {daysSince(partner.last_reviewed_at)}d ago
           </Badge>
@@ -109,7 +109,7 @@ export function PartnerDetailClient() {
                   <p className="text-xs font-mono font-semibold text-foreground">
                     {cap.area}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">{cap.detail}</p>
+                  <p className="text-[12px] text-muted-foreground">{cap.detail}</p>
                 </div>
               ))}
             </CardContent>
@@ -129,13 +129,13 @@ export function PartnerDetailClient() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="pb-1 text-left font-mono text-[11px] uppercase text-muted-foreground tracking-wider">
+                      <th className="pb-1 text-left font-mono text-[12px] uppercase text-muted-foreground tracking-wider">
                         Agency
                       </th>
-                      <th className="pb-1 text-left font-mono text-[11px] uppercase text-muted-foreground tracking-wider">
+                      <th className="pb-1 text-left font-mono text-[12px] uppercase text-muted-foreground tracking-wider">
                         Contract
                       </th>
-                      <th className="pb-1 text-left font-mono text-[11px] uppercase text-muted-foreground tracking-wider">
+                      <th className="pb-1 text-left font-mono text-[12px] uppercase text-muted-foreground tracking-wider">
                         Period
                       </th>
                     </tr>
@@ -169,7 +169,7 @@ export function PartnerDetailClient() {
             <CardContent className="space-y-1">
               {partner.certifications.map((cert) => (
                 <div key={cert} className="flex items-center gap-2">
-                  <span className="text-gda-green text-[11px]">●</span>
+                  <span className="text-gda-green text-[12px]">●</span>
                   <span className="text-xs font-mono text-foreground">{cert}</span>
                 </div>
               ))}
@@ -189,7 +189,7 @@ export function PartnerDetailClient() {
                   <Badge
                     key={agency}
                     variant="outline"
-                    className="border-border text-[11px] font-mono text-foreground"
+                    className="border-border text-[12px] font-mono text-foreground"
                   >
                     {agency}
                   </Badge>
@@ -211,7 +211,7 @@ export function PartnerDetailClient() {
                   <Badge
                     key={naics}
                     variant="outline"
-                    className="border-border text-[11px] font-mono text-foreground"
+                    className="border-border text-[12px] font-mono text-foreground"
                   >
                     {naics}
                   </Badge>
@@ -236,7 +236,7 @@ export function PartnerDetailClient() {
                     <p className="text-xs font-mono font-semibold text-foreground">
                       {person.name}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[12px] text-muted-foreground">
                       Clearance: {person.clearance}
                       {person.certifications.length > 0 &&
                         ` | ${person.certifications.join(", ")}`}

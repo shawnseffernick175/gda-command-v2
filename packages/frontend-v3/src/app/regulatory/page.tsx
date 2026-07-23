@@ -50,7 +50,7 @@ function SourceLink({ notice }: { notice: RegulatoryNotice }) {
           href={notice.pdf_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-gda-panel hover:text-foreground"
+          className="rounded border border-border px-1.5 py-0.5 text-[12px] text-muted-foreground hover:bg-gda-panel hover:text-foreground"
         >
           PDF
         </a>
@@ -131,7 +131,7 @@ function RegulatoryContent() {
           <div className="overflow-x-auto rounded border border-border">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
                   <SortableHeader label="Document #" field="document_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                   <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                   <th className="px-3 py-2 text-left font-medium">Agencies</th>

@@ -260,7 +260,7 @@ export function PwinWeightsPanel() {
               Total: {Math.round(weightSum * 100) / 100}
             </span>
             {!sumValid && (
-              <span className="rounded bg-gda-amber/10 border border-gda-amber/30 px-2 py-0.5 text-[11px] font-mono text-gda-amber">
+              <span className="rounded bg-gda-amber/10 border border-gda-amber/30 px-2 py-0.5 text-[12px] font-mono text-gda-amber">
                 Weights must sum to 100
               </span>
             )}
@@ -281,7 +281,7 @@ export function PwinWeightsPanel() {
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b border-border text-[11px] font-mono text-muted-foreground">
+                  <tr className="border-b border-border text-[12px] font-mono text-muted-foreground">
                     <th className="pb-1.5 pr-2 w-8">#</th>
                     <th className="pb-1.5 pr-2">Program</th>
                     <th className="pb-1.5 pr-2 w-16">Current</th>

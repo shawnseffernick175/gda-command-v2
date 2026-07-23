@@ -137,11 +137,11 @@ export function TrendChart({
           const delta  = prev !== 0 ? ((latest - prev) / prev) * 100 : 0;
           return (
             <div key={m.label} className="rounded border border-border bg-gda-panel p-3 space-y-1">
-              <p className="text-[11px] text-muted-foreground">{m.label}</p>
+              <p className="text-[12px] text-muted-foreground">{m.label}</p>
               <p className={cn("text-base font-bold", m.textClass)}>
                 {m.format(latest)}
               </p>
-              <div className={cn("text-[11px]", delta >= 0 ? "text-gda-green" : "text-red-400")}>
+              <div className={cn("text-[12px]", delta >= 0 ? "text-gda-green" : "text-red-400")}>
                 {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}% vs prior period
               </div>
               <SparkLine points={m.values} max={m.max} color={m.color} />
@@ -151,7 +151,7 @@ export function TrendChart({
       </div>
 
       {clickable && (
-        <p className="text-[11px] text-muted-foreground text-center">
+        <p className="text-[12px] text-muted-foreground text-center">
           Click a row to see period details
         </p>
       )}
@@ -160,7 +160,7 @@ export function TrendChart({
       <div className="rounded border border-border overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] text-muted-foreground">
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Orders" field="orders" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-cyan" />
               <SortableHeader label="Sales" field="sales" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-green" />
@@ -200,7 +200,7 @@ export function TrendChart({
               grouped.map((g) => (
                 <Fragment key={g.source}>
                   <tr className="border-b border-border bg-gda-bg-base">
-                    <td colSpan={6} className="px-3 py-1.5 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                    <td colSpan={6} className="px-3 py-1.5 text-left text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
                       {sourceLabel(g.source)}
                     </td>
                   </tr>

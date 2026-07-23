@@ -8,7 +8,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value * 100);
   return (
     <div className="space-y-0.5">
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+      <div className="flex items-center justify-between text-[12px] text-muted-foreground">
         <span>{label}</span>
         <span className="font-mono text-foreground">{pct}%</span>
       </div>
@@ -27,7 +27,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 
 function Tag({ label }: { label: string }) {
   return (
-    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[12px] font-mono text-muted-foreground">
       {label}
     </span>
   );
@@ -48,7 +48,7 @@ export function MatchCardV2({ m }: { m: FTMatchWithEvidence }) {
       {/* Header: Need × Score × Solution */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+          <p className="text-[12px] text-muted-foreground uppercase tracking-wide mb-0.5">
             Need Signal
           </p>
           {m.need_source_url ? (
@@ -65,7 +65,7 @@ export function MatchCardV2({ m }: { m: FTMatchWithEvidence }) {
               {m.need_title}
             </p>
           )}
-          <p className="text-[11px] text-gda-cyan mt-0.5">
+          <p className="text-[12px] text-gda-cyan mt-0.5">
             {m.need_institution ?? m.need_source}
           </p>
         </div>
@@ -83,11 +83,11 @@ export function MatchCardV2({ m }: { m: FTMatchWithEvidence }) {
           >
             {overallPct}
           </span>
-          <span className="text-[11px] text-muted-foreground mt-0.5">match</span>
+          <span className="text-[12px] text-muted-foreground mt-0.5">match</span>
         </div>
 
         <div className="flex-1 min-w-0 text-right">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+          <p className="text-[12px] text-muted-foreground uppercase tracking-wide mb-0.5">
             Solution Signal
           </p>
           {m.solution_source_url ? (
@@ -104,7 +104,7 @@ export function MatchCardV2({ m }: { m: FTMatchWithEvidence }) {
               {m.solution_title}
             </p>
           )}
-          <p className="text-[11px] text-gda-cyan mt-0.5">
+          <p className="text-[12px] text-gda-cyan mt-0.5">
             {m.solution_institution ?? m.solution_source}
           </p>
         </div>
@@ -122,7 +122,7 @@ export function MatchCardV2({ m }: { m: FTMatchWithEvidence }) {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1">
           {m.recommended_vehicle && (
             <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+              <p className="text-[12px] text-muted-foreground uppercase tracking-wide mb-0.5">
                 Recommended pursuit
               </p>
               <p className="text-xs text-gda-green font-medium">
@@ -132,7 +132,7 @@ export function MatchCardV2({ m }: { m: FTMatchWithEvidence }) {
           )}
           {m.adoption_path && (
             <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+              <p className="text-[12px] text-muted-foreground uppercase tracking-wide mb-0.5">
                 Adoption path
               </p>
               <p className="text-xs text-foreground">{m.adoption_path}</p>

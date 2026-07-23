@@ -25,7 +25,7 @@ function formatDate(iso: string): string {
 
 function StatBadge({ label, value }: { label: string; value: number }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] font-mono">
+    <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[12px] font-mono">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-foreground">{value}</span>
     </span>
@@ -82,18 +82,18 @@ function UploadPanel({ onSuccess }: { onSuccess?: () => void }) {
               <label className="text-[12px] font-medium text-foreground">
                 {slot.label}
               </label>
-              <p className="text-[11px] text-muted-foreground">{slot.hint}</p>
+              <p className="text-[12px] text-muted-foreground">{slot.hint}</p>
               <input
                 type="file"
                 accept=".xlsx,.xls"
-                className="block w-full text-[12px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-card file:px-2 file:py-1 file:text-[11px] file:font-medium file:text-foreground"
+                className="block w-full text-[12px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-card file:px-2 file:py-1 file:text-[12px] file:font-medium file:text-foreground"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) setFiles((prev) => ({ ...prev, [slot.key]: f }));
                 }}
               />
               {files[slot.key] && (
-                <p className="text-[11px] text-gda-green font-mono truncate">
+                <p className="text-[12px] text-gda-green font-mono truncate">
                   {files[slot.key].name}
                 </p>
               )}
@@ -172,16 +172,16 @@ function VersionRow({
       <div className="space-y-0.5 min-w-0">
         <div className="flex items-center gap-2">
           {v.active && (
-            <Badge variant="outline" className="border-gda-green text-gda-green text-[11px]">
+            <Badge variant="outline" className="border-gda-green text-gda-green text-[12px]">
               ACTIVE
             </Badge>
           )}
-          <span className="font-mono text-muted-foreground text-[11px]">
+          <span className="font-mono text-muted-foreground text-[12px]">
             {formatDate(v.uploaded_at)}
           </span>
         </div>
         {v.notes && (
-          <p className="text-[11px] text-muted-foreground truncate max-w-[400px]">
+          <p className="text-[12px] text-muted-foreground truncate max-w-[400px]">
             {v.notes}
           </p>
         )}
@@ -198,7 +198,7 @@ function VersionRow({
       <div className="flex items-center gap-2 shrink-0">
         <button
           type="button"
-          className="rounded border border-border px-2 py-1 text-[11px] font-mono text-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors"
+          className="rounded border border-border px-2 py-1 text-[12px] font-mono text-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors"
           onClick={() => onSelect(v.id)}
         >
           Details
@@ -207,7 +207,7 @@ function VersionRow({
           <button
             type="button"
             disabled={isActivating}
-            className="rounded border border-gda-green/40 px-2 py-1 text-[11px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors disabled:opacity-50"
+            className="rounded border border-gda-green/40 px-2 py-1 text-[12px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors disabled:opacity-50"
             onClick={() => onActivate(v.id)}
           >
             Activate
@@ -282,7 +282,7 @@ function VersionDetail({ id, onClose }: { id: string; onClose: () => void }) {
 
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
           {tab === "rates" && (
-            <table className="w-full text-[11px]">
+            <table className="w-full text-[12px]">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
                   <th className="px-2 py-1">Labor Category</th>
@@ -306,7 +306,7 @@ function VersionDetail({ id, onClose }: { id: string; onClose: () => void }) {
             </table>
           )}
           {tab === "indirects" && (
-            <table className="w-full text-[11px]">
+            <table className="w-full text-[12px]">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
                   <th className="px-2 py-1">Contract Type</th>
@@ -332,7 +332,7 @@ function VersionDetail({ id, onClose }: { id: string; onClose: () => void }) {
             </table>
           )}
           {tab === "odcs" && (
-            <table className="w-full text-[11px]">
+            <table className="w-full text-[12px]">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
                   <th className="px-2 py-1">Category</th>
@@ -356,7 +356,7 @@ function VersionDetail({ id, onClose }: { id: string; onClose: () => void }) {
             </table>
           )}
           {tab === "history" && (
-            <table className="w-full text-[11px]">
+            <table className="w-full text-[12px]">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
                   <th className="px-2 py-1">Pursuit ID</th>
@@ -376,7 +376,7 @@ function VersionDetail({ id, onClose }: { id: string; onClose: () => void }) {
                       <Badge
                         variant="outline"
                         className={cn(
-                          "text-[11px]",
+                          "text-[12px]",
                           r.outcome === "won" && "border-gda-green text-gda-green",
                           r.outcome === "lost" && "border-gda-red text-gda-red",
                           r.outcome === "no_bid" && "border-muted-foreground text-muted-foreground",
@@ -431,7 +431,7 @@ export function FinancialBibleTab() {
           ) : active ? (
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <Badge variant="outline" className="border-gda-green text-gda-green text-[11px]">
+                <Badge variant="outline" className="border-gda-green text-gda-green text-[12px]">
                   ACTIVE
                 </Badge>
                 <span className="text-[12px] font-mono text-muted-foreground">
@@ -447,7 +447,7 @@ export function FinancialBibleTab() {
                 <StatBadge label="ODC Categories" value={active.odc_count} />
                 <StatBadge label="Historical Pursuits" value={active.history_count} />
               </div>
-              <div className="flex gap-2 flex-wrap text-[11px] text-muted-foreground">
+              <div className="flex gap-2 flex-wrap text-[12px] text-muted-foreground">
                 <span>Files: {Object.values(active.source_files).join(", ")}</span>
               </div>
             </div>

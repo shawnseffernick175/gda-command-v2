@@ -5,7 +5,7 @@ import type { FTSignalFeed } from "@/hooks/use-fastrac-bidirectional";
 
 function Tag({ label }: { label: string }) {
   return (
-    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[12px] font-mono text-muted-foreground">
       {label}
     </span>
   );
@@ -54,13 +54,13 @@ export function SignalFeedCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-mono text-gda-cyan whitespace-nowrap">
+            <span className="text-[12px] font-mono text-gda-cyan whitespace-nowrap">
               {signal.source}
             </span>
             {signal.urgency && (
               <span
                 className={cn(
-                  "rounded border px-1.5 py-0.5 text-[11px] font-mono uppercase",
+                  "rounded border px-1.5 py-0.5 text-[12px] font-mono uppercase",
                   URGENCY_STYLES[signal.urgency] ?? URGENCY_STYLES.low
                 )}
               >
@@ -68,7 +68,7 @@ export function SignalFeedCard({
               </span>
             )}
             {matchCount > 0 && (
-              <span className="rounded border border-gda-green/30 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green">
+              <span className="rounded border border-gda-green/30 bg-gda-green/10 px-1.5 py-0.5 text-[12px] font-mono text-gda-green">
                 {matchCount} match{matchCount !== 1 ? "es" : ""}
               </span>
             )}
@@ -90,7 +90,7 @@ export function SignalFeedCard({
           )}
 
           {signal.summary && (
-            <p className="text-[11px] text-muted-foreground leading-relaxed mt-1 line-clamp-2">
+            <p className="text-[12px] text-muted-foreground leading-relaxed mt-1 line-clamp-2">
               {signal.summary}
             </p>
           )}
@@ -104,13 +104,13 @@ export function SignalFeedCard({
 
         <div className="flex flex-col items-end gap-2 shrink-0">
           <SignalStrength value={signal.signal_strength} />
-          <span className="text-[11px] text-muted-foreground font-mono">
+          <span className="text-[12px] text-muted-foreground font-mono">
             {signal.horizon}
           </span>
           <button
             onClick={onAction}
             disabled={actionLoading}
-            className="rounded border border-gda-cyan bg-gda-cyan/10 px-3 py-1 text-[11px] font-mono font-medium text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50 transition-colors whitespace-nowrap"
+            className="rounded border border-gda-cyan bg-gda-cyan/10 px-3 py-1 text-[12px] font-mono font-medium text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50 transition-colors whitespace-nowrap"
           >
             {actionLoading ? "Searching…" : actionLabel}
           </button>
@@ -118,7 +118,7 @@ export function SignalFeedCard({
       </div>
 
       {signal.institution_name && (
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
           <span>{signal.institution_name}</span>
           {signal.published_at && (
             <span>· {new Date(signal.published_at).toLocaleDateString()}</span>

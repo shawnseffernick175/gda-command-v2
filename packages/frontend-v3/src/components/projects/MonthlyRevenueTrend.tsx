@@ -57,7 +57,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
     legend: {
       data: ["Actual Revenue", "Target"],
       bottom: 0,
-      textStyle: { color: STONE, fontSize: 11 },
+      textStyle: { color: STONE, fontSize: 12 },
       itemWidth: 16,
       itemHeight: 2,
       itemGap: 20,
@@ -74,7 +74,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
       boundaryGap: false,
       axisLabel: {
         color: STONE,
-        fontSize: 11,
+        fontSize: 12,
         interval: 0,
       },
       axisLine: { lineStyle: { color: SAND } },
@@ -84,7 +84,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
       type: "value",
       axisLabel: {
         color: STONE,
-        fontSize: 11,
+        fontSize: 12,
         formatter: (v: number) => formatMoney(v),
       },
       splitLine: { lineStyle: { color: SAND, type: "dashed" } },
@@ -119,7 +119,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
           formatter: (p: { value: number | null }) =>
             p.value != null ? formatMoney(p.value) : "",
           color: INK,
-          fontSize: 10,
+          fontSize: 12,
         },
       },
       {
@@ -140,7 +140,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
       <h3 className="mb-1 text-sm font-medium text-fin-ink">
         Monthly Revenue Trend
       </h3>
-      <p className="mb-3 text-[11px] text-muted-foreground">
+      <p className="mb-3 text-[12px] text-muted-foreground">
         Actual period revenue vs target across months
       </p>
       <ReactEChartsCore

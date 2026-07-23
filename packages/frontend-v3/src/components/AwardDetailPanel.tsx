@@ -82,11 +82,11 @@ export function AwardDetailPanel({
             <span className="font-mono text-sm text-foreground tabular-nums">
               {formatMoney(award.awarded_amount)}
             </span>
-            <span className="text-[11px] text-muted-foreground font-mono">
+            <span className="text-[12px] text-muted-foreground font-mono">
               Awarded {formatDate(award.awarded_at)}
             </span>
             {award.period_of_performance_end && (
-              <span className="text-[11px] text-muted-foreground font-mono">
+              <span className="text-[12px] text-muted-foreground font-mono">
                 PoP ends {formatDate(award.period_of_performance_end)}
               </span>
             )}
@@ -125,7 +125,7 @@ export function AwardDetailPanel({
 
               {/* Win Rationale */}
               <div className="space-y-0.5">
-                <span className="text-[11px] font-mono text-muted-foreground">
+                <span className="text-[12px] font-mono text-muted-foreground">
                   Win Rationale
                 </span>
                 <p className="text-xs text-foreground/80">
@@ -135,7 +135,7 @@ export function AwardDetailPanel({
 
               {/* Agency Signal */}
               <div className="space-y-0.5">
-                <span className="text-[11px] font-mono text-muted-foreground">
+                <span className="text-[12px] font-mono text-muted-foreground">
                   Agency Signal
                 </span>
                 <p className="text-xs text-foreground/80">
@@ -145,7 +145,7 @@ export function AwardDetailPanel({
 
               {/* Re-Compete Assessment */}
               <div className="space-y-0.5">
-                <span className="text-[11px] font-mono text-muted-foreground">
+                <span className="text-[12px] font-mono text-muted-foreground">
                   Re-Compete Assessment
                 </span>
                 <p className="text-xs text-foreground/80">

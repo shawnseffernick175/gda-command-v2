@@ -37,7 +37,7 @@ export function MilestonesTab({ captureId, milestones }: MilestonesTabProps) {
         <button
           type="button"
           onClick={() => setShowAdd(true)}
-          className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-1 text-[11px] font-medium text-gda-green hover:bg-gda-green/20"
+          className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-1 text-[12px] font-medium text-gda-green hover:bg-gda-green/20"
         >
           + Add
         </button>
@@ -55,7 +55,7 @@ export function MilestonesTab({ captureId, milestones }: MilestonesTabProps) {
                   <select
                     value={m.status}
                     onChange={(e) => handleStatusChange(m.id, e.target.value)}
-                    className="rounded border border-border bg-gda-bg-deep px-1 py-0.5 text-[11px] text-foreground"
+                    className="rounded border border-border bg-gda-bg-deep px-1 py-0.5 text-[12px] text-foreground"
                   >
                     <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
@@ -64,7 +64,7 @@ export function MilestonesTab({ captureId, milestones }: MilestonesTabProps) {
                   </select>
                   <span className="text-xs text-foreground">{m.milestone_name}</span>
                 </div>
-                <span className={`text-[11px] tabular-nums ${isOverdue ? "text-gda-red font-medium" : "text-muted-foreground"}`}>
+                <span className={`text-[12px] tabular-nums ${isOverdue ? "text-gda-red font-medium" : "text-muted-foreground"}`}>
                   {m.due_date}
                 </span>
               </div>
@@ -93,14 +93,14 @@ export function MilestonesTab({ captureId, milestones }: MilestonesTabProps) {
               type="button"
               onClick={handleAdd}
               disabled={addMilestone.isPending}
-              className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-1 text-[11px] font-medium text-gda-green hover:bg-gda-green/20"
+              className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-1 text-[12px] font-medium text-gda-green hover:bg-gda-green/20"
             >
               Add
             </button>
             <button
               type="button"
               onClick={() => setShowAdd(false)}
-              className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-gda-panel"
+              className="rounded border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-gda-panel"
             >
               Cancel
             </button>

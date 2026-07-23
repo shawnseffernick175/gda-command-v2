@@ -46,7 +46,7 @@ export function AiAnalyzeModal({
                 {analysis}
               </div>
               {generatedAt && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   Generated{" "}
                   {new Date(generatedAt).toISOString().replace("T", " ").slice(0, 19)}{" "}
                   UTC

@@ -95,7 +95,7 @@ function VersionHistoryDrawer({
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-gda-bg-base px-4 py-3">
           <div>
             <h2 className="font-mono text-sm font-semibold text-foreground">Version History</h2>
-            <p className="text-[11px] text-muted-foreground">{displayName}</p>
+            <p className="text-[12px] text-muted-foreground">{displayName}</p>
           </div>
           <button
             type="button"
@@ -115,30 +115,30 @@ function VersionHistoryDrawer({
             <div key={v.id} className="rounded border border-border bg-gda-panel p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] font-medium text-foreground">v{v.version}</span>
-                  <span className="text-[11px] text-muted-foreground">by {v.changed_by}</span>
+                  <span className="font-mono text-[12px] font-medium text-foreground">v{v.version}</span>
+                  <span className="text-[12px] text-muted-foreground">by {v.changed_by}</span>
                 </div>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-[12px] text-muted-foreground">
                   {new Date(v.created_at).toLocaleDateString()} {new Date(v.created_at).toLocaleTimeString()}
                 </span>
               </div>
               {v.change_note && (
-                <p className="text-[11px] text-muted-foreground italic">{v.change_note}</p>
+                <p className="text-[12px] text-muted-foreground italic">{v.change_note}</p>
               )}
-              <details className="text-[11px]">
+              <details className="text-[12px]">
                 <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                   Show system prompt
                 </summary>
-                <pre className="mt-1 whitespace-pre-wrap font-mono text-[11px] bg-gda-bg-base rounded border border-border p-2 text-foreground max-h-40 overflow-y-auto">
+                <pre className="mt-1 whitespace-pre-wrap font-mono text-[12px] bg-gda-bg-base rounded border border-border p-2 text-foreground max-h-40 overflow-y-auto">
                   {v.system_prompt}
                 </pre>
               </details>
               {v.user_prompt_template && (
-                <details className="text-[11px]">
+                <details className="text-[12px]">
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                     Show user prompt template
                   </summary>
-                  <pre className="mt-1 whitespace-pre-wrap font-mono text-[11px] bg-gda-bg-base rounded border border-border p-2 text-foreground max-h-40 overflow-y-auto">
+                  <pre className="mt-1 whitespace-pre-wrap font-mono text-[12px] bg-gda-bg-base rounded border border-border p-2 text-foreground max-h-40 overflow-y-auto">
                     {v.user_prompt_template}
                   </pre>
                 </details>
@@ -147,7 +147,7 @@ function VersionHistoryDrawer({
                 type="button"
                 disabled={restoreVersion.isPending}
                 onClick={() => restoreVersion.mutate({ key: promptKey, version: v.version })}
-                className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-3 py-1 text-[11px] font-mono text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50 transition-colors"
+                className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-3 py-1 text-[12px] font-mono text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50 transition-colors"
               >
                 {restoreVersion.isPending ? "Restoring..." : "Restore this version"}
               </button>
@@ -223,8 +223,8 @@ function EditorPanel({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="font-mono text-sm font-semibold text-foreground">{prompt.display_name}</h2>
-            <span className="font-mono text-[11px] text-muted-foreground">v{prompt.version}</span>
-            <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono", surfaceBadgeColor(prompt.surface))}>
+            <span className="font-mono text-[12px] text-muted-foreground">v{prompt.version}</span>
+            <span className={cn("rounded border px-1.5 py-0.5 text-[12px] font-mono", surfaceBadgeColor(prompt.surface))}>
               {prompt.surface}
             </span>
             {(() => {
@@ -233,7 +233,7 @@ function EditorPanel({
                 <span
                   title={promptStatusTooltip(status)}
                   className={cn(
-                    "rounded border px-1.5 py-0.5 text-[11px] font-mono",
+                    "rounded border px-1.5 py-0.5 text-[12px] font-mono",
                     promptStatusClasses(status),
                   )}
                 >
@@ -245,7 +245,7 @@ function EditorPanel({
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="rounded border border-border px-2.5 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel transition-colors"
+            className="rounded border border-border px-2.5 py-1 text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel transition-colors"
           >
             {showAdvanced ? "Hide Advanced" : "Advanced"}
           </button>
@@ -255,7 +255,7 @@ function EditorPanel({
         )}
 
         {promptStatus(prompt.prompt_key) === "live" ? (
-          <div className="rounded border border-gda-green/30 bg-gda-green/5 px-3 py-2 text-[11px] text-muted-foreground">
+          <div className="rounded border border-gda-green/30 bg-gda-green/5 px-3 py-2 text-[12px] text-muted-foreground">
             <span className="font-mono text-gda-green">How to use this:</span>{" "}
             Type your instructions in plain English in the{" "}
             <span className="text-foreground">System Prompt</span> box below —
@@ -265,7 +265,7 @@ function EditorPanel({
             handled automatically, so you can rewrite the instructions freely.
           </div>
         ) : (
-          <div className="rounded border border-border bg-gda-panel px-3 py-2 text-[11px] text-muted-foreground">
+          <div className="rounded border border-border bg-gda-panel px-3 py-2 text-[12px] text-muted-foreground">
             This prompt is stored but not currently read by any AI task, so
             editing it will not change AI behavior yet. The live prompts are the
             ones marked{" "}
@@ -275,7 +275,7 @@ function EditorPanel({
 
         {/* System Prompt — always visible */}
         <div className="space-y-1.5">
-          <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
             System Prompt {"\u2014"} plain English, no JSON needed
           </label>
           <textarea
@@ -312,7 +312,7 @@ function EditorPanel({
           <div className="space-y-4 border-t border-border pt-4">
             {/* User Prompt Template */}
             <div className="space-y-1.5">
-              <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
                 User Prompt Template
               </label>
               <textarea
@@ -327,7 +327,7 @@ function EditorPanel({
                     <span
                       key={v.name}
                       title={v.description ?? v.name}
-                      className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-cyan"
+                      className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-1.5 py-0.5 text-[12px] font-mono text-gda-cyan"
                     >
                       {`{${v.name}}`}
                     </span>
@@ -338,7 +338,7 @@ function EditorPanel({
 
             {/* Change Note */}
             <div className="space-y-1.5">
-              <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
                 Change Note (optional)
               </label>
               <input
@@ -352,14 +352,14 @@ function EditorPanel({
 
             {/* Test Preview */}
             <div className="space-y-2 border-t border-border pt-4">
-              <h3 className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <h3 className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
                 Test Preview
               </h3>
               {variables.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   {variables.map((v) => (
                     <div key={v.name} className="space-y-0.5">
-                      <label className="text-[11px] font-mono text-muted-foreground">{v.name}</label>
+                      <label className="text-[12px] font-mono text-muted-foreground">{v.name}</label>
                       <input
                         type="text"
                         value={variableValues[v.name] ?? ""}
@@ -390,7 +390,7 @@ function EditorPanel({
 
               {testPrompt.isSuccess && testPrompt.data && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
                     <span>Model: {testPrompt.data.model_used}</span>
                     <span>Tokens: {testPrompt.data.tokens_used}</span>
                     <span>Time: {testPrompt.data.duration_ms}ms</span>
@@ -460,19 +460,19 @@ function DoctrinePrincipleCard({ principle }: { principle: DoctrinePrinciple }) 
       )}
     >
       <div className="flex items-center gap-3 mb-1">
-        <span className="font-mono text-[11px] font-medium text-muted-foreground">
+        <span className="font-mono text-[12px] font-medium text-muted-foreground">
           {principle.display_order}
         </span>
         <span className="font-mono text-sm font-semibold text-foreground">
           {principle.name}
         </span>
-        <span className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-cyan">
+        <span className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-1.5 py-0.5 text-[12px] font-mono text-gda-cyan">
           {principle.short_form}
         </span>
       </div>
-      <p className="text-[11px] text-muted-foreground mb-3">{principle.long_form}</p>
+      <p className="text-[12px] text-muted-foreground mb-3">{principle.long_form}</p>
 
-      <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+      <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
         Evaluation Prompt
       </label>
       <textarea
@@ -556,20 +556,20 @@ function ColorTeamsPanel() {
           </div>
 
           <div>
-            <span className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
               Description
             </span>
             <p className="text-xs text-foreground mt-0.5">{ct.description}</p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide mr-1">
+            <span className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide mr-1">
               Tools
             </span>
             {ct.tools.map((tool) => (
               <span
                 key={tool}
-                className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[11px] font-mono text-foreground"
+                className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[12px] font-mono text-foreground"
               >
                 {tool}
               </span>
@@ -577,7 +577,7 @@ function ColorTeamsPanel() {
           </div>
 
           <div>
-            <span className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
               Output
             </span>
             <pre className="mt-0.5 font-mono text-xs text-foreground bg-gda-bg-base border border-border rounded px-2.5 py-1.5 whitespace-pre-wrap">
@@ -751,7 +751,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
           <button
             type="button"
             onClick={addPoint}
-            className="text-[11px] font-mono text-muted-foreground hover:text-foreground mt-1 transition-colors"
+            className="text-[12px] font-mono text-muted-foreground hover:text-foreground mt-1 transition-colors"
           >
             + Add Point
           </button>
@@ -760,7 +760,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
 
       {/* Surface */}
       <div className="flex items-center gap-3">
-        <span className="font-mono text-[11px] text-muted-foreground">Surface</span>
+        <span className="font-mono text-[12px] text-muted-foreground">Surface</span>
         <select
           value={surface}
           onChange={(e) => setSurface(e.target.value)}
@@ -801,7 +801,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
       {result && (
         <div className="space-y-3 border-t border-border pt-4">
           <div className="flex items-center justify-between">
-            <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
               Your Prompt
             </label>
             <button
@@ -825,7 +825,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
             type="button"
             onClick={handleSaveToLibrary}
             disabled={createPrompt.isPending}
-            className="rounded border border-border px-3 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel disabled:opacity-50 transition-colors"
+            className="rounded border border-border px-3 py-1 text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel disabled:opacity-50 transition-colors"
           >
             {createPrompt.isPending ? "Saving..." : "Save to Library"}
           </button>
@@ -921,7 +921,7 @@ function FrameworkBuilder({ onNavigateToPrompt }: { onNavigateToPrompt: (key: st
       </div>
 
       <div className="space-y-1.5">
-        <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+        <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
           Framework
         </label>
         <select
@@ -935,13 +935,13 @@ function FrameworkBuilder({ onNavigateToPrompt }: { onNavigateToPrompt: (key: st
             </option>
           ))}
         </select>
-        <p className="text-[11px] text-muted-foreground italic">{framework.tagline}</p>
+        <p className="text-[12px] text-muted-foreground italic">{framework.tagline}</p>
       </div>
 
       <div className="space-y-4">
         {framework.fields.map((field) => (
           <div key={field.key} className="space-y-1.5">
-            <label className="flex items-center gap-2 font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <label className="flex items-center gap-2 font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
               <span className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-1.5 py-0.5 text-gda-cyan">
                 {field.letter}
               </span>
@@ -974,7 +974,7 @@ function FrameworkBuilder({ onNavigateToPrompt }: { onNavigateToPrompt: (key: st
 
       <div className="space-y-3 border-t border-border pt-4">
         <div className="flex items-center justify-between">
-          <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
             Your Prompt
           </label>
           <button
@@ -1000,7 +1000,7 @@ function FrameworkBuilder({ onNavigateToPrompt }: { onNavigateToPrompt: (key: st
       <div className="space-y-3 border-t border-border pt-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
               Name (optional)
             </label>
             <input
@@ -1012,7 +1012,7 @@ function FrameworkBuilder({ onNavigateToPrompt }: { onNavigateToPrompt: (key: st
             />
           </div>
           <div className="space-y-1.5">
-            <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <label className="font-mono text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
               Surface
             </label>
             <select
@@ -1036,7 +1036,7 @@ function FrameworkBuilder({ onNavigateToPrompt }: { onNavigateToPrompt: (key: st
         >
           {createPrompt.isPending ? "Saving\u2026" : "Save to Library"}
         </button>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Saved prompts appear in the All tab. Note: prompts saved here are
           stored for reuse but are not wired to a live AI task.
         </p>
@@ -1086,7 +1086,7 @@ export default function PromptsPage() {
           <div className="flex min-w-0 items-baseline gap-3">
             <h1 className="shrink-0 font-mono text-base font-bold text-foreground">Prompts</h1>
             {!isSpecialTab && (
-              <span className="shrink-0 rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green">
+              <span className="shrink-0 rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[12px] font-mono text-gda-green">
                 {prompts.length} prompts
               </span>
             )}
@@ -1104,7 +1104,7 @@ export default function PromptsPage() {
             type="button"
             onClick={() => { setActiveTab(tab.value); setSelectedKey(null); }}
             className={cn(
-              "rounded px-2.5 py-1 text-[11px] font-mono transition-colors whitespace-nowrap",
+              "rounded px-2.5 py-1 text-[12px] font-mono transition-colors whitespace-nowrap",
               activeTab === tab.value
                 ? "bg-gda-green/10 text-gda-green border border-gda-green/30"
                 : "text-muted-foreground hover:text-foreground hover:bg-gda-panel border border-transparent",
@@ -1120,7 +1120,7 @@ export default function PromptsPage() {
             type="button"
             onClick={() => { setActiveTab(tab.value); setSelectedKey(null); }}
             className={cn(
-              "rounded px-2.5 py-1 text-[11px] font-mono transition-colors whitespace-nowrap",
+              "rounded px-2.5 py-1 text-[12px] font-mono transition-colors whitespace-nowrap",
               activeTab === tab.value
                 ? "bg-gda-green/10 text-gda-green border border-gda-green/30"
                 : "text-muted-foreground hover:text-foreground hover:bg-gda-panel border border-transparent",
@@ -1167,12 +1167,12 @@ export default function PromptsPage() {
                   <span className="font-mono text-xs font-medium text-foreground truncate">
                     {p.display_name}
                   </span>
-                  <span className="font-mono text-[11px] text-muted-foreground shrink-0 ml-2">
+                  <span className="font-mono text-[12px] text-muted-foreground shrink-0 ml-2">
                     v{p.version}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono", surfaceBadgeColor(p.surface))}>
+                  <span className={cn("rounded border px-1.5 py-0.5 text-[12px] font-mono", surfaceBadgeColor(p.surface))}>
                     {p.surface}
                   </span>
                   {(() => {
@@ -1181,7 +1181,7 @@ export default function PromptsPage() {
                       <span
                         title={promptStatusTooltip(status)}
                         className={cn(
-                          "rounded border px-1.5 py-0.5 text-[11px] font-mono",
+                          "rounded border px-1.5 py-0.5 text-[12px] font-mono",
                           promptStatusClasses(status),
                         )}
                       >
@@ -1190,7 +1190,7 @@ export default function PromptsPage() {
                     );
                   })()}
                   {!p.is_active && (
-                    <span className="rounded border border-gda-red/30 bg-gda-red/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-red">
+                    <span className="rounded border border-gda-red/30 bg-gda-red/10 px-1.5 py-0.5 text-[12px] font-mono text-gda-red">
                       inactive
                     </span>
                   )}

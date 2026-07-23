@@ -35,7 +35,7 @@ function ChipListEditor({
 
   return (
     <div className="space-y-2">
-      <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider">{label}</span>
       <div className="flex flex-wrap gap-1.5">
         {items.map((item) => (
           <span
@@ -46,14 +46,14 @@ function ChipListEditor({
             <button
               type="button"
               onClick={() => removeItem(item)}
-              className="text-muted-foreground hover:text-gda-red text-[11px]"
+              className="text-muted-foreground hover:text-gda-red text-[12px]"
             >
               x
             </button>
           </span>
         ))}
         {items.length === 0 && (
-          <span className="text-[11px] text-muted-foreground">None</span>
+          <span className="text-[12px] text-muted-foreground">None</span>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -69,7 +69,7 @@ function ChipListEditor({
           type="button"
           onClick={addItem}
           disabled={!newItem.trim()}
-          className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-gda-bg-base disabled:opacity-50"
+          className="rounded border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-gda-bg-base disabled:opacity-50"
         >
           + Add
         </button>
@@ -158,10 +158,10 @@ export function WheelhouseSection({ wheelhouse }: { wheelhouse: WheelhouseConfig
 
       {/* Dollar band */}
       <div className="rounded border border-border bg-gda-bg-base px-4 py-3 space-y-2">
-        <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">Dollar band</span>
+        <span className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider">Dollar band</span>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Min $</span>
+            <span className="text-[12px] text-muted-foreground">Min $</span>
             <input
               type="number"
               value={draft.dollar_min}
@@ -169,9 +169,9 @@ export function WheelhouseSection({ wheelhouse }: { wheelhouse: WheelhouseConfig
               className="w-32 rounded border border-border bg-gda-panel px-2 py-1 text-xs font-mono text-foreground tabular-nums focus:outline-none focus:ring-1 focus:ring-gda-green/50"
             />
           </div>
-          <span className="text-[11px] text-muted-foreground">to</span>
+          <span className="text-[12px] text-muted-foreground">to</span>
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Max $</span>
+            <span className="text-[12px] text-muted-foreground">Max $</span>
             <input
               type="number"
               value={draft.dollar_max}
@@ -184,7 +184,7 @@ export function WheelhouseSection({ wheelhouse }: { wheelhouse: WheelhouseConfig
 
       {/* Set-asides */}
       <div className="rounded border border-border bg-gda-bg-base px-4 py-3 space-y-2">
-        <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">Set-asides we pursue</span>
+        <span className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider">Set-asides we pursue</span>
         <div className="flex flex-wrap gap-3">
           {SET_ASIDE_OPTIONS.map((sa) => (
             <label key={sa} className="flex items-center gap-1.5 cursor-pointer">

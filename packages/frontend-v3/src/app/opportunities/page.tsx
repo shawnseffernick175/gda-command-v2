@@ -58,7 +58,7 @@ import { useGenerateBriefing, useGeneratedDocuments } from "@/hooks/use-output-g
 import { PricingScenarioCard } from "@/components/shared/PricingScenarioCard";
 import { useTeamingFit, type TeamingFitResult } from "@/hooks/use-partners";
 
-const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
+const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[12px] font-mono text-gda-green";
 
 export default function OpportunitiesPage() {
   return (
@@ -406,13 +406,13 @@ function OpportunityList() {
               onChange={(e) => setRelevantOnly(e.target.checked)}
               className="accent-gda-green h-3.5 w-3.5"
             />
-            <span className="text-[11px] text-muted-foreground whitespace-nowrap">Relevant Only (IT/Consulting)</span>
+            <span className="text-[12px] text-muted-foreground whitespace-nowrap">Relevant Only (IT/Consulting)</span>
           </label>
           {hasActiveFilters && (
             <button
               type="button"
               onClick={handleClearFilters}
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
             >
               Clear
             </button>
@@ -635,7 +635,7 @@ function HotChip({
       >
         <svg className="inline-block h-3.5 w-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
         {count} Hot
-        <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current text-[11px] opacity-60">?</span>
+        <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current text-[12px] opacity-60">?</span>
       </button>
       {showTip && (
         <div className="absolute bottom-full left-0 z-50 mb-2 w-56 rounded border border-border bg-gda-bg-raised p-2.5 text-xs text-muted-foreground shadow-lg normal-case font-normal">
@@ -691,7 +691,7 @@ function HeaderInfoTooltip({ text }: { text: string }) {
     >
       <button
         type="button"
-        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border text-[11px] text-muted-foreground hover:bg-gda-panel"
+        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border text-[12px] text-muted-foreground hover:bg-gda-panel"
         aria-label="Column info"
       >
         ?
@@ -812,20 +812,20 @@ function VehicleOpportunityRow({
           {opp.agency && (
             <button
               type="button"
-              className="text-[11px] font-mono text-muted-foreground hover:text-gda-green cursor-pointer"
+              className="text-[12px] font-mono text-muted-foreground hover:text-gda-green cursor-pointer"
               onClick={(e) => { e.stopPropagation(); onAgencyFilter?.(opp.agency!); }}
             >
               {opp.agency}
             </button>
           )}
           {opp.naics && (
-            <span className="text-[11px] font-mono text-muted-foreground/60">NAICS {opp.naics}</span>
+            <span className="text-[12px] font-mono text-muted-foreground/60">NAICS {opp.naics}</span>
           )}
           {opp.set_aside && (
-            <span className="text-[11px] font-mono text-muted-foreground/60">{opp.set_aside}</span>
+            <span className="text-[12px] font-mono text-muted-foreground/60">{opp.set_aside}</span>
           )}
           {opp.match_type && (
-            <span className="text-[11px] font-mono text-gda-green/70">{opp.match_type}</span>
+            <span className="text-[12px] font-mono text-gda-green/70">{opp.match_type}</span>
           )}
         </div>
       </div>
@@ -838,7 +838,7 @@ function VehicleOpportunityRow({
           <FieldStatusBadge reason="no_source_data" />
         )}
         {opp.pipeline_stage && (
-          <span className="rounded border border-border px-1.5 py-0.5 text-[11px]">
+          <span className="rounded border border-border px-1.5 py-0.5 text-[12px]">
             {opp.pipeline_stage}
           </span>
         )}
@@ -915,7 +915,7 @@ function OpportunityRow({
             </Link>
             {isSbPlay && (
               <span
-                className="shrink-0 rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono font-bold text-gda-green"
+                className="shrink-0 rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[12px] font-mono font-bold text-gda-green"
                 title={sbPlayTooltip(opp.naics, opp.set_aside)}
               >
                 SB PLAY
@@ -924,7 +924,7 @@ function OpportunityRow({
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             {sources.length > 0 && (
-              <span className="text-[11px] font-mono text-muted-foreground/40">
+              <span className="text-[12px] font-mono text-muted-foreground/40">
                 {sources.map((s, i) => (
                   <span key={s}>
                     {i > 0 && "  "}  {s}
@@ -933,12 +933,12 @@ function OpportunityRow({
               </span>
             )}
             {opp.naics && (
-              <span className="text-[11px] font-mono text-muted-foreground/60">
+              <span className="text-[12px] font-mono text-muted-foreground/60">
                 NAICS {opp.naics}
               </span>
             )}
             {opp.set_aside && (
-              <span className="text-[11px] font-mono text-muted-foreground/60">
+              <span className="text-[12px] font-mono text-muted-foreground/60">
                 {opp.set_aside}
               </span>
             )}
@@ -986,7 +986,7 @@ function OpportunityRow({
           }}
           disabled={updateStage.isPending}
           className={cn(
-            "w-full rounded border bg-gda-panel px-1.5 py-0.5 text-[11px] font-mono cursor-pointer focus:outline-none focus:ring-1 focus:ring-gda-green/50",
+            "w-full rounded border bg-gda-panel px-1.5 py-0.5 text-[12px] font-mono cursor-pointer focus:outline-none focus:ring-1 focus:ring-gda-green/50",
             pipelineStage
               ? (STAGE_BADGE_STYLES[pipelineStage] ?? "border-border text-foreground")
               : "border-border text-muted-foreground",
@@ -1004,7 +1004,7 @@ function OpportunityRow({
         {elig ? (
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-mono whitespace-nowrap",
+              "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[12px] font-mono whitespace-nowrap",
               elig.status === "prime"
                 ? "border-gda-green/40 bg-gda-green/10 text-gda-green"
                 : elig.status === "team"
@@ -1029,11 +1029,11 @@ function OpportunityRow({
             )}
           </span>
         ) : setAsideLabel ? (
-          <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-mono text-foreground">
+          <span className="rounded border border-border px-1.5 py-0.5 text-[12px] font-mono text-foreground">
             {setAsideLabel}
           </span>
         ) : (
-          <span className="text-[11px] font-mono text-muted-foreground">Unrestricted</span>
+          <span className="text-[12px] font-mono text-muted-foreground">Unrestricted</span>
         )}
       </td>
       <td className="px-3 py-1.5">
@@ -1191,7 +1191,7 @@ function QualifyStagingRow({
             type="button"
             disabled={isPending}
             onClick={() => onPromote(item.opportunity_id)}
-            className="rounded border border-gda-green/40 bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green hover:bg-gda-green/20 transition-colors disabled:opacity-50"
+            className="rounded border border-gda-green/40 bg-gda-green/10 px-2 py-0.5 text-[12px] font-mono text-gda-green hover:bg-gda-green/20 transition-colors disabled:opacity-50"
           >
             Promote
           </button>
@@ -1199,7 +1199,7 @@ function QualifyStagingRow({
             type="button"
             disabled={isPending}
             onClick={() => onReturn(item.opportunity_id)}
-            className="rounded border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-50"
+            className="rounded border border-border px-2 py-0.5 text-[12px] font-mono text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-50"
           >
             Return
           </button>
@@ -1320,13 +1320,13 @@ function OpportunityDetail({ id }: { id: string }) {
                   type="button"
                   onClick={() => updateStage.mutate({ id, stage })}
                   className={cn(
-                    "flex items-center gap-1 text-[11px] font-mono transition-colors",
+                    "flex items-center gap-1 text-[12px] font-mono transition-colors",
                     isCurrent && "text-gda-green font-bold",
                     isCompleted && "text-gda-green",
                     !isCurrent && !isCompleted && "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <span className="text-[11px]">{isCompleted || isCurrent ? "●" : "○"}</span>
+                  <span className="text-[12px]">{isCompleted || isCurrent ? "●" : "○"}</span>
                   {stage}
                 </button>
               </div>
@@ -1379,7 +1379,7 @@ function OpportunityDetail({ id }: { id: string }) {
           )}
           {isSmallBizPlay(opp.naics, opp.set_aside) && (
             <span
-              className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono font-bold text-gda-green"
+              className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[12px] font-mono font-bold text-gda-green"
               title={sbPlayTooltip(opp.naics, opp.set_aside)}
             >
               SB PLAY
@@ -1564,18 +1564,18 @@ function OpportunityDetail({ id }: { id: string }) {
               {/* Doctrine hard-block: disable Qualify when exclusion triggered */}
               {isDoctrineBlocked && (
                 <div className="rounded border border-gda-red/30 bg-gda-red/5 px-3 py-2 space-y-1">
-                  <p className="text-[11px] font-semibold text-gda-red">
+                  <p className="text-[12px] font-semibold text-gda-red">
                     Qualify blocked — strategic exclusion triggered
                   </p>
                   {triggeredExclusions.map((excl) => (
-                    <p key={excl.id} className="text-[11px] text-muted-foreground">
+                    <p key={excl.id} className="text-[12px] text-muted-foreground">
                       {excl.name}: {excl.evidence.join("; ")}
                     </p>
                   ))}
                   <button
                     type="button"
                     onClick={() => setShowOverrideModal(true)}
-                    className="mt-1 text-[11px] font-mono text-gda-green hover:underline"
+                    className="mt-1 text-[12px] font-mono text-gda-green hover:underline"
                   >
                     Override with rationale
                   </button>
@@ -1584,13 +1584,13 @@ function OpportunityDetail({ id }: { id: string }) {
 
               {isMarginBlocked && !isDoctrineBlocked && (
                 <div className="rounded border border-gda-red/30 bg-gda-red/5 px-3 py-2 space-y-1">
-                  <p className="text-[11px] font-semibold text-gda-red">
+                  <p className="text-[12px] font-semibold text-gda-red">
                     Qualify blocked — margin below {latestDoctrineEval?.margin_check.threshold}% floor
                   </p>
                   <button
                     type="button"
                     onClick={() => setShowOverrideModal(true)}
-                    className="mt-1 text-[11px] font-mono text-gda-green hover:underline"
+                    className="mt-1 text-[12px] font-mono text-gda-green hover:underline"
                   >
                     Override with rationale
                   </button>
@@ -1704,7 +1704,7 @@ function MetaRow({ label, value, mono, className }: { label: string; value: stri
 function TimelineEntry({ label, date, filled, urgent }: { label: string; date?: string | null; filled?: boolean; urgent?: boolean }) {
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className={cn("text-[11px]", filled ? "text-gda-green" : "text-muted-foreground")}>
+      <span className={cn("text-[12px]", filled ? "text-gda-green" : "text-muted-foreground")}>
         {filled ? "●" : "○"}
       </span>
       <span className="text-muted-foreground flex-1">{label}</span>
@@ -1747,7 +1747,7 @@ function AskAiInline({ id, title, agency, pwin }: { id: string; title: string; a
             <button
               key={chip}
               type="button"
-              className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors"
+              className="rounded border border-border px-2 py-0.5 text-[12px] text-muted-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors"
               onClick={() => { setQuestion(chip); handleAsk(chip); }}
             >
               {chip}
@@ -1780,7 +1780,7 @@ function AskAiInline({ id, title, agency, pwin }: { id: string; title: string; a
           </div>
         )}
         {askAi.error && (
-          <p className="text-[11px] text-gda-red">{(askAi.error as Error).message}</p>
+          <p className="text-[12px] text-gda-red">{(askAi.error as Error).message}</p>
         )}
       </CardContent>
     </Card>
@@ -1864,7 +1864,7 @@ function GenerateBriefingButton({ opportunityId }: { opportunityId: string }) {
         </button>
         {docs && docs.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Previous Briefings</p>
+            <p className="text-[12px] text-muted-foreground uppercase tracking-wide">Previous Briefings</p>
             {docs.map((doc) => (
               <a
                 key={doc.id}
@@ -1923,7 +1923,7 @@ function TeamingOpportunitiesCard({ items }: { items?: TeamingFitResult[] }) {
               </Link>
               <span
                 className={cn(
-                  "font-mono text-[11px] font-semibold",
+                  "font-mono text-[12px] font-semibold",
                   fit.fit_score >= 50
                     ? "text-gda-green"
                     : fit.fit_score >= 25
@@ -1936,7 +1936,7 @@ function TeamingOpportunitiesCard({ items }: { items?: TeamingFitResult[] }) {
             </div>
             <div className="space-y-0.5">
               {fit.reasons.map((reason, idx) => (
-                <p key={idx} className="text-[11px] text-muted-foreground">
+                <p key={idx} className="text-[12px] text-muted-foreground">
                   {reason}
                 </p>
               ))}
@@ -1947,7 +1947,7 @@ function TeamingOpportunitiesCard({ items }: { items?: TeamingFitResult[] }) {
                   <Badge
                     key={idx}
                     variant="outline"
-                    className="border-border text-[11px] font-mono text-muted-foreground"
+                    className="border-border text-[12px] font-mono text-muted-foreground"
                   >
                     {ev.kind}: {ev.detail}
                   </Badge>

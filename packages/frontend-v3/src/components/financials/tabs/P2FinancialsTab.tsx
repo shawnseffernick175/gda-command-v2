@@ -250,7 +250,7 @@ export function P2FinancialsTab() {
       {/* Revenue Trend Chart — dual axis: $ (bars) left, % margin (lines) right */}
       {months.length > 0 && (
         <div className="rounded border border-border bg-card p-4">
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
             Revenue & Profitability Trend
           </p>
           <ReactEChartsCore
@@ -275,23 +275,23 @@ export function P2FinancialsTab() {
               },
               legend: {
                 data: ["Revenue", "Gross Profit", "Gross Margin %", "Return on Sales %"],
-                textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+                textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
               },
               grid: { left: 60, right: 56, top: 32, bottom: 32 },
               xAxis: {
                 type: "category" as const,
                 data: months.map((m) => shortPeriod(m.period)),
-                axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+                axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
                 axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
               },
               yAxis: [
                 {
                   type: "value" as const,
                   name: "$",
-                  nameTextStyle: { color: "var(--color-fin-stone)", fontSize: 10 },
+                  nameTextStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
                   axisLabel: {
                     color: "var(--color-fin-stone)",
-                    fontSize: 11,
+                    fontSize: 12,
                     formatter: (v: number) => formatMoney(v),
                   },
                   splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
@@ -299,10 +299,10 @@ export function P2FinancialsTab() {
                 {
                   type: "value" as const,
                   name: "%",
-                  nameTextStyle: { color: "var(--color-fin-stone)", fontSize: 10 },
+                  nameTextStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
                   axisLabel: {
                     color: "var(--color-fin-stone)",
-                    fontSize: 11,
+                    fontSize: 12,
                     formatter: (v: number) => `${v}%`,
                   },
                   splitLine: { show: false },
@@ -356,7 +356,7 @@ export function P2FinancialsTab() {
           <div className="overflow-x-auto rounded border border-border max-h-[640px] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
-                <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
                   <th className="py-2 pl-4 pr-4 text-left font-medium min-w-[220px]">
                     Line Item
                   </th>
@@ -396,7 +396,7 @@ export function P2FinancialsTab() {
                       >
                         <td
                           colSpan={1 + months.length + quarters.length}
-                          className="py-2 pl-4 text-[11px] uppercase tracking-wider text-muted-foreground font-medium"
+                          className="py-2 pl-4 text-[12px] uppercase tracking-wider text-muted-foreground font-medium"
                         >
                           {row.label}
                         </td>
@@ -486,7 +486,7 @@ export function P2FinancialsTab() {
           <div className="overflow-x-auto rounded border border-border max-h-[480px] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
-                <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
                   <SortableHeader label="Pool" field="pool" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                   <SortableHeader label="Target" field="target" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
                   <SortableHeader label="Actual" field="actual" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />

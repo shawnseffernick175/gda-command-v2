@@ -52,7 +52,7 @@ export function FindingCard({ finding, diffTag }: FindingCardProps) {
     >
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
         <span
-          className={`rounded border px-1.5 py-0.5 text-[11px] font-semibold uppercase ${SEVERITY_CLASSES[finding.severity] ?? ""}`}
+          className={`rounded border px-1.5 py-0.5 text-[12px] font-semibold uppercase ${SEVERITY_CLASSES[finding.severity] ?? ""}`}
         >
           {finding.severity}
         </span>
@@ -62,7 +62,7 @@ export function FindingCard({ finding, diffTag }: FindingCardProps) {
           </span>
         )}
         {diffTag && diffBadge && (
-          <span className={`rounded border px-1.5 py-0.5 text-[11px] ${diffBadge}`}>
+          <span className={`rounded border px-1.5 py-0.5 text-[12px] ${diffBadge}`}>
             {diffTag.toUpperCase()}
           </span>
         )}
@@ -85,7 +85,7 @@ export function FindingCard({ finding, diffTag }: FindingCardProps) {
               href={c.url !== "#" ? c.url : undefined}
               target="_blank"
               rel="noopener noreferrer"
-              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] ${GRADE_CLASSES[c.grade] ?? GRADE_CLASSES.C}`}
+              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[12px] ${GRADE_CLASSES[c.grade] ?? GRADE_CLASSES.C}`}
             >
               [{c.grade}] {c.source}
             </a>
@@ -97,7 +97,7 @@ export function FindingCard({ finding, diffTag }: FindingCardProps) {
         <button
           onClick={handleSendToActionItem}
           disabled={sent || sendToAI.isPending}
-          className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-gda-panel-alt hover:text-foreground disabled:opacity-40"
+          className="rounded border border-border px-2 py-0.5 text-[12px] text-muted-foreground hover:bg-gda-panel-alt hover:text-foreground disabled:opacity-40"
         >
           {sent ? "Sent to Action Items" : sendToAI.isPending ? "Sending..." : "Send to Action Items"}
         </button>

@@ -93,14 +93,14 @@ export function TrialBalanceTab() {
     grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
     xAxis: {
       type: "value" as const,
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, formatter: (v: number) => formatMoney(v) },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12, formatter: (v: number) => formatMoney(v) },
       splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
     },
     yAxis: {
       type: "category" as const,
       inverse: true,
       data: classSummary.map((c) => c.label),
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
       axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     series: [
@@ -110,7 +110,7 @@ export function TrialBalanceTab() {
         label: {
           show: true,
           position: "right" as const,
-          fontSize: 10,
+          fontSize: 12,
           color: "var(--color-fin-stone)",
           formatter: (p: { value: number }) => formatMoney(p.value),
         },
@@ -132,7 +132,7 @@ export function TrialBalanceTab() {
 
       {/* Class-composition chart */}
       <div className="rounded border border-border bg-card p-4">
-        <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
           Net Balance by Account Class
         </p>
         <ReactEChartsCore
@@ -162,7 +162,7 @@ export function TrialBalanceTab() {
       <div className="rounded border border-border overflow-x-auto max-h-[560px] overflow-y-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <th className="px-3 py-2 text-left font-medium">Account</th>
               <th className="px-3 py-2 text-right font-medium">Debit</th>
               <th className="px-3 py-2 text-right font-medium">Credit</th>
@@ -183,7 +183,7 @@ export function TrialBalanceTab() {
                         {isCollapsed ? "▸" : "▾"}
                       </span>
                       {c.label}
-                      <span className="ml-2 text-[11px] text-muted-foreground">({c.rows.length})</span>
+                      <span className="ml-2 text-[12px] text-muted-foreground">({c.rows.length})</span>
                     </td>
                     <td className="px-3 py-2" />
                     <td className="px-3 py-2" />

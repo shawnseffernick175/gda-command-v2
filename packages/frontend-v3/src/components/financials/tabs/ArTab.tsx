@@ -93,7 +93,7 @@ export function ArTab() {
     },
     legend: {
       bottom: 0,
-      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+      textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
     },
     grid: { left: 8, right: 8, top: 8, bottom: 32 },
     xAxis: {
@@ -118,7 +118,7 @@ export function ArTab() {
       label: {
         show: total ? amt / total > 0.06 : false,
         color: "var(--color-fin-sand)",
-        fontSize: 11,
+        fontSize: 12,
         formatter: (p: { value: number }) => formatMoney(p.value),
       },
     })),
@@ -134,14 +134,14 @@ export function ArTab() {
     grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
     xAxis: {
       type: "value" as const,
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, formatter: (v: number) => formatMoney(v) },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12, formatter: (v: number) => formatMoney(v) },
       splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
     },
     yAxis: {
       type: "category" as const,
       inverse: true,
       data: topCustomers.map(([c]) => (c.length > 26 ? c.slice(0, 24) + "…" : c)),
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
       axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     series: [
@@ -152,7 +152,7 @@ export function ArTab() {
         label: {
           show: true,
           position: "right" as const,
-          fontSize: 10,
+          fontSize: 12,
           color: "var(--color-fin-stone)",
           formatter: (p: { value: number }) => formatMoney(p.value),
         },
@@ -176,7 +176,7 @@ export function ArTab() {
 
       {/* Aging composition */}
       <div className="rounded border border-border bg-card p-4">
-        <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
           Receivables Aging — composition
         </p>
         <ReactEChartsCore echarts={echarts} option={agingBar} style={{ height: 120 }} notMerge />
@@ -184,7 +184,7 @@ export function ArTab() {
 
       {/* Customer concentration */}
       <div className="rounded border border-border bg-card p-4">
-        <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
           Top Customers by Open Receivable
         </p>
         <ReactEChartsCore
@@ -216,7 +216,7 @@ export function ArTab() {
       <div className={cn("rounded border border-border overflow-x-auto max-h-[480px] overflow-y-auto")}>
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Customer" field="customer_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Invoice #" field="invoice_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />

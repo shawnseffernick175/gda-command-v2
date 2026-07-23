@@ -89,7 +89,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
     legend: {
       data: ["Actual", "Target"],
       bottom: 0,
-      textStyle: { color: STONE, fontSize: 11 },
+      textStyle: { color: STONE, fontSize: 12 },
       itemWidth: 12,
       itemHeight: 8,
       itemGap: 20,
@@ -105,7 +105,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
       data: xLabels,
       axisLabel: {
         color: STONE,
-        fontSize: 11,
+        fontSize: 12,
         interval: 0,
         lineHeight: 14,
       },
@@ -116,7 +116,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
       type: "value",
       axisLabel: {
         color: STONE,
-        fontSize: 11,
+        fontSize: 12,
         formatter: (v: number) => formatMoney(v),
       },
       splitLine: { lineStyle: { color: SAND, type: "dashed" } },
@@ -135,7 +135,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
           position: "top",
           formatter: (p: { value: number }) => formatMoney(p.value),
           color: INK,
-          fontSize: 10,
+          fontSize: 12,
         },
       },
       {
@@ -149,7 +149,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
           position: "top",
           formatter: (p: { value: number }) => formatMoney(p.value),
           color: STONE,
-          fontSize: 10,
+          fontSize: 12,
         },
       },
     ],
@@ -161,7 +161,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
       <h3 className="mb-1 text-sm font-medium text-fin-ink">
         Actual vs Target
       </h3>
-      <p className="mb-3 text-[11px] text-muted-foreground">
+      <p className="mb-3 text-[12px] text-muted-foreground">
         Period and YTD comparison across costs, profit, and revenue
       </p>
       <ReactEChartsCore

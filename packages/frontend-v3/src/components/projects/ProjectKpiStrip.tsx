@@ -63,7 +63,7 @@ export function ProjectKpiStrip({ project }: { project: ProjectFullRow }) {
             key={kpi.label}
             className="rounded border border-border bg-gda-panel p-4"
           >
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
               {kpi.label}
             </p>
             <p className="mt-1 text-xl font-semibold text-foreground">
@@ -84,7 +84,7 @@ export function ProjectKpiStrip({ project }: { project: ProjectFullRow }) {
               </p>
             )}
             {kpi.target != null && (
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
                 Target: {formatVal(kpi.target, kpi.format)}
               </p>
             )}

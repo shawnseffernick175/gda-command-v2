@@ -77,7 +77,7 @@ export function PeriodDrillDrawer({
           <div className="space-y-4">
             {data.actuals.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
                   Actuals
                 </h3>
                 {data.actuals.map((a) => (
@@ -88,7 +88,7 @@ export function PeriodDrillDrawer({
 
             {data.plans.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
                   Plan
                 </h3>
                 {data.plans.map((p) => (
@@ -99,7 +99,7 @@ export function PeriodDrillDrawer({
 
             {data.actuals.length > 0 && data.plans.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
                   Variance
                 </h3>
                 <VarianceTable
@@ -112,13 +112,13 @@ export function PeriodDrillDrawer({
             {/* Cost Detail rows for this period */}
             {costData && costData.items.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
                   Cost Detail (TGT vs ACT)
                 </h3>
                 <div className="rounded border border-border overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+                      <tr className="border-b border-border bg-gda-bg-base text-[12px] text-muted-foreground">
                         <SortableHeader label="Element" field="cost_element" sortBy={costSortBy} sortDir={costSortDir} onSort={costHandleSort} />
                         <SortableHeader label="Pool" field="pool" sortBy={costSortBy} sortDir={costSortDir} onSort={costHandleSort} />
                         <SortableHeader label="Target" field="target_amount" sortBy={costSortBy} sortDir={costSortDir} onSort={costHandleSort} align="right" />
@@ -165,13 +165,13 @@ export function PeriodDrillDrawer({
             {/* Indirect Expense rows for this period */}
             {sieData && sieData.items.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
                   Indirect Expenses (SIE)
                 </h3>
                 <div className="rounded border border-border overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+                      <tr className="border-b border-border bg-gda-bg-base text-[12px] text-muted-foreground">
                         <SortableHeader label="Pool" field="pool" sortBy={sieSortBy} sortDir={sieSortDir} onSort={sieHandleSort} />
                         <SortableHeader label="Account" field="account_name" sortBy={sieSortBy} sortDir={sieSortDir} onSort={sieHandleSort} />
                         <SortableHeader label="Actual" field="current_period_actual" sortBy={sieSortBy} sortDir={sieSortDir} onSort={sieHandleSort} align="right" />
@@ -207,7 +207,7 @@ export function PeriodDrillDrawer({
 
             {data.source_documents.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
                   Source Documents
                 </h3>
                 <div className="space-y-1">
@@ -219,7 +219,7 @@ export function PeriodDrillDrawer({
                       <span className="text-foreground truncate max-w-[260px]">
                         {d.filename}
                       </span>
-                      <span className="text-muted-foreground text-[11px]">
+                      <span className="text-muted-foreground text-[12px]">
                         {d.doc_type}
                       </span>
                     </div>
@@ -260,24 +260,24 @@ function MetricsRow({
   const displayLabel = SOURCE_LABELS[label] ?? label;
   return (
     <div className="rounded border border-border p-3 mb-2">
-      <p className="text-[11px] text-muted-foreground mb-1.5">
+      <p className="text-[12px] text-muted-foreground mb-1.5">
         {displayLabel}
       </p>
       <div className="grid grid-cols-5 gap-2 text-xs">
         <div>
-          <span className="text-[11px] text-muted-foreground">Orders</span>
+          <span className="text-[12px] text-muted-foreground">Orders</span>
           <p className="text-foreground tabular-nums">
             {formatMoney(metrics.orders)}
           </p>
         </div>
         <div>
-          <span className="text-[11px] text-muted-foreground">Sales</span>
+          <span className="text-[12px] text-muted-foreground">Sales</span>
           <p className="text-foreground tabular-nums">
             {formatMoney(metrics.sales)}
           </p>
         </div>
         <div>
-          <span className="text-[11px] text-muted-foreground">EBIT</span>
+          <span className="text-[12px] text-muted-foreground">EBIT</span>
           <p
             className={cn(
               "tabular-nums",
@@ -288,13 +288,13 @@ function MetricsRow({
           </p>
         </div>
         <div>
-          <span className="text-[11px] text-muted-foreground">GM%</span>
+          <span className="text-[12px] text-muted-foreground">GM%</span>
           <p className="text-foreground tabular-nums">
             {metrics.gross_margin.toFixed(1)}%
           </p>
         </div>
         <div>
-          <span className="text-[11px] text-muted-foreground">ROS%</span>
+          <span className="text-[12px] text-muted-foreground">ROS%</span>
           <p className="text-foreground tabular-nums">
             {metrics.ros.toFixed(1)}%
           </p>
@@ -343,7 +343,7 @@ function VarianceTable({
     <div className="rounded border border-border overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+          <tr className="border-b border-border bg-gda-bg-base text-[12px] text-muted-foreground">
             <th className="px-3 py-2 text-left font-medium">Metric</th>
             <th className="px-3 py-2 text-right font-medium">Actual</th>
             <th className="px-3 py-2 text-right font-medium">Plan</th>

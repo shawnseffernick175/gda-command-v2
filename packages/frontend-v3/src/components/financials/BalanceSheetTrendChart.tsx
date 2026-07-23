@@ -68,7 +68,7 @@ export function BalanceSheetTrendChart() {
     legend: {
       data: SERIES_CONFIG.map((c) => c.label),
       bottom: 0,
-      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+      textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
     },
     grid: {
       left: 60,
@@ -79,14 +79,14 @@ export function BalanceSheetTrendChart() {
     xAxis: {
       type: "category" as const,
       data: periods,
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
       axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     yAxis: {
       type: "value" as const,
       axisLabel: {
         color: "var(--color-fin-stone)",
-        fontSize: 11,
+        fontSize: 12,
         formatter: (v: number) => formatMoney(v),
       },
       splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },

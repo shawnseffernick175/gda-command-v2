@@ -5,7 +5,7 @@ import type { MatchEvidence } from "@/hooks/use-fastrac-bidirectional";
 
 function Tag({ label }: { label: string }) {
   return (
-    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[12px] font-mono text-muted-foreground">
       {label}
     </span>
   );
@@ -33,7 +33,7 @@ export function EvidencePanel({
   if (!evidence) {
     return (
       <div className="border-t border-border pt-3 mt-2">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Evidence not captured for this historical match.
         </p>
       </div>
@@ -44,7 +44,7 @@ export function EvidencePanel({
     <div className="border-t border-border pt-2 mt-2">
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+        className="flex items-center gap-2 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors w-full text-left"
       >
         <span>Show evidence</span>
         <span>{expanded ? "▲" : "▼"}</span>
@@ -53,7 +53,7 @@ export function EvidencePanel({
       {expanded && (
         <div className="mt-3 space-y-3 text-xs">
           <div>
-            <p className="text-[11px] font-mono uppercase text-muted-foreground tracking-wide mb-1.5">
+            <p className="text-[12px] font-mono uppercase text-muted-foreground tracking-wide mb-1.5">
               Why this match was created:
             </p>
             <ul className="space-y-1 text-foreground list-disc list-inside">
@@ -103,7 +103,7 @@ export function EvidencePanel({
 
           {evidence.mission_tag_unmatched.length > 0 && (
             <div>
-              <p className="text-[11px] font-mono uppercase text-muted-foreground tracking-wide mb-1">
+              <p className="text-[12px] font-mono uppercase text-muted-foreground tracking-wide mb-1">
                 Unmatched tags
               </p>
               <div className="flex flex-wrap gap-1">
@@ -115,7 +115,7 @@ export function EvidencePanel({
           )}
 
           <div>
-            <p className="text-[11px] font-mono uppercase text-muted-foreground tracking-wide mb-1">
+            <p className="text-[12px] font-mono uppercase text-muted-foreground tracking-wide mb-1">
               Sources
             </p>
             <ul className="space-y-0.5 text-foreground list-disc list-inside">

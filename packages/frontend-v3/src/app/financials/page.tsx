@@ -260,7 +260,7 @@ export default function FinancialsPage() {
         <nav className="flex flex-wrap items-start gap-x-5 gap-y-1">
           {TAB_GROUPS.map((group) => (
             <div key={group.label} className="flex flex-col gap-0.5">
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium select-none">
+              <span className="text-[12px] uppercase tracking-wider text-muted-foreground/60 font-medium select-none">
                 {group.label}
               </span>
               <div className="flex items-center gap-0.5">

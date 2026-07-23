@@ -78,14 +78,14 @@ export function ProjectRevenueTab() {
     grid: { left: 8, right: 64, top: 8, bottom: 8, containLabel: true },
     xAxis: {
       type: "value" as const,
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, formatter: (v: number) => formatMoney(v) },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12, formatter: (v: number) => formatMoney(v) },
       splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
     },
     yAxis: {
       type: "category" as const,
       inverse: true,
       data: ranked.map((r) => (r.project_name.length > 28 ? r.project_name.slice(0, 26) + "…" : r.project_name)),
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10 },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
       axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     series: [
@@ -96,7 +96,7 @@ export function ProjectRevenueTab() {
         label: {
           show: true,
           position: "right" as const,
-          fontSize: 10,
+          fontSize: 12,
           color: "var(--color-fin-stone)",
           formatter: (p: { value: number }) => formatMoney(p.value),
         },
@@ -116,14 +116,14 @@ export function ProjectRevenueTab() {
     grid: { left: 8, right: 48, top: 8, bottom: 8, containLabel: true },
     xAxis: {
       type: "value" as const,
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, formatter: (v: number) => `${v}%` },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12, formatter: (v: number) => `${v}%` },
       splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
     },
     yAxis: {
       type: "category" as const,
       inverse: true,
       data: withMargin.map((r) => (r.project_name.length > 28 ? r.project_name.slice(0, 26) + "…" : r.project_name)),
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10 },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
       axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     series: [
@@ -143,7 +143,7 @@ export function ProjectRevenueTab() {
         label: {
           show: true,
           position: "right" as const,
-          fontSize: 10,
+          fontSize: 12,
           color: "var(--color-fin-stone)",
           formatter: (p: { value: number }) => `${p.value.toFixed(1)}%`,
         },
@@ -163,7 +163,7 @@ export function ProjectRevenueTab() {
 
       {/* Revenue by project — all projects */}
       <div className="rounded border border-border bg-card p-4">
-        <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
           Revenue by Project — all {ranked.length} projects
         </p>
         <ReactEChartsCore
@@ -177,7 +177,7 @@ export function ProjectRevenueTab() {
       {/* Margin by project */}
       {withMargin.length > 0 && (
         <div className="rounded border border-border bg-card p-4">
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
             {"Margin by Project (red <0% · amber <8% · green ≥8%)"}
           </p>
           <ReactEChartsCore
@@ -193,7 +193,7 @@ export function ProjectRevenueTab() {
       <div className="rounded border border-border overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Project" field="project_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Contract #" field="contract_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />

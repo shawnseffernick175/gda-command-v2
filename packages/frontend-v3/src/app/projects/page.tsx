@@ -252,7 +252,7 @@ function ProjectsContent() {
         <div className="rounded border border-border overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-border text-[11px] text-muted-foreground">
+              <tr className="border-b border-border text-[12px] text-muted-foreground">
                 <SortableHeader
                   label="Project ID"
                   field="project_id"

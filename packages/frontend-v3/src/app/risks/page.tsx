@@ -117,10 +117,10 @@ function AiRiskGeneration() {
             Generated {generateRisks.data.risks_created} risks and added to register.
           </p>
           <p className="text-xs text-muted-foreground">{generateRisks.data.generation_summary}</p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             Generated at {new Date(generateRisks.data.generated_at).toLocaleString()}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             Review and edit generated risks in the Risk Register above.
           </p>
         </div>
@@ -269,7 +269,7 @@ function RisksRegisterContent() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Title */}
             <div className="sm:col-span-2">
-              <label className="block text-[11px] text-muted-foreground mb-1">Title *</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Title *</label>
               <input
                 required
                 value={form.title}
@@ -280,7 +280,7 @@ function RisksRegisterContent() {
             </div>
             {/* Description */}
             <div className="sm:col-span-2">
-              <label className="block text-[11px] text-muted-foreground mb-1">Description</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Description</label>
               <textarea
                 rows={2}
                 value={form.description}
@@ -291,7 +291,7 @@ function RisksRegisterContent() {
             </div>
             {/* Category */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Category</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Category</label>
               <select
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
@@ -304,7 +304,7 @@ function RisksRegisterContent() {
             </div>
             {/* Severity */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Severity</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Severity</label>
               <select
                 value={form.severity}
                 onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as Risk["severity"] }))}
@@ -317,7 +317,7 @@ function RisksRegisterContent() {
             </div>
             {/* Status */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Status</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Status</label>
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "open" | "mitigated" | "accepted" | "closed" }))}
@@ -330,7 +330,7 @@ function RisksRegisterContent() {
             </div>
             {/* Likelihood */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">
+              <label className="block text-[12px] text-muted-foreground mb-1">
                 Likelihood (1–5): <span className="font-mono text-foreground">{form.likelihood}</span>
               </label>
               <input
@@ -345,7 +345,7 @@ function RisksRegisterContent() {
             </div>
             {/* Impact */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">
+              <label className="block text-[12px] text-muted-foreground mb-1">
                 Impact (1–5): <span className="font-mono text-foreground">{form.impact}</span>
               </label>
               <input
@@ -360,7 +360,7 @@ function RisksRegisterContent() {
             </div>
             {/* Owner */}
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Owner</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Owner</label>
               <input
                 value={form.owner}
                 onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
@@ -376,7 +376,7 @@ function RisksRegisterContent() {
             </div>
             {/* Mitigation */}
             <div className="sm:col-span-2">
-              <label className="block text-[11px] text-muted-foreground mb-1">Mitigation Plan</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Mitigation Plan</label>
               <textarea
                 rows={2}
                 value={form.mitigation}
@@ -441,7 +441,7 @@ function RisksRegisterContent() {
           <button
             type="button"
             onClick={() => { setFilterStatus(""); setFilterCategory(""); setFilterSeverity(""); }}
-            className="text-[11px] text-muted-foreground hover:text-foreground"
+            className="text-[12px] text-muted-foreground hover:text-foreground"
           >
             Clear filters
           </button>
@@ -455,7 +455,7 @@ function RisksRegisterContent() {
             {/* Y-axis label */}
             <div className="flex">
               <div className="w-16 shrink-0" />
-              <div className="flex-1 text-center text-[11px] text-muted-foreground mb-1">
+              <div className="flex-1 text-center text-[12px] text-muted-foreground mb-1">
                 Impact →
               </div>
             </div>
@@ -463,7 +463,7 @@ function RisksRegisterContent() {
               {/* Likelihood label rotated */}
               <div className="w-8 shrink-0 flex items-center justify-center">
                 <span
-                  className="text-[11px] text-muted-foreground"
+                  className="text-[12px] text-muted-foreground"
                   style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                 >
                   Likelihood ↑
@@ -476,7 +476,7 @@ function RisksRegisterContent() {
                   {IMPACTS.map((imp) => (
                     <div
                       key={imp}
-                      className="w-14 text-center text-[11px] text-muted-foreground pb-1"
+                      className="w-14 text-center text-[12px] text-muted-foreground pb-1"
                     >
                       {imp}
                     </div>
@@ -485,7 +485,7 @@ function RisksRegisterContent() {
                 {/* Rows: likelihood 5→1 (high at top) */}
                 {[5, 4, 3, 2, 1].map((lik) => (
                   <div key={lik} className="flex items-center">
-                    <div className="w-8 shrink-0 text-center text-[11px] text-muted-foreground">
+                    <div className="w-8 shrink-0 text-center text-[12px] text-muted-foreground">
                       {lik}
                     </div>
                     {IMPACTS.map((imp) => {
@@ -502,7 +502,7 @@ function RisksRegisterContent() {
                           key={imp}
                           title={cellItems.map((r) => r.title).join("\n")}
                           className={cn(
-                            "w-14 h-10 border flex items-center justify-center text-[11px] font-mono cursor-default",
+                            "w-14 h-10 border flex items-center justify-center text-[12px] font-mono cursor-default",
                             bg
                           )}
                         >
@@ -511,7 +511,7 @@ function RisksRegisterContent() {
                               {cellItems.length}
                             </span>
                           ) : (
-                            <span className="text-muted-foreground/30 text-[11px]">{score}</span>
+                            <span className="text-muted-foreground/30 text-[12px]">{score}</span>
                           )}
                         </div>
                       );
@@ -520,7 +520,7 @@ function RisksRegisterContent() {
                 ))}
               </div>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-2">
+            <p className="text-[12px] text-muted-foreground mt-2">
               Numbers = risk count per cell. Hover for titles. Red ≥ 15 · Amber ≥ 8 · Green {'<'} 8.
             </p>
           </div>
@@ -570,18 +570,18 @@ function RisksRegisterContent() {
                         {r.title}
                       </span>
                       {r.mitigation && (
-                        <span className="block text-[11px] text-muted-foreground truncate" title={r.mitigation}>
+                        <span className="block text-[12px] text-muted-foreground truncate" title={r.mitigation}>
                           {r.mitigation}
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <Badge className={cn("text-[10px] font-mono font-bold uppercase tracking-wide border", severityColor(r.severity ?? "medium"))}>
+                      <Badge className={cn("text-[12px] font-mono font-bold uppercase tracking-wide border", severityColor(r.severity ?? "medium"))}>
                         {r.severity ?? "medium"}
                       </Badge>
                     </td>
                     <td className="px-3 py-2">
-                      <Badge className={cn("text-[10px] font-mono font-bold uppercase tracking-wide", r.risk_type === "positive" ? "bg-gda-green/15 text-gda-green border-gda-green/30" : "bg-red-500/15 text-red-400 border-red-500/30")}>
+                      <Badge className={cn("text-[12px] font-mono font-bold uppercase tracking-wide", r.risk_type === "positive" ? "bg-gda-green/15 text-gda-green border-gda-green/30" : "bg-red-500/15 text-red-400 border-red-500/30")}>
                         {r.risk_type === "positive" ? "OPPORTUNITY" : "THREAT"}
                       </Badge>
                     </td>
@@ -595,12 +595,12 @@ function RisksRegisterContent() {
                       {r.impact ?? "—"}
                     </td>
                     <td className="px-3 py-2 text-left">
-                      <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono font-bold", scoreBg(score))}>
+                      <span className={cn("rounded border px-1.5 py-0.5 text-[12px] font-mono font-bold", scoreBg(score))}>
                         {score}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-left">
-                      <Badge variant={statusBadgeVariant(r.status ?? "open") as "outline" | "destructive" | "secondary"} className="text-[11px] capitalize">
+                      <Badge variant={statusBadgeVariant(r.status ?? "open") as "outline" | "destructive" | "secondary"} className="text-[12px] capitalize">
                         {r.status ?? "open"}
                       </Badge>
                     </td>
@@ -619,14 +619,14 @@ function RisksRegisterContent() {
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); startEdit(r); }}
-                          className="text-[11px] text-muted-foreground hover:text-foreground"
+                          className="text-[12px] text-muted-foreground hover:text-foreground"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
-                          className="text-[11px] text-red-400 hover:text-red-300"
+                          className="text-[12px] text-red-400 hover:text-red-300"
                         >
                           Del
                         </button>

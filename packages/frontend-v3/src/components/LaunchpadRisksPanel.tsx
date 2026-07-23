@@ -27,16 +27,16 @@ function RiskRow({ risk }: { risk: Risk }) {
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-foreground truncate">{risk.title}</p>
         {risk.opportunity_title && (
-          <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+          <p className="text-[12px] text-muted-foreground truncate mt-0.5">
             {risk.opportunity_title}
           </p>
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <Badge className={cn("text-[10px] font-mono font-bold uppercase tracking-wide border", severityColor(risk.severity ?? "medium"))}>
+        <Badge className={cn("text-[12px] font-mono font-bold uppercase tracking-wide border", severityColor(risk.severity ?? "medium"))}>
           {risk.severity ?? "medium"}
         </Badge>
-        <span className="text-[11px] font-mono text-muted-foreground">
+        <span className="text-[12px] font-mono text-muted-foreground">
           {score}
         </span>
       </div>
@@ -70,7 +70,7 @@ export function LaunchpadRisksPanel() {
             What{"'"}s at Risk
           </h3>
         </div>
-        <Badge variant="outline" className="text-[11px] font-mono">
+        <Badge variant="outline" className="text-[12px] font-mono">
           {total} critical/high
         </Badge>
       </div>
@@ -89,7 +89,7 @@ export function LaunchpadRisksPanel() {
 
       {warning && (
         <div className="rounded border border-amber-400/30 bg-amber-400/5 p-2">
-          <p className="text-[11px] text-amber-400">
+          <p className="text-[12px] text-amber-400">
             Owner concentration alert: {warning.owner} owns {warning.percentage}% of critical/high risks.
           </p>
         </div>
@@ -98,7 +98,7 @@ export function LaunchpadRisksPanel() {
       {total > 5 && (
         <Link
           href="/risks?severity=critical|high&status=open"
-          className="block text-center text-[11px] text-gda-green hover:underline"
+          className="block text-center text-[12px] text-gda-green hover:underline"
         >
           View all {total} risks
         </Link>

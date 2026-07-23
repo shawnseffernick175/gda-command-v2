@@ -32,7 +32,7 @@ function PwinDisplay({ score }: { score: number }) {
 
 function AnalyzingSkeleton() {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded border border-border bg-muted/20 px-2 py-0.5 text-[11px] text-muted-foreground animate-pulse">
+    <span className="inline-flex items-center gap-1.5 rounded border border-border bg-muted/20 px-2 py-0.5 text-[12px] text-muted-foreground animate-pulse">
       Analyzing…
     </span>
   );
@@ -66,7 +66,7 @@ export function OpportunityCard({ opp }: { opp: OpportunitySummary }) {
     <div className="relative rounded border border-border bg-gda-panel p-4 space-y-3 flex flex-col">
       {/* Deadline warning badge */}
       {deadlineWarning && (
-        <span className="absolute top-2 right-2 rounded bg-red-500/15 border border-red-500/40 px-1.5 py-0.5 text-[11px] font-mono font-bold uppercase text-red-400">
+        <span className="absolute top-2 right-2 rounded bg-red-500/15 border border-red-500/40 px-1.5 py-0.5 text-[12px] font-mono font-bold uppercase text-red-400">
           DEADLINE
         </span>
       )}
@@ -81,14 +81,14 @@ export function OpportunityCard({ opp }: { opp: OpportunitySummary }) {
         </Link>
         <div className="flex flex-wrap items-center gap-1.5">
           {opp.agency && (
-            <Badge variant="outline" className="text-[11px]">
+            <Badge variant="outline" className="text-[12px]">
               {opp.agency}
             </Badge>
           )}
           {opp.set_aside && (
             <Badge
               variant="outline"
-              className="text-[11px] border-gda-amber/30 text-gda-amber"
+              className="text-[12px] border-gda-amber/30 text-gda-amber"
             >
               {opp.set_aside}
             </Badge>
@@ -101,7 +101,7 @@ export function OpportunityCard({ opp }: { opp: OpportunitySummary }) {
         {hasPwin ? (
           <div className="flex items-center gap-2">
             <PwinDisplay score={opp.pwin!.score} />
-            <BandBadge band={opp.pwin!.band} className="text-[11px]" />
+            <BandBadge band={opp.pwin!.band} className="text-[12px]" />
           </div>
         ) : (
           <AnalyzingSkeleton />
@@ -111,14 +111,14 @@ export function OpportunityCard({ opp }: { opp: OpportunitySummary }) {
           opp.doctrine_badge ? (
             <span
               className={cn(
-                "text-[11px] font-mono capitalize",
+                "text-[12px] font-mono capitalize",
                 FIT_COLORS[opp.doctrine_badge.label],
               )}
             >
               {opp.doctrine_badge.label}
             </span>
           ) : (
-            <span className="text-[11px] font-mono text-gda-cyan">
+            <span className="text-[12px] font-mono text-gda-cyan">
               {opp.doctrine_score}pt
             </span>
           )
@@ -128,7 +128,7 @@ export function OpportunityCard({ opp }: { opp: OpportunitySummary }) {
       </div>
 
       {/* Bottom row */}
-      <div className="flex items-center gap-3 mt-auto pt-1 border-t border-border/50 text-[11px]">
+      <div className="flex items-center gap-3 mt-auto pt-1 border-t border-border/50 text-[12px]">
         {opp.value != null && (
           <span className="font-mono text-foreground">
             {formatMoney(opp.value)}
@@ -150,7 +150,7 @@ export function OpportunityCard({ opp }: { opp: OpportunitySummary }) {
 
       {/* Right edge — Stage dropdown */}
       <div className="absolute top-12 right-3">
-        <StageDropdown value={opp.stage ?? "Interest"} className="text-[11px]" />
+        <StageDropdown value={opp.stage ?? "Interest"} className="text-[12px]" />
       </div>
     </div>
   );

@@ -28,7 +28,7 @@ export function EvidenceBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded border px-1 py-0.5 text-[11px] font-mono font-bold leading-none",
+        "inline-flex items-center rounded border px-1 py-0.5 text-[12px] font-mono font-bold leading-none",
         GRADE_STYLES[grade],
         className,
       )}

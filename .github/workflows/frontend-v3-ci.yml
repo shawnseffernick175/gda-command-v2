@@ -144,6 +144,15 @@ jobs:
       - name: Scan for HTML entities in JSX
         run: bash scripts/lint-jsx-entities.sh
 
+  font-floor:
+    name: Font Size Floor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enforce 12px minimum font size
+        run: node scripts/check-font-floor.mjs
+
   build-and-bundle:
     name: Build + Bundle Size + Lighthouse
     runs-on: ubuntu-latest

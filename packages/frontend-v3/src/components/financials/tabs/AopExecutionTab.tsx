@@ -128,7 +128,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
       {/* Plan vs Actual chart (G1) */}
       {hasCostItems && elementTotals.length > 0 && (
         <div className="rounded border border-border bg-white p-4">
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
             Plan vs Actual by Cost Element
           </p>
           <ReactEChartsCore
@@ -144,7 +144,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
               },
               legend: {
                 data: ["Planned", "Actual"],
-                textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+                textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
               },
               grid: { left: 60, right: 16, top: 32, bottom: 48 },
               xAxis: {
@@ -152,14 +152,14 @@ export function AopExecutionTab({ fy }: { fy: string }) {
                 data: elementTotals.map((e) =>
                   e.element.length > 14 ? e.element.slice(0, 12) + "\u2026" : e.element,
                 ),
-                axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, rotate: 15 },
+                axisLabel: { color: "var(--color-fin-stone)", fontSize: 12, rotate: 15 },
                 axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
               },
               yAxis: {
                 type: "value" as const,
                 axisLabel: {
                   color: "var(--color-fin-stone)",
-                  fontSize: 11,
+                  fontSize: 12,
                   formatter: (v: number) => formatMoney(v),
                 },
                 splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
@@ -201,7 +201,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
               <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10">
-                    <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
                       <th className="py-2 pr-4 text-left font-medium bg-gda-bg-base">
                         {"\u2014"}
                       </th>
@@ -277,7 +277,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
               </div>
             </div>
           ))}
-          <p className="text-[11px] text-muted-foreground italic">
+          <p className="text-[12px] text-muted-foreground italic">
             Actual above plan is favorable (green). Dollar lines (Orders, Sales,
             EBIT) come from your annual AOP plan divided flat monthly (annual
             {" \u00f7 "}12); percentage lines (GM, ROS) apply the same plan value
@@ -314,7 +314,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
       <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Cost Element / Pool" field="element" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Planned" field="totalPlanned" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
               <SortableHeader label="Actual" field="totalActual" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
@@ -377,7 +377,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
         </table>
       </div>
 
-      <div className="mt-2 text-[11px] text-muted-foreground italic">
+      <div className="mt-2 text-[12px] text-muted-foreground italic">
         Risk/Opportunity adjustments not yet available. Future update will add
         per-contract R/O overrides.
       </div>

@@ -303,7 +303,7 @@ function WaterfallFilterBar({
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+      <span className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
         {label}
       </span>
       {children}
@@ -368,7 +368,7 @@ function CsvUploadButton() {
         {bulkCreate.isPending ? "Uploading\u2026" : "Upload CSV"}
       </button>
       {parseError && (
-        <span className="absolute top-full left-0 mt-1 text-[11px] text-fin-plum whitespace-nowrap">
+        <span className="absolute top-full left-0 mt-1 text-[12px] text-fin-plum whitespace-nowrap">
           {parseError}
         </span>
       )}
@@ -498,9 +498,9 @@ function ForecastSummaryStrip({ data }: { data: ContractWaterfallData }) {
 function MetricCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
   return (
     <div className="rounded border border-border bg-card p-3">
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+      <p className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
       <p className={`text-[16px] tabular-nums font-semibold ${accent ? "text-fin-teal" : "text-foreground"}`}>{value}</p>
-      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+      {sub && <p className="text-[12px] text-muted-foreground">{sub}</p>}
     </div>
   );
 }
@@ -579,7 +579,7 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
       legend: {
         type: "scroll",
         bottom: 0,
-        textStyle: { fontSize: 10, color: "#7A7974" }, // allowed-hex
+        textStyle: { fontSize: 12, color: "#7A7974" }, // allowed-hex
       },
       grid: {
         left: 80,
@@ -591,7 +591,7 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
         type: "category",
         data: months,
         axisLabel: {
-          fontSize: 10,
+          fontSize: 12,
           color: "#7A7974", // allowed-hex
           rotate: 45,
         },
@@ -602,8 +602,8 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
         {
           type: "value",
           name: showRevenue ? "Revenue ($)" : "Profit ($)",
-          nameTextStyle: { fontSize: 10, color: "#7A7974" }, // allowed-hex
-          axisLabel: { fontSize: 10, color: "#7A7974" }, // allowed-hex
+          nameTextStyle: { fontSize: 12, color: "#7A7974" }, // allowed-hex
+          axisLabel: { fontSize: 12, color: "#7A7974" }, // allowed-hex
           splitLine: { lineStyle: { color: "#D4D1CA", type: "dashed" } }, // allowed-hex
         },
         ...(showRevenue && showProfit
@@ -611,8 +611,8 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
               {
                 type: "value",
                 name: "Profit ($)",
-                nameTextStyle: { fontSize: 10, color: "#A12C7B" }, // allowed-hex
-                axisLabel: { fontSize: 10, color: "#A12C7B" }, // allowed-hex
+                nameTextStyle: { fontSize: 12, color: "#A12C7B" }, // allowed-hex
+                axisLabel: { fontSize: 12, color: "#A12C7B" }, // allowed-hex
                 splitLine: { show: false },
               },
             ]
@@ -654,7 +654,7 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
         <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
           Task Order Revenue/Profit Forecast
         </h3>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           Funded TOs only {"\u2014"} IDIQs excluded
         </span>
       </div>
@@ -714,7 +714,7 @@ function PipelineScaffold() {
       <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
         Pipeline Forecast Layer
       </h3>
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[12px] text-muted-foreground">
         Weighted pipeline / capture opportunities will overlay signed backlog once a pipeline data source is connected.
         This layer renders probability-weighted revenue from active pursuits on top of the contracted forecast.
       </p>
@@ -802,7 +802,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+              <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
                 Role
               </label>
               <select
@@ -817,7 +817,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
               </select>
             </div>
             <div className="flex-1">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+              <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
                 Status
               </label>
               <select
@@ -879,7 +879,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+            <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
               Notes
             </label>
             <textarea
@@ -909,7 +909,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
             Cancel
           </button>
           {createTO.isError && (
-            <span className="text-[11px] text-fin-plum">
+            <span className="text-[12px] text-fin-plum">
               Failed to save. Try again.
             </span>
           )}
@@ -936,7 +936,7 @@ function FormField({
 }) {
   return (
     <div className="flex-1">
-      <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+      <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
         {label}
       </label>
       <input

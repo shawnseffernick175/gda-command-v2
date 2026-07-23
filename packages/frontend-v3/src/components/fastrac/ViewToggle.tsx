@@ -19,7 +19,7 @@ export function ViewToggle({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[11px] text-muted-foreground font-mono uppercase tracking-wide">
+      <span className="text-[12px] text-muted-foreground font-mono uppercase tracking-wide">
         View:
       </span>
       <div className="flex gap-1">

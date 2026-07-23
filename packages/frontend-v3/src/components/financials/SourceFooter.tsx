@@ -28,7 +28,7 @@ export function SourceFooter({ meta }: { meta: FinancialMeta | undefined }) {
   const uniqueParsers = [...new Set(parsers)];
 
   return (
-    <div className="mt-4 border-t border-border pt-3 text-[11px] text-muted-foreground">
+    <div className="mt-4 border-t border-border pt-3 text-[12px] text-muted-foreground">
       Source: {sourceLabels.join(", ")}
       {uniqueParsers.length > 0 && (
         <>

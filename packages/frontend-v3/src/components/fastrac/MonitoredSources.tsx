@@ -19,26 +19,26 @@ function TierBlock({ tier }: { tier: SourceTierConfig }) {
       <div className="flex items-center gap-2 flex-wrap">
         <span
           className={cn(
-            "rounded border px-2 py-0.5 text-[11px] font-mono font-medium uppercase",
+            "rounded border px-2 py-0.5 text-[12px] font-mono font-medium uppercase",
             TIER_ACCENT[tier.tier],
           )}
         >
           {tier.label}
         </span>
-        <span className="text-[11px] font-mono text-muted-foreground">
+        <span className="text-[12px] font-mono text-muted-foreground">
           {count} sources · {tier.cadence}
         </span>
       </div>
-      <p className="text-[11px] text-muted-foreground leading-relaxed">{tier.description}</p>
+      <p className="text-[12px] text-muted-foreground leading-relaxed">{tier.description}</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tier.groups.map((group) => (
           <div key={group.label} className="space-y-1.5">
-            <p className="text-[11px] font-mono font-semibold text-foreground/80 uppercase tracking-wide">
+            <p className="text-[12px] font-mono font-semibold text-foreground/80 uppercase tracking-wide">
               {group.label}
             </p>
             <ul className="space-y-1">
               {group.sources.map((s) => (
-                <li key={s.name} className="text-[11px] leading-snug">
+                <li key={s.name} className="text-[12px] leading-snug">
                   {s.url ? (
                     <a
                       href={s.url}
@@ -65,7 +65,7 @@ function TierBlock({ tier }: { tier: SourceTierConfig }) {
 export function MonitoredSources() {
   return (
     <div className="space-y-4">
-      <p className="text-[11px] text-muted-foreground leading-relaxed">
+      <p className="text-[12px] text-muted-foreground leading-relaxed">
         FasTrac continuously monitors {TOTAL_MONITORED_SOURCES} DoD military
         innovation organizations for RFIs, Commercial Solutions Openings (CSOs),
         Broad Agency Announcements (BAAs), and prize challenges — the

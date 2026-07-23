@@ -109,7 +109,7 @@ export function SortableHeader({
           >
             <span>{label}</span>
             {indicator && (
-              <span className="font-mono text-[11px] leading-none">
+              <span className="font-mono text-[12px] leading-none">
                 {indicator}
               </span>
             )}
@@ -122,7 +122,7 @@ export function SortableHeader({
             type="button"
             onClick={() => setMenuOpen((o) => !o)}
             className={cn(
-              "ml-0.5 rounded px-1 text-[10px] transition-colors",
+              "ml-0.5 rounded px-1 text-[12px] transition-colors",
               filterCount > 0
                 ? "bg-gda-green/20 text-gda-green"
                 : "text-muted-foreground hover:text-foreground",
@@ -137,7 +137,7 @@ export function SortableHeader({
             type="button"
             onClick={() => setTextOpen((o) => !o)}
             className={cn(
-              "ml-0.5 rounded px-1 text-[10px] transition-colors",
+              "ml-0.5 rounded px-1 text-[12px] transition-colors",
               textFilter.value
                 ? "bg-gda-green/20 text-gda-green"
                 : "text-muted-foreground hover:text-foreground",
@@ -164,7 +164,7 @@ export function SortableHeader({
             <button
               type="button"
               onClick={() => textFilter.onChange("")}
-              className="mt-1 text-[11px] text-muted-foreground hover:text-foreground"
+              className="mt-1 text-[12px] text-muted-foreground hover:text-foreground"
             >
               Clear
             </button>
@@ -190,7 +190,7 @@ export function SortableHeader({
               >
                 <span
                   className={cn(
-                    "flex h-3.5 w-3.5 items-center justify-center rounded border text-[10px]",
+                    "flex h-3.5 w-3.5 items-center justify-center rounded border text-[12px]",
                     checked
                       ? "border-gda-green bg-gda-green/20 text-gda-green"
                       : "border-border",

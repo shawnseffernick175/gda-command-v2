@@ -58,7 +58,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
         ? ["Billed", "Remaining", "Funded", "Unfunded"]
         : ["Billed", "Remaining"],
       bottom: 0,
-      textStyle: { color: STONE, fontSize: 11 },
+      textStyle: { color: STONE, fontSize: 12 },
       itemWidth: 12,
       itemHeight: 8,
       itemGap: 16,
@@ -72,7 +72,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
     yAxis: {
       type: "category",
       data: categories,
-      axisLabel: { color: STONE, fontSize: 11 },
+      axisLabel: { color: STONE, fontSize: 12 },
       axisLine: { lineStyle: { color: SAND } },
       axisTick: { show: false },
     },
@@ -80,7 +80,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
       type: "value",
       axisLabel: {
         color: STONE,
-        fontSize: 11,
+        fontSize: 12,
         formatter: (v: number) => formatMoney(v),
       },
       splitLine: { lineStyle: { color: SAND, type: "dashed" } },
@@ -99,7 +99,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
           position: "inside",
           formatter: (p: { value: number }) => formatMoney(p.value),
           color: "var(--color-foreground)",
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: 600,
         },
       },
@@ -115,7 +115,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
           position: "inside",
           formatter: (p: { value: number }) => formatMoney(p.value),
           color: INK,
-          fontSize: 11,
+          fontSize: 12,
         },
       },
       ...(funded > 0
@@ -132,7 +132,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
                 position: "inside" as const,
                 formatter: (p: { value: number }) => formatMoney(p.value),
                 color: "var(--color-foreground)",
-                fontSize: 11,
+                fontSize: 12,
               },
             },
             {
@@ -156,7 +156,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
           {burnPct.toFixed(1)}% consumed
         </span>
       </div>
-      <p className="mb-3 text-[11px] text-muted-foreground">
+      <p className="mb-3 text-[12px] text-muted-foreground">
         Contract value: {formatMoney(contractValue)}
       </p>
       <ReactEChartsCore

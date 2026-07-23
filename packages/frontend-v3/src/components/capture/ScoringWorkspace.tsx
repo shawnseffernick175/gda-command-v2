@@ -147,12 +147,12 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
           <span className="text-xs font-bold text-foreground uppercase">
             {COLOR_LABELS[review.color]} Review
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             Section {currentSectionIdx + 1} of {sections.length}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             j/k nav · 1-5 score · s save
           </span>
           <button
@@ -169,25 +169,25 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
       <div className="flex flex-1 overflow-hidden">
         {/* Left: RFP criterion */}
         <div className="w-1/3 overflow-y-auto border-r border-border p-4 space-y-4">
-          <h4 className="text-[11px] font-medium text-muted-foreground uppercase">RFP Criterion</h4>
+          <h4 className="text-[12px] font-medium text-muted-foreground uppercase">RFP Criterion</h4>
           <div className="space-y-2">
             <p className="text-xs font-medium text-foreground">
               {currentSection.section_m_criterion ?? currentSection.section_name}
             </p>
             {currentSection.section_l_requirement && (
               <div className="rounded border border-border bg-gda-panel p-2">
-                <span className="text-[11px] text-muted-foreground">Section L:</span>
+                <span className="text-[12px] text-muted-foreground">Section L:</span>
                 <p className="mt-1 text-xs text-foreground">{currentSection.section_l_requirement}</p>
               </div>
             )}
             {currentSection.rfp_text_excerpt && (
               <div className="rounded border border-border bg-gda-panel p-2">
-                <span className="text-[11px] text-muted-foreground">RFP Text:</span>
+                <span className="text-[12px] text-muted-foreground">RFP Text:</span>
                 <p className="mt-1 text-xs text-foreground whitespace-pre-wrap">{currentSection.rfp_text_excerpt}</p>
               </div>
             )}
             {currentSection.weight_pct != null && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 Weight: {currentSection.weight_pct}%
               </p>
             )}
@@ -196,7 +196,7 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
 
         {/* Center: proposal text */}
         <div className="w-1/3 overflow-y-auto border-r border-border p-4 space-y-4">
-          <h4 className="text-[11px] font-medium text-muted-foreground uppercase">Proposal Section</h4>
+          <h4 className="text-[12px] font-medium text-muted-foreground uppercase">Proposal Section</h4>
           {currentSection.proposal_text_excerpt ? (
             <p className="text-xs text-foreground whitespace-pre-wrap">
               {currentSection.proposal_text_excerpt}
@@ -210,11 +210,11 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
 
         {/* Right: score form */}
         <div className="w-1/3 overflow-y-auto p-4 space-y-4">
-          <h4 className="text-[11px] font-medium text-muted-foreground uppercase">Your Score & Notes</h4>
+          <h4 className="text-[12px] font-medium text-muted-foreground uppercase">Your Score & Notes</h4>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <span className="text-[11px] text-muted-foreground">Color Rating</span>
+              <span className="text-[12px] text-muted-foreground">Color Rating</span>
               <select
                 value={colorRating}
                 onChange={(e) => setColorRating(e.target.value)}
@@ -229,7 +229,7 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
               </select>
             </div>
             <div>
-              <span className="text-[11px] text-muted-foreground">Score (1-5)</span>
+              <span className="text-[12px] text-muted-foreground">Score (1-5)</span>
               <input
                 type="number"
                 min={1}
@@ -242,7 +242,7 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
           </div>
 
           <div>
-            <span className="text-[11px] text-muted-foreground">Strengths</span>
+            <span className="text-[12px] text-muted-foreground">Strengths</span>
             <textarea
               value={strengths}
               onChange={(e) => setStrengths(e.target.value)}
@@ -252,7 +252,7 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
           </div>
 
           <div>
-            <span className="text-[11px] text-muted-foreground">Weaknesses</span>
+            <span className="text-[12px] text-muted-foreground">Weaknesses</span>
             <textarea
               value={weaknesses}
               onChange={(e) => setWeaknesses(e.target.value)}
@@ -262,7 +262,7 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
           </div>
 
           <div>
-            <span className="text-[11px] text-muted-foreground">Recommendations</span>
+            <span className="text-[12px] text-muted-foreground">Recommendations</span>
             <textarea
               value={recommendations}
               onChange={(e) => setRecommendations(e.target.value)}

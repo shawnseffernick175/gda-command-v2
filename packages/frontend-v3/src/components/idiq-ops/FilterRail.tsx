@@ -13,7 +13,7 @@ export function FilterRail({ filters, onChange, vehicles }: FilterRailProps) {
   return (
     <aside className="w-[200px] shrink-0 space-y-4 border-r border-border pr-4">
       <div>
-        <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
           Vehicle
         </label>
         <select
@@ -37,7 +37,7 @@ export function FilterRail({ filters, onChange, vehicles }: FilterRailProps) {
       </div>
 
       <div>
-        <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
           Eligibility
         </label>
         <div className="mt-1 space-y-1">
@@ -66,7 +66,7 @@ export function FilterRail({ filters, onChange, vehicles }: FilterRailProps) {
       </div>
 
       <div>
-        <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
           Status
         </label>
         <div className="mt-1 space-y-1">
@@ -91,7 +91,7 @@ export function FilterRail({ filters, onChange, vehicles }: FilterRailProps) {
       </div>
 
       <div>
-        <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
           Heat
         </label>
         <div className="mt-1 space-y-1">
@@ -126,7 +126,7 @@ export function FilterRail({ filters, onChange, vehicles }: FilterRailProps) {
       </div>
 
       <div>
-        <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
           Closing window
         </label>
         <div className="mt-1 space-y-1">
@@ -161,7 +161,7 @@ export function FilterRail({ filters, onChange, vehicles }: FilterRailProps) {
       </div>
 
       <div>
-        <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        <label className="text-[12px] uppercase tracking-wider text-muted-foreground font-medium">
           Agency
         </label>
         <input

@@ -81,13 +81,13 @@ function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
             setEditing((v) => !v);
             setError(null);
           }}
-          className="text-[11px] text-muted-foreground hover:text-foreground"
+          className="text-[12px] text-muted-foreground hover:text-foreground"
         >
           {editing ? "Cancel" : "Edit"}
         </button>
       </div>
       {row.description && (
-        <p className="text-[11px] text-muted-foreground">{row.description}</p>
+        <p className="text-[12px] text-muted-foreground">{row.description}</p>
       )}
       {editing ? (
         <div className="space-y-1.5 pt-1">
@@ -95,24 +95,24 @@ function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
             rows={3}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="w-full rounded border border-border bg-gda-panel px-2 py-1 font-mono text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 resize-none"
+            className="w-full rounded border border-border bg-gda-panel px-2 py-1 font-mono text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 resize-none"
           />
-          {error && <p className="text-[11px] text-red-400">{error}</p>}
+          {error && <p className="text-[12px] text-red-400">{error}</p>}
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleSave}
               disabled={update.isPending}
-              className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[11px] font-mono text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+              className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[12px] font-mono text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
             >
               {update.isPending ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
       ) : (
-        <p className="font-mono text-[11px] text-muted-foreground truncate">{displayValue}</p>
+        <p className="font-mono text-[12px] text-muted-foreground truncate">{displayValue}</p>
       )}
-      <p className="text-[11px] text-muted-foreground/50">
+      <p className="text-[12px] text-muted-foreground/50">
         Updated {new Date(row.updated_at).toLocaleString()}
       </p>
     </div>
@@ -144,7 +144,7 @@ function SystemHealthSection({ sysHealth }: {
                 "h-2 w-2 rounded-full shrink-0",
                 checking ? "bg-muted-foreground animate-pulse" : up ? "bg-gda-green" : "bg-gda-red"
               )} />
-              <span className="font-mono text-[11px] text-muted-foreground">{svc.label}</span>
+              <span className="font-mono text-[12px] text-muted-foreground">{svc.label}</span>
             </div>
           );
         })}
@@ -308,13 +308,13 @@ function UserManagementPanel() {
           <p className="text-xs text-amber-400 font-mono">
             Temp password for new user: <strong>{tempPassword}</strong>
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-[12px] text-muted-foreground mt-0.5">
             Share securely — only shown once.
           </p>
           <button
             type="button"
             onClick={() => setTempPassword(null)}
-            className="text-[11px] text-muted-foreground hover:text-foreground mt-1"
+            className="text-[12px] text-muted-foreground hover:text-foreground mt-1"
           >
             Dismiss
           </button>
@@ -344,7 +344,7 @@ function UserManagementPanel() {
           <p className="font-mono text-xs font-semibold text-foreground">New User</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Email *</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Email *</label>
               <input
                 required
                 type="email"
@@ -355,7 +355,7 @@ function UserManagementPanel() {
               />
             </div>
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Display Name *</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Display Name *</label>
               <input
                 required
                 value={form.display_name}
@@ -365,7 +365,7 @@ function UserManagementPanel() {
               />
             </div>
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Role</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Role</label>
               <select
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
@@ -377,7 +377,7 @@ function UserManagementPanel() {
               </select>
             </div>
             <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Password (leave blank to auto-generate)</label>
+              <label className="block text-[12px] text-muted-foreground mb-1">Password (leave blank to auto-generate)</label>
               <input
                 type="password"
                 value={form.password}
@@ -429,7 +429,7 @@ function UserManagementPanel() {
                 <tr key={u.id} className="border-b border-border hover:bg-gda-panel/50">
                   <td className="px-3 py-2">
                     <p className="text-xs font-medium text-foreground">{u.display_name}</p>
-                    <p className="text-[11px] text-muted-foreground">{u.email}</p>
+                    <p className="text-[12px] text-muted-foreground">{u.email}</p>
                   </td>
                   <td className="px-3 py-2 text-left">
                     <select
@@ -438,7 +438,7 @@ function UserManagementPanel() {
                         updateUser.mutate({ id: u.id, role: e.target.value })
                       }
                       className={cn(
-                        "rounded border bg-transparent px-1.5 py-0.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-gda-green/50",
+                        "rounded border bg-transparent px-1.5 py-0.5 text-[12px] font-mono focus:outline-none focus:ring-1 focus:ring-gda-green/50",
                         roleBadgeClass(u.role)
                       )}
                     >
@@ -450,12 +450,12 @@ function UserManagementPanel() {
                   <td className="px-3 py-2 text-left">
                     <Badge
                       variant={u.is_active ? "outline" : "secondary"}
-                      className={cn("text-[11px]", u.is_active ? "text-gda-green border-gda-green/30" : "text-muted-foreground")}
+                      className={cn("text-[12px]", u.is_active ? "text-gda-green border-gda-green/30" : "text-muted-foreground")}
                     >
                       {u.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </td>
-                  <td className="px-3 py-2 text-left text-[11px] text-muted-foreground">
+                  <td className="px-3 py-2 text-left text-[12px] text-muted-foreground">
                     {u.last_login_at
                       ? new Date(u.last_login_at).toLocaleDateString()
                       : "Never"}
@@ -469,7 +469,7 @@ function UserManagementPanel() {
                             deactivate.mutate(u.id);
                           }
                         }}
-                        className="text-[11px] text-red-400 hover:text-red-300"
+                        className="text-[12px] text-red-400 hover:text-red-300"
                       >
                         Deactivate
                       </button>
@@ -477,7 +477,7 @@ function UserManagementPanel() {
                       <button
                         type="button"
                         onClick={() => updateUser.mutate({ id: u.id, is_active: true })}
-                        className="text-[11px] text-gda-green hover:text-gda-green/80"
+                        className="text-[12px] text-gda-green hover:text-gda-green/80"
                       >
                         Reactivate
                       </button>
@@ -608,12 +608,12 @@ export default function SettingsPage() {
                     key={p.id}
                     className="flex items-start gap-3 rounded border border-border bg-gda-bg-base px-3 py-2"
                   >
-                    <span className="font-mono text-[11px] text-muted-foreground w-4 shrink-0">
+                    <span className="font-mono text-[12px] text-muted-foreground w-4 shrink-0">
                       {i + 1}
                     </span>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-foreground">{p.name}</p>
-                      <p className="text-[11px] text-muted-foreground">{p.short_form}</p>
+                      <p className="text-[12px] text-muted-foreground">{p.short_form}</p>
                     </div>
                   </div>
                 ))}

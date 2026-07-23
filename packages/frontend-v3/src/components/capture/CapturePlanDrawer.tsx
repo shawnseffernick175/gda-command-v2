@@ -110,7 +110,7 @@ export function CapturePlanDrawer({
                 {(docs?.items ?? []).map((doc: { id: number; filename: string; doc_type: string }) => (
                   <div key={doc.id} className="flex items-center justify-between rounded border border-border bg-gda-panel px-3 py-2">
                     <span className="text-xs text-foreground">{doc.filename}</span>
-                    <span className="text-[11px] text-muted-foreground">{doc.doc_type}</span>
+                    <span className="text-[12px] text-muted-foreground">{doc.doc_type}</span>
                   </div>
                 ))}
               </div>

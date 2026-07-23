@@ -104,7 +104,7 @@ function CompetitorsContent() {
             <button
               type="button"
               onClick={() => { setQ(""); setDebouncedQ(""); }}
-              className="text-[11px] text-muted-foreground hover:text-foreground"
+              className="text-[12px] text-muted-foreground hover:text-foreground"
             >
               Clear
             </button>
@@ -120,7 +120,7 @@ function CompetitorsContent() {
           >
             Filter{appliedNaics ? " (1)" : ""}
           </button>
-          <span className="ml-auto text-[11px] text-muted-foreground">
+          <span className="ml-auto text-[12px] text-muted-foreground">
             {debouncedQ || appliedNaics
               ? `${items.length} on this page`
               : countData
@@ -132,7 +132,7 @@ function CompetitorsContent() {
         {showFilters && (
           <div className="flex items-end gap-3 rounded border border-border bg-gda-panel px-3 py-2">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <label className="text-[12px] uppercase tracking-wide text-muted-foreground">
                 NAICS code
               </label>
               <input
@@ -160,7 +160,7 @@ function CompetitorsContent() {
               <button
                 type="button"
                 onClick={() => { setNaics(""); setAppliedNaics(""); setPage(1); }}
-                className="text-[11px] text-muted-foreground hover:text-foreground"
+                className="text-[12px] text-muted-foreground hover:text-foreground"
               >
                 Clear filter
               </button>
@@ -215,7 +215,7 @@ function CompetitorsContent() {
                         <SizeBadge analysis={c.competitor_analysis ?? null} />
                       </div>
                       {c.awardee_uei && (
-                        <span className="text-[11px] text-muted-foreground font-mono">{c.awardee_uei}</span>
+                        <span className="text-[12px] text-muted-foreground font-mono">{c.awardee_uei}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-left text-xs text-muted-foreground max-w-[180px]">
@@ -226,7 +226,7 @@ function CompetitorsContent() {
                         >
                           {c.naics_codes!.slice(0, 3).join(", ")}
                           {c.naics_codes!.length > 3 && (
-                            <span className="text-[11px] text-muted-foreground ml-1">
+                            <span className="text-[12px] text-muted-foreground ml-1">
                               +{c.naics_codes!.length - 3}
                             </span>
                           )}
@@ -236,7 +236,7 @@ function CompetitorsContent() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-left">
-                      <Badge variant="outline" className="text-[11px] font-mono">
+                      <Badge variant="outline" className="text-[12px] font-mono">
                         {c.win_count}
                       </Badge>
                     </td>
@@ -256,7 +256,7 @@ function CompetitorsContent() {
                       >
                         {agencyDisplay}
                         {agencyMore > 0 && (
-                          <span className="text-[11px] text-muted-foreground ml-1">+{agencyMore}</span>
+                          <span className="text-[12px] text-muted-foreground ml-1">+{agencyMore}</span>
                         )}
                       </span>
                     </td>

@@ -105,7 +105,7 @@ export function IndirectExpensePanel() {
     legend: {
       data: pools,
       bottom: 0,
-      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+      textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
     },
     grid: {
       left: 60,
@@ -116,14 +116,14 @@ export function IndirectExpensePanel() {
     xAxis: {
       type: "category" as const,
       data: periods,
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
       axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     yAxis: {
       type: "value" as const,
       axisLabel: {
         color: "var(--color-fin-stone)",
-        fontSize: 11,
+        fontSize: 12,
         formatter: (v: number) => formatMoney(v),
       },
       splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
@@ -145,7 +145,7 @@ export function IndirectExpensePanel() {
       <div className="rounded border border-border overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground uppercase tracking-wider">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] text-muted-foreground uppercase tracking-wider">
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Pool" field="pool" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Actual" field="period_actual" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />

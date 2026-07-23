@@ -20,7 +20,7 @@ function MarginGauge({ marginPct, pass }: { marginPct: number; pass: boolean }) 
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-[11px]">
+      <div className="flex items-center justify-between text-[12px]">
         <span className="text-muted-foreground">Margin</span>
         <span className={cn("font-mono font-bold", pass ? "text-gda-green" : "text-gda-red")}>
           {marginPct.toFixed(1)}%
@@ -41,13 +41,13 @@ function MarginGauge({ marginPct, pass }: { marginPct: number; pass: boolean }) 
         <Badge
           variant="outline"
           className={cn(
-            "text-[11px]",
+            "text-[12px]",
             pass ? "border-gda-green text-gda-green" : "border-gda-red text-gda-red",
           )}
         >
           {pass ? "PASS" : "FAIL"}
         </Badge>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {MARGIN_FLOOR}% floor (F-303)
         </span>
       </div>
@@ -60,7 +60,7 @@ function ScenarioRow({ s }: { s: PricingScenarioSummary }) {
     <div className="flex items-center justify-between rounded border border-border px-3 py-2 text-xs">
       <div className="space-y-0.5 min-w-0">
         <p className="font-mono text-foreground truncate">{s.title}</p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           ${s.total_price.toLocaleString()} total |{" "}
           {new Date(s.created_at).toLocaleDateString()}
         </p>
@@ -144,7 +144,7 @@ function ScenarioForm({
       <CardContent className="space-y-3">
         <div className="grid gap-2 sm:grid-cols-2">
           <div>
-            <label className="text-[11px] text-muted-foreground">Scenario Title</label>
+            <label className="text-[12px] text-muted-foreground">Scenario Title</label>
             <input
               type="text"
               value={title}
@@ -154,7 +154,7 @@ function ScenarioForm({
             />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground">Contract Type</label>
+            <label className="text-[12px] text-muted-foreground">Contract Type</label>
             <select
               value={contractType}
               onChange={(e) => setContractType(e.target.value)}
@@ -168,7 +168,7 @@ function ScenarioForm({
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground">Period (months)</label>
+            <label className="text-[12px] text-muted-foreground">Period (months)</label>
             <input
               type="number"
               value={periodMonths}
@@ -177,7 +177,7 @@ function ScenarioForm({
             />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground">Fee % (blank = use Bible defaults)</label>
+            <label className="text-[12px] text-muted-foreground">Fee % (blank = use Bible defaults)</label>
             <input
               type="number"
               step="0.1"
@@ -188,7 +188,7 @@ function ScenarioForm({
             />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground">ODC Amount ($)</label>
+            <label className="text-[12px] text-muted-foreground">ODC Amount ($)</label>
             <input
               type="number"
               value={odcAmount || ""}
@@ -202,11 +202,11 @@ function ScenarioForm({
         {/* Labor Mix */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[11px] text-muted-foreground font-medium">Labor Mix</label>
+            <label className="text-[12px] text-muted-foreground font-medium">Labor Mix</label>
             <button
               type="button"
               onClick={addRow}
-              className="text-[11px] font-mono text-gda-green hover:underline"
+              className="text-[12px] font-mono text-gda-green hover:underline"
             >
               + Add Row
             </button>
@@ -219,35 +219,35 @@ function ScenarioForm({
                   value={row.labor_category}
                   onChange={(e) => updateRow(idx, "labor_category", e.target.value)}
                   placeholder="Labor Category"
-                  className="flex-1 rounded border border-border bg-card px-1.5 py-1 text-[11px] text-foreground"
+                  className="flex-1 rounded border border-border bg-card px-1.5 py-1 text-[12px] text-foreground"
                 />
                 <input
                   type="text"
                   value={row.clearance}
                   onChange={(e) => updateRow(idx, "clearance", e.target.value)}
                   placeholder="Clearance"
-                  className="w-24 rounded border border-border bg-card px-1.5 py-1 text-[11px] text-foreground"
+                  className="w-24 rounded border border-border bg-card px-1.5 py-1 text-[12px] text-foreground"
                 />
                 <input
                   type="number"
                   value={row.hours || ""}
                   onChange={(e) => updateRow(idx, "hours", Number(e.target.value))}
                   placeholder="Hours"
-                  className="w-20 rounded border border-border bg-card px-1.5 py-1 text-[11px] text-foreground"
+                  className="w-20 rounded border border-border bg-card px-1.5 py-1 text-[12px] text-foreground"
                 />
                 <input
                   type="number"
                   value={row.rate_override ?? ""}
                   onChange={(e) => updateRow(idx, "rate_override", Number(e.target.value) || 0)}
                   placeholder="Rate $"
-                  className="w-20 rounded border border-border bg-card px-1.5 py-1 text-[11px] text-foreground"
+                  className="w-20 rounded border border-border bg-card px-1.5 py-1 text-[12px] text-foreground"
                   title="Leave blank to use Bible rate"
                 />
                 {rows.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeRow(idx)}
-                    className="text-[11px] text-muted-foreground hover:text-gda-red"
+                    className="text-[12px] text-muted-foreground hover:text-gda-red"
                   >
                     x
                   </button>
@@ -312,7 +312,7 @@ export function PricingScenarioCard({
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="text-[11px] font-mono text-gda-green hover:underline normal-case"
+              className="text-[12px] font-mono text-gda-green hover:underline normal-case"
             >
               + Build Scenario
             </button>
@@ -321,7 +321,7 @@ export function PricingScenarioCard({
       </CardHeader>
       <CardContent className="space-y-2">
         {!hasActiveBible && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             No active Financial Bible. Upload and activate one on the Financials page to build pricing scenarios.
           </p>
         )}
@@ -335,7 +335,7 @@ export function PricingScenarioCard({
         )}
 
         {scenarios.length === 0 && !showForm && hasActiveBible && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             No pricing scenarios yet. Click {"\u201C"}Build Scenario{"\u201D"} to create one.
           </p>
         )}

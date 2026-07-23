@@ -80,7 +80,7 @@ function UrgencyBadge({ urgency, horizon }: { urgency: string | null; horizon?: 
   if (!urgency) return null;
   return (
     <span className="inline-flex items-center gap-1">
-      <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono uppercase", URGENCY_STYLES[urgency] ?? URGENCY_STYLES.low)}>
+      <span className={cn("rounded border px-1.5 py-0.5 text-[12px] font-mono uppercase", URGENCY_STYLES[urgency] ?? URGENCY_STYLES.low)}>
         {urgency}
       </span>
       <ScoreExplain
@@ -116,7 +116,7 @@ const INSTITUTION_LABELS: Record<string, string> = {
 
 function InstitutionBadge({ type }: { type: string }) {
   return (
-    <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono uppercase", INSTITUTION_STYLES[type] ?? INSTITUTION_STYLES.npo)}>
+    <span className={cn("rounded border px-1.5 py-0.5 text-[12px] font-mono uppercase", INSTITUTION_STYLES[type] ?? INSTITUTION_STYLES.npo)}>
       {INSTITUTION_LABELS[type] ?? type}
     </span>
   );
@@ -127,7 +127,7 @@ function InstitutionBadge({ type }: { type: string }) {
 // ────────────────────────────────────────────────────────────
 function Tag({ label }: { label: string }) {
   return (
-    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[12px] font-mono text-muted-foreground">
       {label}
     </span>
   );
@@ -161,7 +161,7 @@ function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: bool
       >
         {/* Source */}
         <td className="px-3 py-2 text-left align-top">
-          <span className="text-[11px] font-mono text-gda-cyan whitespace-nowrap">{s.source}</span>
+          <span className="text-[12px] font-mono text-gda-cyan whitespace-nowrap">{s.source}</span>
         </td>
         {/* Title */}
         <td className="px-3 py-2 text-left align-top max-w-[260px]">
@@ -177,7 +177,7 @@ function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: bool
           <td className="px-3 py-2 text-left align-top">
             <div className="flex flex-col gap-1">
               {s.institution_name && (
-                <span className="text-[11px] text-foreground">{s.institution_name}</span>
+                <span className="text-[12px] text-foreground">{s.institution_name}</span>
               )}
               {s.institution_type && <InstitutionBadge type={s.institution_type} />}
             </div>
@@ -197,7 +197,7 @@ function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: bool
         </td>
         {/* Next action */}
         <td className="px-3 py-2 text-left align-top max-w-[240px]">
-          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+          <p className="text-[12px] text-muted-foreground leading-snug line-clamp-2">
             {s.next_review_action ?? "—"}
           </p>
         </td>
@@ -209,7 +209,7 @@ function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: bool
               {s.summary && (
                 <p className="text-xs text-foreground leading-relaxed">{s.summary}</p>
               )}
-              <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+              <div className="flex flex-wrap gap-3 text-[12px] text-muted-foreground">
                 {s.maturity && (
                   <span><span className="text-foreground/60">Maturity:</span> {s.maturity}</span>
                 )}
@@ -237,7 +237,7 @@ function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: bool
                   href={s.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-gda-cyan hover:underline font-mono"
+                  className="text-[12px] text-gda-cyan hover:underline font-mono"
                   onClick={(e) => e.stopPropagation()}
                 >
                   View Source ↗
@@ -281,7 +281,7 @@ function SignalTable({ signals, loading, showInstitution, sortPrefix }: { signal
     <div className="rounded border border-border overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+          <tr className="border-b border-border bg-gda-bg-base text-[12px] text-muted-foreground">
             <SortableHeader label="Source" field="source" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
             <SortableHeader label="Title / Mission Tags" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             {showInstitution && (
@@ -413,7 +413,7 @@ function MatchEngineView({ activeTab }: { activeTab: FasTracTab }) {
         defaultOpen={true}
       >
         <div className="mb-2">
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
             {activeTab === "academia"
               ? "Academic papers, FFRDC research outputs, innovation factory results, and university research that align with Envision's mission areas."
               : activeTab === "industry"
@@ -431,7 +431,7 @@ function MatchEngineView({ activeTab }: { activeTab: FasTracTab }) {
         defaultOpen={true}
       >
         <div className="mb-2">
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
             {activeTab === "academia"
               ? "FFRDC reports, university research outputs, and innovation factory assessments that surface emerging requirement patterns before formal procurements."
               : activeTab === "industry"
@@ -449,7 +449,7 @@ function MatchEngineView({ activeTab }: { activeTab: FasTracTab }) {
         defaultOpen={true}
       >
         <div className="mb-3">
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
             Signals are normalized on mission, problem, maturity, urgency, and transition tags, then scored on mission fit, technical fit, and timing. Each match recommends a pursuit vehicle — direct contract, partner vehicle, subcontract, SBIR/STTR, CSO, or OT Agreement.
           </p>
         </div>
@@ -524,7 +524,7 @@ function NeedFeedView() {
         defaultOpen={true}
       >
         <div className="mb-3">
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
             Need signals without strong solution matches, sorted by urgency. Click {'"'}Find solutions{'"'} to see the top 5 ranked solution candidates from the entire solution corpus.
           </p>
         </div>
@@ -616,7 +616,7 @@ function SolutionFeedView() {
         defaultOpen={true}
       >
         <div className="mb-3">
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
             Solution signals without strong need matches, sorted by signal strength. Click {'"'}Find needs{'"'} to see the top 5 ranked need candidates.
           </p>
         </div>

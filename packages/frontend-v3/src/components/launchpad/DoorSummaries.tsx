@@ -40,10 +40,10 @@ export default function DoorSummaries() {
             href={href}
             className="rounded border border-border bg-gda-panel p-3 hover:bg-gda-panel-alt transition-colors block"
           >
-            <h3 className="font-mono text-[11px] font-bold text-gda-cyan uppercase tracking-widest mb-1">
+            <h3 className="font-mono text-[12px] font-bold text-gda-cyan uppercase tracking-widest mb-1">
               {door.door_label}
             </h3>
-            <p className="font-mono text-[11px] text-muted-foreground leading-relaxed">
+            <p className="font-mono text-[12px] text-muted-foreground leading-relaxed">
               {door.summary}
             </p>
           </Link>

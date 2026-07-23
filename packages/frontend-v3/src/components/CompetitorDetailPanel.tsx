@@ -293,7 +293,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
                 <p className="text-sm text-gray-600 leading-relaxed">{blackHat.data.intel_summary}</p>
               </div>
               {blackHat.data.from_cache && (
-                <span className="text-[11px] text-gray-400">Cached</span>
+                <span className="text-[12px] text-gray-400">Cached</span>
               )}
             </div>
           ) : blackHat.isError ? (

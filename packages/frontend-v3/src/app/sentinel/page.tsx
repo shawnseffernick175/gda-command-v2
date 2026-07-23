@@ -34,7 +34,7 @@ function HandoffCardRow({ card }: { card: SentinelHandoffCard }) {
             <p className="text-xs text-muted-foreground">{card.context}</p>
           )}
           {card.due_by && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               Due by: {new Date(card.due_by).toLocaleDateString("en-US", { timeZone: "America/New_York" })}
             </p>
           )}
@@ -59,7 +59,7 @@ function HandoffCardRow({ card }: { card: SentinelHandoffCard }) {
           <button
             type="button"
             onClick={() => setShowDetails((v) => !v)}
-            className="text-[11px] text-muted-foreground hover:text-foreground"
+            className="text-[12px] text-muted-foreground hover:text-foreground"
           >
             {showDetails ? "Hide details" : "Show details"}
           </button>
@@ -87,7 +87,7 @@ function RecentWinRow({ card }: { card: SentinelRecentWinCard }) {
           <p className="text-xs text-muted-foreground">{card.context}</p>
         )}
       </div>
-      <span className="text-[11px] text-muted-foreground shrink-0">
+      <span className="text-[12px] text-muted-foreground shrink-0">
         {timeAgo(new Date(card.created_at))}
       </span>
     </div>
@@ -132,7 +132,7 @@ function UpcomingBreakRow({ card }: { card: SentinelUpcomingBreakCard }) {
           <button
             type="button"
             onClick={() => setShowDetails((v) => !v)}
-            className="text-[11px] text-muted-foreground hover:text-foreground"
+            className="text-[12px] text-muted-foreground hover:text-foreground"
           >
             {showDetails ? "Hide" : "Details"}
           </button>
@@ -166,7 +166,7 @@ function CreditPacingSection() {
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-foreground">GovWin API Volume</p>
             <span className={cn(
-              "rounded px-2 py-0.5 text-[11px] font-medium",
+              "rounded px-2 py-0.5 text-[12px] font-medium",
               govwin.auth_status.token_valid
                 ? "bg-gda-green/10 text-gda-green"
                 : "bg-red-500/10 text-red-500",
@@ -194,7 +194,7 @@ function CreditPacingSection() {
 function MetricCell({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="text-[12px] text-muted-foreground">{label}</p>
       <p className={cn("text-sm font-mono font-medium", alert ? "text-amber-500" : "text-foreground")}>{value}</p>
     </div>
   );
@@ -306,7 +306,7 @@ function SectionHeader({ title, subtitle, count }: { title: string; subtitle?: s
     <div className="flex items-baseline gap-2">
       <h2 className="font-mono text-sm font-semibold text-foreground">{title}</h2>
       {count != null && count > 0 && (
-        <span className="rounded-full bg-gda-bg-base px-2 py-0.5 text-[11px] font-mono text-muted-foreground">
+        <span className="rounded-full bg-gda-bg-base px-2 py-0.5 text-[12px] font-mono text-muted-foreground">
           {count}
         </span>
       )}

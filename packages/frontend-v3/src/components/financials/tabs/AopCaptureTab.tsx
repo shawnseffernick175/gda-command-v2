@@ -95,7 +95,7 @@ export function AopCaptureTab({ fy }: { fy: string }) {
 
       {/* Pipeline by stage chart (G1) */}
       <div className="rounded border border-border bg-white p-4">
-        <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
           Pipeline by Stage
         </p>
         <ReactEChartsCore
@@ -111,14 +111,14 @@ export function AopCaptureTab({ fy }: { fy: string }) {
             xAxis: {
               type: "category" as const,
               data: stageEntries.map(([s]) => s),
-              axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+              axisLabel: { color: "var(--color-fin-stone)", fontSize: 12 },
               axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
             },
             yAxis: {
               type: "value" as const,
               axisLabel: {
                 color: "var(--color-fin-stone)",
-                fontSize: 11,
+                fontSize: 12,
                 formatter: (v: number) => formatMoney(v),
               },
               splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
@@ -131,7 +131,7 @@ export function AopCaptureTab({ fy }: { fy: string }) {
                 label: {
                   show: true,
                   position: "top" as const,
-                  fontSize: 11,
+                  fontSize: 12,
                   color: "var(--color-fin-stone)",
                   formatter: (p: { value: number }) => formatMoney(p.value),
                 },
@@ -144,7 +144,7 @@ export function AopCaptureTab({ fy }: { fy: string }) {
       <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -167,7 +167,7 @@ export function AopCaptureTab({ fy }: { fy: string }) {
                   {item.agency ?? <span className="italic">N/A</span>}
                 </td>
                 <td className="py-2 pr-4">
-                  <span className="rounded bg-fin-navy/30 px-2 py-0.5 text-[11px] font-medium text-foreground">
+                  <span className="rounded bg-fin-navy/30 px-2 py-0.5 text-[12px] font-medium text-foreground">
                     {STAGE_LABELS[item.stage] ?? item.stage}
                   </span>
                 </td>

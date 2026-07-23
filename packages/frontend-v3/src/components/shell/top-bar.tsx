@@ -26,7 +26,7 @@ export function TopBar() {
             >
               Envision
             </a>
-            <span className="text-[11px] text-muted-foreground">OU</span>
+            <span className="text-[12px] text-muted-foreground">OU</span>
           </div>
           <span className="h-4 w-px shrink-0 bg-border" />
           <KpiHeader />
@@ -39,7 +39,7 @@ export function TopBar() {
             className="flex items-center gap-1.5 rounded border border-border bg-gda-bg-base px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-gda-panel hover:text-foreground"
           >
             <span>Search</span>
-            <kbd className="rounded border border-border bg-gda-bg-deep px-1 text-[11px]">
+            <kbd className="rounded border border-border bg-gda-bg-deep px-1 text-[12px]">
               ⌘K
             </kbd>
           </button>
@@ -91,13 +91,13 @@ export function TopBar() {
 
           {user && (
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[12px] text-muted-foreground">
                 {user.display_name || user.email}
               </span>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-[11px] text-muted-foreground hover:text-destructive"
+                className="h-7 text-[12px] text-muted-foreground hover:text-destructive"
                 onClick={() => void logout()}
               >
                 Sign out

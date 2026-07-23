@@ -16,7 +16,7 @@ export function SourceChip({
   className?: string;
 }) {
   const base =
-    "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-mono leading-tight border";
+    "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] font-mono leading-tight border";
 
   const kindStyles: Record<ChipKind, string> = {
     real: "border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan",

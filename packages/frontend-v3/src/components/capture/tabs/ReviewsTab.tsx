@@ -52,8 +52,8 @@ export function ReviewsTab({ captureId, reviews, onOpenScoringWorkspace }: Revie
           return (
             <div key={color} className="text-center">
               <ReviewDot color={color} status={status} />
-              <p className="mt-1 text-[11px] text-muted-foreground uppercase">{color}</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="mt-1 text-[12px] text-muted-foreground uppercase">{color}</p>
+              <p className="text-[12px] text-muted-foreground">
                 {status === "none" ? "Not yet" : status === "complete" ? "Done" : "Sched"}
               </p>
             </div>
@@ -146,7 +146,7 @@ function ReviewCard({ review, onResume }: { review: ColorReview; onResume: () =>
           <span className="text-xs font-medium text-foreground">
             {COLOR_LABELS[review.color]}
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {review.status === "complete"
               ? `COMPLETE ${review.completed_date ?? ""}`
               : review.scheduled_date
@@ -155,24 +155,24 @@ function ReviewCard({ review, onResume }: { review: ColorReview; onResume: () =>
           </span>
         </div>
         {review.status === "complete" && review.overall_color_rating && (
-          <span className="rounded bg-gda-green/10 px-2 py-0.5 text-[11px] font-medium text-gda-green">
+          <span className="rounded bg-gda-green/10 px-2 py-0.5 text-[12px] font-medium text-gda-green">
             Overall: {review.overall_color_rating}
           </span>
         )}
       </div>
 
       {reviewerNames && (
-        <p className="text-[11px] text-muted-foreground">Reviewers: {reviewerNames}</p>
+        <p className="text-[12px] text-muted-foreground">Reviewers: {reviewerNames}</p>
       )}
 
       {totalSections > 0 && review.status !== "complete" && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Status: {scoredSections} of {totalSections} sections scored
         </p>
       )}
 
       {review.status === "complete" && review.pwin_impact != null && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Pwin impact: {review.pwin_impact > 0 ? "+" : ""}{Math.round(review.pwin_impact * 100)}%
         </p>
       )}
@@ -182,7 +182,7 @@ function ReviewCard({ review, onResume }: { review: ColorReview; onResume: () =>
           <button
             type="button"
             onClick={onResume}
-            className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[11px] font-medium text-gda-green hover:bg-gda-green/20"
+            className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[12px] font-medium text-gda-green hover:bg-gda-green/20"
           >
             Resume
           </button>
@@ -202,12 +202,12 @@ function OutbriefDownload({ reviewId }: { reviewId: number }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-muted-foreground">Outbrief:</span>
+      <span className="text-[12px] text-muted-foreground">Outbrief:</span>
       <button
         type="button"
         disabled={pending}
         onClick={() => download.mutate("docx")}
-        className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-gda-panel disabled:opacity-50"
+        className="rounded border border-border px-2 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-gda-panel disabled:opacity-50"
         title="Download the outbrief as a Word document"
       >
         {pending && pendingFormat === "docx" ? "Preparing…" : "Word"}
@@ -216,13 +216,13 @@ function OutbriefDownload({ reviewId }: { reviewId: number }) {
         type="button"
         disabled={pending}
         onClick={() => download.mutate("pdf")}
-        className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-gda-panel disabled:opacity-50"
+        className="rounded border border-border px-2 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-gda-panel disabled:opacity-50"
         title="Download the outbrief as a PDF"
       >
         {pending && pendingFormat === "pdf" ? "Preparing…" : "PDF"}
       </button>
       {download.isError && (
-        <span className="text-[11px] text-gda-red">
+        <span className="text-[12px] text-gda-red">
           {(download.error as Error).message}
         </span>
       )}
@@ -269,7 +269,7 @@ function ScheduleReviewModal({
         <h3 className="font-mono text-sm font-bold text-foreground">Schedule New Review</h3>
 
         <div>
-          <span className="text-[11px] text-muted-foreground">Color</span>
+          <span className="text-[12px] text-muted-foreground">Color</span>
           <select
             value={color}
             onChange={(e) => setColor(e.target.value as ReviewColor)}
@@ -293,7 +293,7 @@ function ScheduleReviewModal({
             />
             <span className="text-xs text-foreground">
               Also back-review earlier stages
-              <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              <span className="mt-0.5 block text-[12px] text-muted-foreground">
                 {canBeCumulative
                   ? `Adds a labeled section to confirm ${earlierLabels} ${earlier.length === 1 ? "was" : "were"} done right before this ${COLOR_LABELS[color]} review. Use when you're starting mid-stream and want to catch anything missed earlier.`
                   : "Black Hat is the first stage, so there is nothing earlier to back-review."}
@@ -303,7 +303,7 @@ function ScheduleReviewModal({
         </div>
 
         <div>
-          <span className="text-[11px] text-muted-foreground">Due Date</span>
+          <span className="text-[12px] text-muted-foreground">Due Date</span>
           <input
             type="date"
             value={scheduledDate}
@@ -313,7 +313,7 @@ function ScheduleReviewModal({
         </div>
 
         <div>
-          <span className="text-[11px] text-muted-foreground">Lead Reviewer</span>
+          <span className="text-[12px] text-muted-foreground">Lead Reviewer</span>
           <input
             type="text"
             value={reviewerName}

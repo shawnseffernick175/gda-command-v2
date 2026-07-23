@@ -330,7 +330,7 @@ function LeadStoryContent({ lead }: { lead: DigestLeadStory }) {
                 ? `/opportunities?id=${lead.related_opportunity_ids[0]}`
                 : `/opportunities`
             }
-            className="font-mono text-[11px] text-gda-cyan hover:underline"
+            className="font-mono text-[12px] text-gda-cyan hover:underline"
           >
             {"\u2192"} View {lead.related_opportunity_ids.length} related{" "}
             {lead.related_opportunity_ids.length === 1 ? "opportunity" : "opportunities"}
@@ -341,7 +341,7 @@ function LeadStoryContent({ lead }: { lead: DigestLeadStory }) {
             href={lead.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 font-mono text-[12px] text-muted-foreground hover:text-foreground"
           >
             {lead.source_label || "Source"}
             <ExternalLink size={10} />
@@ -365,11 +365,11 @@ function SignalCard({ signal }: { signal: DigestSignal }) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <Icon size={13} className={cfg.color} />
-          <span className={cn("font-mono text-[11px] font-bold uppercase tracking-wider", cfg.color)}>
+          <span className={cn("font-mono text-[12px] font-bold uppercase tracking-wider", cfg.color)}>
             {cfg.label}
           </span>
         </div>
-        <span className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+        <span className="font-mono text-[12px] text-muted-foreground whitespace-nowrap">
           {relativeTime(signal.posted_at)}
         </span>
       </div>
@@ -390,7 +390,7 @@ function SignalCard({ signal }: { signal: DigestSignal }) {
       </h4>
 
       {/* Meta row */}
-      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[12px] text-muted-foreground">
         {signal.naics_code && <span>{signal.naics_code}</span>}
         {signal.value_estimate && <span>{"\u00B7"} {signal.value_estimate}</span>}
         {signal.agency && <span>{"\u00B7"} {signal.agency}</span>}
@@ -398,7 +398,7 @@ function SignalCard({ signal }: { signal: DigestSignal }) {
 
       {/* AI summary */}
       {signal.ai_summary && (
-        <p className="font-mono text-[11px] text-muted-foreground leading-relaxed">
+        <p className="font-mono text-[12px] text-muted-foreground leading-relaxed">
           {signal.ai_summary}
         </p>
       )}
@@ -409,7 +409,7 @@ function SignalCard({ signal }: { signal: DigestSignal }) {
           href={signal.source_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 font-mono text-[12px] text-muted-foreground hover:text-foreground"
         >
           View source <ExternalLink size={9} />
         </a>
@@ -440,12 +440,12 @@ function RegulatoryTrackerContent({ items }: { items: RegulatoryEntry[] }) {
               href={item.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
+              className="font-mono text-[12px] text-foreground hover:text-gda-cyan hover:underline truncate block"
             >
               {item.title}
             </a>
           ) : (
-            <span className="font-mono text-[11px] text-foreground truncate block">
+            <span className="font-mono text-[12px] text-foreground truncate block">
               {item.title}
             </span>
           )}
@@ -462,7 +462,7 @@ function RegulatoryTrackerContent({ items }: { items: RegulatoryEntry[] }) {
 function UpcomingSolicitationsContent({ items }: { items: UpcomingSolicitation[] }) {
   return (
     <div className="space-y-1.5">
-      <p className="font-mono text-[11px] text-muted-foreground">
+      <p className="font-mono text-[12px] text-muted-foreground">
         In Envision{"'"}s NAICS space
       </p>
       {items.length === 0 ? (
@@ -476,14 +476,14 @@ function UpcomingSolicitationsContent({ items }: { items: UpcomingSolicitation[]
               <div className="min-w-0 flex-1">
                 <a
                   href={`/opportunities?id=${item.id}`}
-                  className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
+                  className="font-mono text-[12px] text-foreground hover:text-gda-cyan hover:underline truncate block"
                 >
                   {item.title}
                 </a>
               </div>
               <span
                 className={cn(
-                  "font-mono text-[11px] font-bold whitespace-nowrap",
+                  "font-mono text-[12px] font-bold whitespace-nowrap",
                   urgencyColor(item.response_due_at),
                 )}
               >
@@ -493,7 +493,7 @@ function UpcomingSolicitationsContent({ items }: { items: UpcomingSolicitation[]
           ))}
           <a
             href="/opportunities"
-            className="block font-mono text-[11px] text-gda-cyan hover:underline pt-1"
+            className="block font-mono text-[12px] text-gda-cyan hover:underline pt-1"
           >
             View all {"\u2192"}
           </a>
@@ -530,7 +530,7 @@ function outcomeLabel(outcome: string | null): string {
 function GaoWatchlistContent({ items }: { items: GaoDecision[] }) {
   return (
     <div className="space-y-1.5">
-      <p className="font-mono text-[11px] text-muted-foreground">
+      <p className="font-mono text-[12px] text-muted-foreground">
         Protests affecting Envision{"'"}s space
       </p>
       {items.length === 0 ? (
@@ -546,17 +546,17 @@ function GaoWatchlistContent({ items }: { items: GaoDecision[] }) {
                   href={item.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
+                  className="font-mono text-[12px] text-foreground hover:text-gda-cyan hover:underline truncate block"
                 >
                   {item.title ?? item.decision_number}
                 </a>
               ) : (
-                <span className="font-mono text-[11px] text-foreground truncate block">
+                <span className="font-mono text-[12px] text-foreground truncate block">
                   {item.title ?? item.decision_number}
                 </span>
               )}
             </div>
-            <span className={cn("font-mono text-[11px] font-bold whitespace-nowrap", outcomeStyle(item.outcome))}>
+            <span className={cn("font-mono text-[12px] font-bold whitespace-nowrap", outcomeStyle(item.outcome))}>
               {outcomeLabel(item.outcome)}
             </span>
           </div>

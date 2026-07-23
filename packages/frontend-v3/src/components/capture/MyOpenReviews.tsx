@@ -51,23 +51,23 @@ export function MyOpenReviews({ onResumeReview }: MyOpenReviewsProps) {
                 <span className="text-xs font-medium text-foreground">
                   {item.capture_name ?? "Untitled Capture"}
                 </span>
-                <span className="rounded bg-gda-bg-deep px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground uppercase">
+                <span className="rounded bg-gda-bg-deep px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground uppercase">
                   {COLOR_LABELS[item.color]}
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 {item.scheduled_date && (
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-[12px] text-muted-foreground">
                     Due {item.scheduled_date}
                   </span>
                 )}
-                <span className="text-[11px] text-muted-foreground tabular-nums">
+                <span className="text-[12px] text-muted-foreground tabular-nums">
                   {pct}% scored
                 </span>
                 <button
                   type="button"
                   onClick={() => onResumeReview?.(item.review_id)}
-                  className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[11px] font-medium text-gda-green hover:bg-gda-green/20"
+                  className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[12px] font-medium text-gda-green hover:bg-gda-green/20"
                 >
                   Resume
                 </button>

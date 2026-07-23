@@ -21,7 +21,7 @@ function WeightsTable({ weights }: { weights: RuleContribution[] }) {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="text-[11px] text-muted-foreground uppercase tracking-wide">
+        <tr className="text-[12px] text-muted-foreground uppercase tracking-wide">
           <th className="text-left py-1">Rule</th>
           <th className="text-right py-1">Contrib</th>
         </tr>
@@ -64,7 +64,7 @@ export function PwinBreakdown({ pwin }: PwinBreakdownProps) {
       </div>
 
       <div>
-        <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide mb-1">
+        <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wide mb-1">
           Top Drivers
         </p>
         {drivers.length > 0 ? (
@@ -77,7 +77,7 @@ export function PwinBreakdown({ pwin }: PwinBreakdownProps) {
       </div>
 
       <div>
-        <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide mb-1">
+        <p className="text-[12px] font-mono text-muted-foreground uppercase tracking-wide mb-1">
           Feature Weights
         </p>
         {weights.length > 0 ? (

@@ -33,7 +33,7 @@ function SourceChip({ source }: { source: SourceRef }) {
       target="_blank"
       rel="noopener noreferrer"
       title={`${source.title}\nRetrieved: ${new Date(source.retrieved_at).toLocaleString()}`}
-      className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] font-mono text-gda-cyan hover:border-gda-cyan/40 hover:bg-gda-cyan/5 transition-colors"
+      className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[12px] font-mono text-gda-cyan hover:border-gda-cyan/40 hover:bg-gda-cyan/5 transition-colors"
     >
       <span className="opacity-60">[{source.kind}]</span>
       <span className="max-w-[180px] truncate">{source.title.slice(0, 50)}</span>
@@ -61,7 +61,7 @@ function SectionSkeleton({ label }: { label: string }) {
 
 function StaleIndicator() {
   return (
-    <Badge variant="outline" className="text-[11px] font-mono text-gda-amber border-gda-amber/30 ml-2">
+    <Badge variant="outline" className="text-[12px] font-mono text-gda-amber border-gda-amber/30 ml-2">
       STALE — re-running
     </Badge>
   );
@@ -101,7 +101,7 @@ function PwinSection({ data, sources, stale }: { data: PwinSectionData; sources:
         </div>
         {data.top_drivers.length > 0 && (
           <div>
-            <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Top Drivers</p>
+            <p className="text-[12px] font-mono text-muted-foreground uppercase mb-1">Top Drivers</p>
             <ul className="space-y-0.5">
               {data.top_drivers.map((d, i) => (
                 <li key={i} className="text-xs text-foreground">• {d}</li>
@@ -164,9 +164,9 @@ function DoctrineSection({ data, sources, stale }: { data: DoctrineSectionData; 
 
         {data.exclusions_triggered.length > 0 && (
           <div className="rounded border border-gda-red/30 bg-gda-red/5 px-3 py-2 space-y-1">
-            <p className="text-[11px] font-semibold text-gda-red uppercase">Hard Block — Exclusions Triggered</p>
+            <p className="text-[12px] font-semibold text-gda-red uppercase">Hard Block — Exclusions Triggered</p>
             {data.exclusions_triggered.map((excl) => (
-              <p key={excl.id} className="text-[11px] text-muted-foreground">
+              <p key={excl.id} className="text-[12px] text-muted-foreground">
                 {excl.name}: {excl.evidence.join("; ")}
               </p>
             ))}
@@ -175,7 +175,7 @@ function DoctrineSection({ data, sources, stale }: { data: DoctrineSectionData; 
 
         {data.margin_check && !data.margin_check.passed && (
           <div className="rounded border border-gda-red/30 bg-gda-red/5 px-3 py-2">
-            <p className="text-[11px] font-semibold text-gda-red">
+            <p className="text-[12px] font-semibold text-gda-red">
               Margin below {data.margin_check.threshold}% floor
             </p>
           </div>
@@ -183,7 +183,7 @@ function DoctrineSection({ data, sources, stale }: { data: DoctrineSectionData; 
 
         {data.recommendations.length > 0 && (
           <div>
-            <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Recommendations</p>
+            <p className="text-[12px] font-mono text-muted-foreground uppercase mb-1">Recommendations</p>
             <ul className="space-y-0.5">
               {data.recommendations.slice(0, 3).map((r, i) => (
                 <li key={i} className="text-xs text-foreground">• {r}</li>
@@ -218,7 +218,7 @@ function IncumbentSection({ data, sources, stale }: { data: IncumbentSectionData
           <div>
             <span className="text-sm font-mono text-foreground font-medium">{data.name}</span>
             {data.confidence && (
-              <span className="ml-2 text-[11px] text-muted-foreground">
+              <span className="ml-2 text-[12px] text-muted-foreground">
                 (confidence: {data.confidence})
               </span>
             )}
@@ -264,11 +264,11 @@ function SimilarAwardsSection({ data, sources, stale }: { data: SimilarAwardsSec
                   <span className="text-xs text-foreground font-medium truncate max-w-[70%]">
                     {award.title}
                   </span>
-                  <Badge variant="outline" className="text-[11px] font-mono text-gda-cyan">
+                  <Badge variant="outline" className="text-[12px] font-mono text-gda-cyan">
                     {award.score}% match
                   </Badge>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+                <p className="text-[12px] text-muted-foreground mt-0.5">
                   {award.awardee} • {award.agency}
                 </p>
               </a>
@@ -307,7 +307,7 @@ function CompetitorsSection({ data, sources, stale }: { data: CompetitorsSection
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className="font-mono text-foreground font-medium">{c.name}</span>
                 <Badge variant="outline" className={cn(
-                  "text-[10px]",
+                  "text-[12px]",
                   c.threat_level === "high" && "text-gda-red border-gda-red/30",
                   c.threat_level === "medium" && "text-gda-amber border-gda-amber/30",
                   c.threat_level === "low" && "text-gda-cyan border-gda-cyan/30",
@@ -349,19 +349,19 @@ function DecisionFactorsSection({ data, sources, stale }: { data: DecisionFactor
       <CardContent className="space-y-2">
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <p className="text-[11px] font-mono text-muted-foreground uppercase">Evaluation Type</p>
+            <p className="text-[12px] font-mono text-muted-foreground uppercase">Evaluation Type</p>
             <p className="text-foreground">{data.evaluation_type}</p>
           </div>
           <div>
-            <p className="text-[11px] font-mono text-muted-foreground uppercase">Past Performance</p>
+            <p className="text-[12px] font-mono text-muted-foreground uppercase">Past Performance</p>
             <p className="text-foreground">{data.past_performance_weight}</p>
           </div>
           <div>
-            <p className="text-[11px] font-mono text-muted-foreground uppercase">Key Personnel</p>
+            <p className="text-[12px] font-mono text-muted-foreground uppercase">Key Personnel</p>
             <p className="text-foreground">{data.key_personnel_required ? "Required" : "Not specified"}</p>
           </div>
           <div>
-            <p className="text-[11px] font-mono text-muted-foreground uppercase">Set-Aside</p>
+            <p className="text-[12px] font-mono text-muted-foreground uppercase">Set-Aside</p>
             <p className="text-foreground">{data.set_aside_type ?? "Full & open"}</p>
           </div>
         </div>
@@ -468,7 +468,7 @@ function RisksSection({ data, sources, stale }: { data: RisksSectionData; source
           data.risks.map((risk, i) => (
             <div key={i} className="text-xs space-y-0.5">
               <div className="flex items-start gap-2">
-                <Badge className={cn("text-[11px] font-mono border shrink-0", RISK_COLORS[risk.level] ?? "text-muted-foreground")}>
+                <Badge className={cn("text-[12px] font-mono border shrink-0", RISK_COLORS[risk.level] ?? "text-muted-foreground")}>
                   {risk.level}
                 </Badge>
                 <span className="text-foreground">{risk.description}</span>
@@ -481,7 +481,7 @@ function RisksSection({ data, sources, stale }: { data: RisksSectionData; source
                   href={`https://www.acquisition.gov/far/${risk.regulatory_citation.replace(/\s/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-12 inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] font-mono text-gda-cyan hover:border-gda-cyan/40 transition-colors"
+                  className="ml-12 inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[12px] font-mono text-gda-cyan hover:border-gda-cyan/40 transition-colors"
                 >
                   {risk.regulatory_citation}
                 </a>
@@ -513,7 +513,7 @@ function CitationsSection({ data }: { data: CitationsSectionData }) {
         <div className="flex flex-wrap gap-1">
           {data.all_sources.map((s, i) => <SourceChip key={i} source={s} />)}
         </div>
-        <div className="flex items-center gap-4 text-[11px] text-muted-foreground font-mono pt-1 border-t border-border">
+        <div className="flex items-center gap-4 text-[12px] text-muted-foreground font-mono pt-1 border-t border-border">
           <span>v{data.analysis_version}</span>
           <span>Generated: {new Date(data.generated_at).toLocaleString()}</span>
           {!data.cache_fresh && (
@@ -570,9 +570,9 @@ export function DecisionBriefStream({ sections, isStreaming, isDone, error, trac
       {isStreaming && (
         <div className="flex items-center gap-2 px-2">
           <span className="inline-block h-2 w-2 rounded-full bg-gda-cyan animate-pulse" />
-          <span className="text-[11px] font-mono text-gda-cyan">Streaming decision brief...</span>
+          <span className="text-[12px] font-mono text-gda-cyan">Streaming decision brief...</span>
           {traceId && (
-            <span className="text-[11px] font-mono text-muted-foreground ml-auto">
+            <span className="text-[12px] font-mono text-muted-foreground ml-auto">
               trace: {traceId.slice(0, 8)}
             </span>
           )}

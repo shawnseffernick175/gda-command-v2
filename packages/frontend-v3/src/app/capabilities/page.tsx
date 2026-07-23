@@ -121,11 +121,11 @@ export default function CapabilitiesPage() {
                     {OU_LABELS[ou]}
                   </h2>
                   {isReadOnly && (
-                    <Badge variant="outline" className="text-[11px] border-gda-amber/30 text-gda-amber">
+                    <Badge variant="outline" className="text-[12px] border-gda-amber/30 text-gda-amber">
                       READ-ONLY (teaming context)
                     </Badge>
                   )}
-                  <span className="text-[11px] font-mono text-muted-foreground">
+                  <span className="text-[12px] font-mono text-muted-foreground">
                     {ouCaps.filter((c) => c.active).length} active
                   </span>
                 </div>
@@ -186,20 +186,20 @@ function CapabilityRow({
             <span className="text-sm font-semibold text-foreground">{capability.name}</span>
             <Badge
               variant="outline"
-              className={cn("text-[11px]", OU_COLORS[capability.ou])}
+              className={cn("text-[12px]", OU_COLORS[capability.ou])}
             >
               {capability.ou}
             </Badge>
-            <Badge variant="outline" className="text-[11px]">
+            <Badge variant="outline" className="text-[12px]">
               {capability.category}
             </Badge>
             {capability.evidence_grade && (
-              <span className={cn("font-mono text-[11px] font-bold", gradeColor)}>
+              <span className={cn("font-mono text-[12px] font-bold", gradeColor)}>
                 Grade {capability.evidence_grade}
               </span>
             )}
             {!capability.active && (
-              <Badge variant="outline" className="text-[11px] border-gda-red/30 text-gda-red">
+              <Badge variant="outline" className="text-[12px] border-gda-red/30 text-gda-red">
                 Inactive
               </Badge>
             )}
@@ -209,22 +209,22 @@ function CapabilityRow({
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-1.5">
             {capability.naics_codes.length > 0 && (
-              <span className="text-[11px] font-mono text-muted-foreground/60">
+              <span className="text-[12px] font-mono text-muted-foreground/60">
                 NAICS: {capability.naics_codes.join(", ")}
               </span>
             )}
             {capability.psc_codes.length > 0 && (
-              <span className="text-[11px] font-mono text-muted-foreground/60">
+              <span className="text-[12px] font-mono text-muted-foreground/60">
                 PSC: {capability.psc_codes.join(", ")}
               </span>
             )}
             {capability.certifications.length > 0 && (
-              <span className="text-[11px] font-mono text-muted-foreground/60">
+              <span className="text-[12px] font-mono text-muted-foreground/60">
                 Certs: {capability.certifications.join(", ")}
               </span>
             )}
             {capability.agencies_strong_in.length > 0 && (
-              <span className="text-[11px] font-mono text-muted-foreground/60">
+              <span className="text-[12px] font-mono text-muted-foreground/60">
                 Agencies: {capability.agencies_strong_in.join(", ")}
               </span>
             )}
@@ -236,7 +236,7 @@ function CapabilityRow({
             <button
               type="button"
               onClick={onEdit}
-              className="px-2 py-1 text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
+              className="px-2 py-1 text-[12px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
             >
               {isEditing ? "Close" : "Edit"}
             </button>
@@ -252,7 +252,7 @@ function CapabilityRow({
                 );
               }}
               disabled={updateCap.isPending}
-              className="px-2 py-1 text-[11px] font-mono text-muted-foreground hover:text-gda-amber transition-colors"
+              className="px-2 py-1 text-[12px] font-mono text-muted-foreground hover:text-gda-amber transition-colors"
             >
               {capability.active ? "Deactivate" : "Activate"}
             </button>
@@ -322,7 +322,7 @@ function CapabilityEditForm({
         <FormField label="Certifications (comma-separated)" value={certifications} onChange={setCertifications} />
       </div>
       <div className="flex items-center gap-3">
-        <label className="text-[11px] text-muted-foreground">Evidence Grade</label>
+        <label className="text-[12px] text-muted-foreground">Evidence Grade</label>
         <select
           value={evidenceGrade}
           onChange={(e) => setEvidenceGrade(e.target.value)}
@@ -409,7 +409,7 @@ function CapabilityForm({
       <CardContent className="space-y-2">
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">OU</label>
+            <label className="text-[12px] text-muted-foreground block mb-0.5">OU</label>
             <select
               value={ou}
               onChange={(e) => setOu(e.target.value)}
@@ -433,7 +433,7 @@ function CapabilityForm({
           <FormField label="Certifications" value={certifications} onChange={setCertifications} />
         </div>
         <div className="flex items-center gap-3">
-          <label className="text-[11px] text-muted-foreground">Evidence Grade</label>
+          <label className="text-[12px] text-muted-foreground">Evidence Grade</label>
           <select
             value={evidenceGrade}
             onChange={(e) => setEvidenceGrade(e.target.value)}
@@ -478,7 +478,7 @@ function FormField({
 }) {
   return (
     <div>
-      <label className="text-[11px] text-muted-foreground block mb-0.5">{label}</label>
+      <label className="text-[12px] text-muted-foreground block mb-0.5">{label}</label>
       {multiline ? (
         <textarea
           value={value}

@@ -111,7 +111,7 @@ export function BalanceSheetCard() {
 
       {sortedTrend.length >= 2 && (
         <div className="rounded border border-border bg-gda-panel p-3 space-y-1">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             Total Assets Trend
           </p>
           <SparkLine
@@ -125,7 +125,7 @@ export function BalanceSheetCard() {
       <div className="rounded border border-border overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Total Assets" field="total_assets" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
               <SortableHeader label="Total Liabilities" field="total_liabilities" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
