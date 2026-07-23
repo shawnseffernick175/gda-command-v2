@@ -195,20 +195,10 @@ export function useDeleteTaskOrder() {
 
 export function useAiAnalyze() {
   return useMutation({
-    mutationFn: (payload: {
-      ytd_revenue?: number;
-      ytd_expenses?: number;
-      ytd_profit?: number;
-      margin?: number;
-      funded_backlog?: number;
-      contracts?: Array<{
-        name: string;
-        revenue: number | null;
-        cost: number | null;
-        profit: number | null;
-        margin: number | null;
-      }>;
-    }) => apiPost<AiAnalyzeResponse>("/v3/financials/ai-analyze", payload),
+    // The backend fetches the active tab's real data (single source of truth);
+    // the client only needs to send which tab is active.
+    mutationFn: (payload: { tab?: string }) =>
+      apiPost<AiAnalyzeResponse>("/v3/financials/ai-analyze", payload),
   });
 }
 

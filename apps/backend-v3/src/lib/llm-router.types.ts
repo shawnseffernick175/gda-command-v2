@@ -237,6 +237,17 @@ export interface FinancialAnalyzeInput {
     profit: number | null;
     margin: number | null;
   }>;
+  // Per-tab context (F-1142 per-tab AI Analyze). When `tab` is set the analysis
+  // targets that Financial Bible view; `tab_data` is a compact, LLM-ready
+  // summary of that tab's real data. Optional so the p2/default path and other
+  // callers stay unchanged.
+  tab?: string;
+  tab_label?: string;
+  tab_data?: Record<string, unknown> | null;
+  // p2 enrichment (gross vs operating margin distinction). Optional.
+  direct_costs?: number | null;
+  gross_margin_pct?: number | null;
+  operating_margin_pct?: number | null;
 }
 
 export interface FinancialAnalyzeOutput {

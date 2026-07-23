@@ -1424,6 +1424,9 @@ export interface DefinitionsData {
 export interface AiAnalyzeResponse {
   analysis: string;
   generated_at: string;
+  tab?: string;
+  tab_label?: string;
+  inputs_used?: Record<string, unknown>;
 }
 
 

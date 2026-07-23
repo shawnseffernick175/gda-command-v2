@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
-import type { FinancialAnalyzeInput } from '../lib/llm-router.types.js';
+import { buildTabAnalysisInput } from '../services/financials/ai-analyze-tabs.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
 import { parseCalendarMode, getMonthsForMode, fiscalMonthIndex, type CalendarMode } from '../lib/fiscal-calendar.js';
 import { classifyFinancialDoc } from '../services/financials/reingest-doc.js';
@@ -2254,119 +2254,20 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /v3/financials/ai-analyze
-  // Fetches the real ingested financials from the DB (same figures the KPI
-  // header computes) and feeds them to the LLM. Previously this route trusted
-  // an empty request body, so the model always received nulls and reported
-  // "not yet ingested". Body fields, if provided, override the DB values.
+  // Context-aware analysis (F-1142): the backend fetches the ACTIVE TAB's real
+  // data (single source of truth) and tailors the prompt per tab. The frontend
+  // sends only { tab }. An absent tab defaults to p2, preserving the shipped
+  // Income Statement behavior ($19.03M / $209K / 1.1% with the gross-vs-
+  // operating margin distinction). No fabrication: empty tabs return an
+  // explicit not-ingested note naming the source needed.
   app.post('/v3/financials/ai-analyze', async (req, reply) => {
-    const body = (req.body ?? {}) as {
-      ytd_revenue?: number;
-      ytd_expenses?: number;
-      ytd_profit?: number;
-      margin?: number;
-      funded_backlog?: number;
-      fiscal_year?: number;
-      contracts?: Array<{
-        name: string;
-        revenue: number | null;
-        cost: number | null;
-        profit: number | null;
-        margin: number | null;
-      }>;
-    };
+    const body = (req.body ?? {}) as { tab?: string };
 
-    const fy = body.fiscal_year ?? new Date().getUTCFullYear();
-
-    // Pull YTD monthly actuals (exclude quarterly rollups and seed/phantom rows)
-    const { rows: aRows } = await pool.query(
-      `SELECT DISTINCT ON (period)
-         period, source, actual_sales, actual_ebit, actual_gross_margin
-       FROM financial_actuals
-       WHERE fiscal_year = $1
-         AND source IN ('income_statement', 'l1_actual')
-         AND is_seed = false
-         AND period NOT LIKE '%Q%'
-         AND (COALESCE(actual_sales,0) <> 0 OR COALESCE(actual_ebit,0) <> 0)
-       ORDER BY period, CASE source WHEN 'income_statement' THEN 1 ELSE 2 END`,
-      [fy],
-    );
-    let ytdRevenue = 0;
-    let ytdEbit = 0;
-    for (const r of aRows) {
-      ytdRevenue += Number(r.actual_sales) || 0;
-      ytdEbit += Number(r.actual_ebit) || 0;
-    }
-
-    // Live (non-superseded) direct cost pool for the same year
-    const { rows: dcRows } = await pool.query(
-      `SELECT COALESCE(SUM(actual_amount),0) AS direct_total
-       FROM cost_detail_actuals
-       WHERE fiscal_year = $1 AND pool = 'DIRECT' AND superseded_at IS NULL`,
-      [fy],
-    );
-    const directCosts = Number(dcRows[0]?.direct_total) || 0;
-
-    // Backlog metrics (real task orders only)
-    const { rows: bRows } = await pool.query(
-      `SELECT COALESCE(SUM(funded_to_date),0) AS funded_backlog
-       FROM task_orders WHERE is_seed = false`,
-    );
-    const fundedBacklog = Number(bRows[0]?.funded_backlog) || 0;
-
-    // Per-contract detail from project revenue actuals (best-effort)
-    const { rows: cRows } = await pool.query(
-      `SELECT project_name AS name,
-              COALESCE(SUM(COALESCE(actual_ytd_revenue, revenue)),0) AS revenue,
-              COALESCE(SUM(COALESCE(actual_ytd_costs, cost)),0)      AS cost,
-              COALESCE(SUM(COALESCE(actual_ytd_profit, profit)),0)   AS profit
-       FROM project_revenue_actuals
-       WHERE fiscal_year = $1
-       GROUP BY project_name
-       ORDER BY 2 DESC
-       LIMIT 25`,
-      [fy],
-    ).catch(() => ({ rows: [] as Array<{ name: string; revenue: number; cost: number; profit: number }> }));
-
-    const ytdRevenueFinal = body.ytd_revenue ?? (ytdRevenue || null);
-    const ytdExpensesFinal = body.ytd_expenses ?? (ytdRevenue ? ytdRevenue - ytdEbit : null);
-    const ytdProfitFinal = body.ytd_profit ?? (aRows.length ? ytdEbit : null);
-    // EBIT (operating) margin — distinct from gross margin. Gross margin uses
-    // direct costs only; this is EBIT / revenue after all costs.
-    const ebitMargin = ytdRevenue ? (ytdEbit / ytdRevenue) * 100 : null;
-    const grossMargin = ytdRevenue ? ((ytdRevenue - directCosts) / ytdRevenue) * 100 : null;
-
-    const input: FinancialAnalyzeInput = {
-      ytd_revenue: ytdRevenueFinal,
-      ytd_expenses: ytdExpensesFinal,
-      ytd_profit: ytdProfitFinal,
-      margin: body.margin ?? ebitMargin,
-      funded_backlog: body.funded_backlog ?? (fundedBacklog || null),
-      contracts: body.contracts ?? cRows.map((r) => {
-        const rev = Number(r.revenue) || null;
-        const cost = Number(r.cost) || null;
-        const profit = Number(r.profit) || (rev !== null && cost !== null ? rev - cost : null);
-        return {
-          name: r.name,
-          revenue: rev,
-          cost,
-          profit,
-          margin: rev && profit !== null ? (profit / rev) * 100 : null,
-        };
-      }),
-    };
-
-    // Give the model the gross-vs-operating margin distinction + direct cost so
-    // it stops conflating the two (root cause of prior "impossible margin" reads).
-    const enriched = {
-      ...input,
-      gross_margin_pct: grossMargin,
-      operating_margin_pct: ebitMargin,
-      direct_costs: directCosts || null,
-    };
+    const built = await buildTabAnalysisInput(body.tab);
 
     const result = await llmRouter.route({
       task: 'financial_analyze',
-      input: enriched as unknown as FinancialAnalyzeInput,
+      input: built.input,
     });
 
     if (!result.ok) {
@@ -2381,7 +2282,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.send(successEnvelope({
       analysis: output?.analysis ?? 'Analysis unavailable.',
-      inputs_used: enriched,
+      inputs_used: built.inputs_used,
+      tab: built.tab,
+      tab_label: built.tab_label,
       generated_at: new Date().toISOString(),
     }, req.requestId));
   });

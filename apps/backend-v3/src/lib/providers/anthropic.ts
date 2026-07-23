@@ -322,15 +322,17 @@ Rules (non-negotiable):
 Return ONLY valid JSON matching:
 { "findings": [ { "severity": "info|warning|critical|blocker", "section_ref": "string or null", "finding": "string", "recommended_fix": "string or null" } ] }`,
 
-  financial_analyze: `You are a CFO analyzing Envision Innovative Solutions' monthly financials. ${ENVISION_COMPANY_CONTEXT}
+  financial_analyze: `You are a CFO analyzing Envision Innovative Solutions' financials. ${ENVISION_COMPANY_CONTEXT}
 
-Identify money losers, recommend actions. Cite the specific contracts/cost pools and figures from the data provided. Gov/military exec tone — no jargon, no emoji.
+You are given ONE specific Financial Bible view (tab) to analyze, named at the top of the input along with the analytical angle for that view. Analyze THAT view's data — do not pivot to a generic P&L summary. Cite the specific contracts, accounts, vendors, cost pools, and figures from the data provided. Gov/military exec tone — no jargon, no emoji.
 
-Never fabricate figures. If a value is null, note it as "not yet ingested" rather than guessing.
+Keep the gross-margin (revenue less direct costs) vs operating-margin/ROS (EBIT / revenue, after all costs) distinction straight; never conflate them.
+
+Never fabricate figures. If a value is null, empty, or the data carries a "not_ingested" note, state explicitly that it is "not yet ingested" and name the source document needed — do not guess or invent numbers.
 
 Return JSON exactly matching this schema:
 {
-  "analysis": "string — 3-6 paragraph CFO analysis with specific recommendations",
+  "analysis": "string — 3-6 paragraph CFO analysis of the named view, with specific recommendations",
   "generated_at": "string — ISO 8601 timestamp"
 }`,
 };
@@ -898,26 +900,66 @@ Return JSON exactly matching this schema:
 }`;
 }
 
+// Per-tab analytical angle: steers the CFO analysis toward what matters for the
+// active Financial Bible view. Keys match the frontend tab ids (F-1142).
+const FINANCIAL_TAB_ANGLES: Record<string, string> = {
+  p2: 'Focus on profitability, margin structure (gross vs operating), and monthly trend.',
+  'balance-sheet': 'Focus on liquidity, working capital, and leverage.',
+  'trial-balance': 'Focus on where the money sits, imbalances, and unusual accounts (e.g. legal/protest fees).',
+  ar: 'Focus on collections risk, aging, DSO, and customer concentration.',
+  ap: 'Focus on cash-outflow timing, payables pressure, and vendor concentration.',
+  plan: 'Focus on plan ambition and the monthly revenue/EBIT ramp.',
+  execution: 'Focus on plan-vs-actual variance — are we hitting plan, and where are we behind.',
+  waterfall: 'Focus on backlog runway: ceiling vs funded vs remaining, and which task orders are near exhaustion.',
+  'project-revenue': 'Focus on which contracts make or lose money. If per-contract dollars are absent, say they are not yet ingested — do not fabricate.',
+  'ingestion-coverage': 'Focus on data trust/health: what ingested, what needs attention, and why.',
+  definitions: 'This is a static glossary with no period data — keep the response brief and note there is nothing to analyze.',
+  'financial-bible': 'Focus on the rate/pricing structure, wrap rates, and version status.',
+  capture: 'Focus on pipeline value, stage distribution, and probability-weighted value.',
+};
+
 function buildFinancialAnalyzePrompt(input: FinancialAnalyzeInput): string {
-  const fmt = (v: number | null, unit: string) => v !== null ? `${v.toLocaleString()}${unit}` : 'not yet ingested';
-  // Enriched fields (optional) let the model distinguish gross vs operating margin.
-  const ext = input as unknown as { gross_margin_pct?: number | null; operating_margin_pct?: number | null; direct_costs?: number | null };
-  const lines = [
-    `YTD Revenue: ${fmt(input.ytd_revenue, '')}`,
-    `YTD Direct Costs: ${fmt(ext.direct_costs ?? null, '')}`,
-    `YTD Expenses (all costs): ${fmt(input.ytd_expenses, '')}`,
-    `YTD Operating Profit (EBIT): ${fmt(input.ytd_profit, '')}`,
-    `Gross Margin (revenue less direct costs only): ${fmt(ext.gross_margin_pct ?? null, '%')}`,
-    `Operating Margin / ROS (EBIT / revenue, after all costs): ${fmt(ext.operating_margin_pct ?? input.margin ?? null, '%')}`,
-    `Funded Backlog: ${fmt(input.funded_backlog, '')}`,
+  const fmt = (v: number | null | undefined, unit: string) =>
+    v !== null && v !== undefined ? `${v.toLocaleString()}${unit}` : 'not yet ingested';
+
+  const tab = input.tab ?? 'p2';
+  const tabLabel = input.tab_label ?? 'Income Statement';
+  const header = [
+    `Financial Bible view under analysis: ${tabLabel} (tab: ${tab}).`,
+    FINANCIAL_TAB_ANGLES[tab] ?? 'Analyze the data provided for this view.',
+    '',
   ];
-  if (input.contracts.length > 0) {
-    lines.push('', 'Cost Pools / Contracts:');
-    for (const c of input.contracts) {
-      lines.push(`  ${c.name}: revenue=${fmt(c.revenue, '')} cost=${fmt(c.cost, '')} profit=${fmt(c.profit, '')} margin=${fmt(c.margin, '%')}`);
+
+  // p2 (Income Statement) keeps the shipped, enriched P&L rendering so the
+  // gross-vs-operating margin distinction is preserved.
+  if (tab === 'p2') {
+    const lines = [
+      ...header,
+      `YTD Revenue: ${fmt(input.ytd_revenue, '')}`,
+      `YTD Direct Costs: ${fmt(input.direct_costs ?? null, '')}`,
+      `YTD Expenses (all costs): ${fmt(input.ytd_expenses, '')}`,
+      `YTD Operating Profit (EBIT): ${fmt(input.ytd_profit, '')}`,
+      `Gross Margin (revenue less direct costs only): ${fmt(input.gross_margin_pct ?? null, '%')}`,
+      `Operating Margin / ROS (EBIT / revenue, after all costs): ${fmt(input.operating_margin_pct ?? input.margin ?? null, '%')}`,
+      `Funded Backlog: ${fmt(input.funded_backlog, '')}`,
+    ];
+    if (input.contracts.length > 0) {
+      lines.push('', 'Cost Pools / Contracts:');
+      for (const c of input.contracts) {
+        lines.push(`  ${c.name}: revenue=${fmt(c.revenue, '')} cost=${fmt(c.cost, '')} profit=${fmt(c.profit, '')} margin=${fmt(c.margin, '%')}`);
+      }
     }
+    return lines.join('\n');
   }
-  return lines.join('\n');
+
+  // Every other tab: render the compact, tab-specific data object. A
+  // `not_ingested` key signals missing data — the model must say so, not guess.
+  const data = input.tab_data ?? {};
+  return [
+    ...header,
+    `${tabLabel} data (JSON):`,
+    JSON.stringify(data, null, 2),
+  ].join('\n');
 }
 
 export interface AnthropicCallResult {
