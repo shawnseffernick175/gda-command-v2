@@ -7,6 +7,16 @@ import { formatMoney, formatMoneyFull } from "@/lib/format-money";
 import { Kpi } from "@/components/financials/primitives/Kpi";
 import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 import { FinSourceStrip } from "@/components/financials/FinSourceStrip";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const TB_COLUMNS: ColumnSortConfig[] = [
+  { field: "account_code", type: "number" },
+  { field: "debit", type: "number" },
+  { field: "credit", type: "number" },
+  { field: "net_balance", type: "number" },
+];
 
 /* Account classes derived from the leading digit of the GL account code —
  * a deterministic classification of the ingested `account_code`, not invented
@@ -37,6 +47,7 @@ export function TrialBalanceTab() {
   const [showZero, setShowZero] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
+  const { sortBy, sortDir, handleSort } = useTableSort("tb");
 
   const items = useMemo(() => data?.items ?? [], [data]);
 
@@ -163,10 +174,10 @@ export function TrialBalanceTab() {
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-border bg-gda-bg-base text-[12px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Account</th>
-              <th className="px-3 py-2 text-right font-medium">Debit</th>
-              <th className="px-3 py-2 text-right font-medium">Credit</th>
-              <th className="px-3 py-2 text-right font-medium">Net Balance</th>
+              <SortableHeader label="Account" field="account_code" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Debit" field="debit" align="right" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Credit" field="credit" align="right" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Net Balance" field="net_balance" align="right" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>
@@ -192,7 +203,12 @@ export function TrialBalanceTab() {
                     </td>
                   </tr>
                   {!isCollapsed &&
-                    c.rows.map((r) => (
+                    (sortData(
+                      c.rows as unknown as Record<string, unknown>[],
+                      sortBy,
+                      sortDir,
+                      TB_COLUMNS,
+                    ) as unknown as TrialBalanceRow[]).map((r) => (
                       <tr key={r.id} className="border-b border-border hover:bg-gda-panel/50">
                         <td className="px-3 py-2 text-left">
                           <span className="pl-6 text-muted-foreground tabular-nums">{r.account_code}</span>
