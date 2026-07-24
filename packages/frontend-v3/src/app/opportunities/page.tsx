@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ScoreExplain } from "@/components/shared/score-explainers";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,9 @@ function OpportunitiesContent() {
 /* ── Stage tabs config (from shared canonical model) ────────────── */
 
 const STAGE_TABS = CANONICAL_STAGE_TABS;
+
+/* Stages shown as inline tabs; all others are collapsed into a dropdown. */
+const PRIMARY_STAGE_TAB_KEYS: readonly string[] = ["active", "all", "won"];
 
 /* ── Urgency heat helpers ───────────────────────────────────────── */
 
@@ -202,7 +206,7 @@ function OpportunityList() {
   const [relevantOnly, setRelevantOnly] = useState(true);
   const [idiqFilter, setIdiqFilter] = useState<'only' | 'exclude' | undefined>(undefined);
   const [sbPlayOnly, setSbPlayOnly] = useState(false);
-  const [stageTab, setStageTab] = useState("all");
+  const [stageTab, setStageTab] = useState("active");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
   const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
   const [showQualifyQueue, setShowQualifyQueue] = useState(false);
@@ -419,9 +423,10 @@ function OpportunityList() {
           )}
         </div>
 
-        {/* Stage tabs + group toggle */}
+        {/* Stage tabs + group toggle. Primary tabs stay inline; the remaining
+            stages are consolidated into a single dropdown to keep the bar tidy. */}
         <div className="border-b border-border flex gap-0 overflow-x-auto items-center">
-          {STAGE_TABS.map((tab) => {
+          {STAGE_TABS.filter((t) => PRIMARY_STAGE_TAB_KEYS.includes(t.key)).map((tab) => {
             const count = getStageCount(tab.key);
             const active = stageTab === tab.key;
             return (
@@ -440,6 +445,34 @@ function OpportunityList() {
               </button>
             );
           })}
+          {(() => {
+            const moreTabs = STAGE_TABS.filter(
+              (t) => !PRIMARY_STAGE_TAB_KEYS.includes(t.key),
+            );
+            const selectedInMore = moreTabs.some((t) => t.key === stageTab);
+            return (
+              <select
+                aria-label="More stages"
+                value={selectedInMore ? stageTab : ""}
+                onChange={(e) => {
+                  if (e.target.value) setStageTab(e.target.value);
+                }}
+                className={cn(
+                  "mb-1 ml-1 rounded border bg-gda-panel px-2 py-1 text-xs font-mono transition-colors",
+                  selectedInMore
+                    ? "border-gda-green text-gda-green"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <option value="">More stages…</option>
+                {moreTabs.map((tab) => (
+                  <option key={tab.key} value={tab.key}>
+                    {tab.label} ({getStageCount(tab.key)})
+                  </option>
+                ))}
+              </select>
+            );
+          })()}
           <div className="ml-auto flex items-center gap-2 pl-3">
             <button
               type="button"
@@ -682,26 +715,25 @@ function IntelChip({
 /* ── Header info tooltip (? popover) ─────────────────────────────── */
 
 function HeaderInfoTooltip({ text }: { text: string }) {
-  const [show, setShow] = useState(false);
+  // Portal-rendered so the popover is not clipped by the table's
+  // overflow-hidden scroll container; opens on hover and keyboard focus.
   return (
-    <span
-      className="relative inline-flex"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-    >
-      <button
-        type="button"
-        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border text-[12px] text-muted-foreground hover:bg-gda-panel"
-        aria-label="Column info"
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border text-[12px] text-muted-foreground hover:bg-gda-panel"
+            aria-label="Column info"
+          />
+        }
       >
         ?
-      </button>
-      {show && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-56 rounded border border-border bg-gda-bg-raised p-2.5 text-xs text-muted-foreground shadow-lg normal-case font-normal">
-          {text}
-        </div>
-      )}
-    </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[240px]">
+        <p className="text-xs leading-relaxed normal-case font-normal">{text}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -1454,6 +1486,24 @@ function OpportunityDetail({ id }: { id: string }) {
 
         {/* ═══ COLUMN B ═══ */}
         <div className="space-y-4">
+          {/* Summary — brief description so users don't have to open SAM */}
+          <Card className="border-border bg-gda-panel">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+                Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs">
+              {opp.description && opp.description.trim() ? (
+                <p className="whitespace-pre-line leading-relaxed text-foreground">
+                  {opp.description}
+                </p>
+              ) : (
+                <FieldStatusBadge reason="no_source_data" />
+              )}
+            </CardContent>
+          </Card>
+
           {/* Metadata Rail */}
           <Card className="border-border bg-gda-panel">
             <CardHeader className="pb-2">
