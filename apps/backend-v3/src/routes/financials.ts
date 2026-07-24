@@ -903,13 +903,35 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const rawPeriods = periodRows
       .map((r) => r.period as string)
       .sort((a, b) => (MONTH_ORDER[a.slice(-3)] ?? 99) - (MONTH_ORDER[b.slice(-3)] ?? 99));
-    const availablePeriods = ['YTD', ...rawPeriods];
 
-    // Normalize the requested period; default and unknown values fall back to YTD.
+    // Calendar quarter of a period's month (Q1=Jan–Mar, Q2=Apr–Jun, …), matching
+    // the Income Statement / view-selector convention. Only quarters that
+    // actually carry monthly rows are offered.
+    const calQuarter = (mon: string): number => Math.ceil((MONTH_ORDER[mon] ?? 0) / 3);
+    const availableQuarters = [
+      ...new Set(rawPeriods.map((p) => calQuarter(p.slice(-3))).filter((q) => q >= 1)),
+    ]
+      .sort((a, b) => a - b)
+      .map((q) => `Q${q}`);
+    const availablePeriods = ['YTD', ...availableQuarters, ...rawPeriods];
+
+    // Normalize the requested period. Accepts 'YTD', a calendar quarter 'Q1'..'Q4',
+    // or a month period string; unknown values fall back to YTD.
     const requested = (qp.period || '').trim();
+    const qMatch = /^Q([1-4])$/i.exec(requested);
     let effectivePeriod: string;
+    let quarterMonths: string[] | null = null;
     if (!requested || requested.toUpperCase() === 'YTD') {
       effectivePeriod = 'YTD';
+    } else if (qMatch) {
+      const qn = Number(qMatch[1]);
+      const months = rawPeriods.filter((p) => calQuarter(p.slice(-3)) === qn);
+      if (months.length > 0) {
+        effectivePeriod = `Q${qn}`;
+        quarterMonths = months;
+      } else {
+        effectivePeriod = 'YTD';
+      }
     } else if (rawPeriods.some((p) => p.toUpperCase() === requested.toUpperCase())) {
       effectivePeriod = rawPeriods.find((p) => p.toUpperCase() === requested.toUpperCase()) as string;
     } else {
@@ -924,13 +946,15 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     };
     let items: PrRow[] = [];
 
-    if (effectivePeriod === 'YTD') {
+    if (effectivePeriod === 'YTD' || quarterMonths) {
       // Sum the official monthly rows per contract. Identity is the L2 Proj ID
       // (project_id) — falling back to contract_number then project_name for
       // legacy rows — so distinct contracts that share a Project Name are NOT
       // merged, and legacy null-contract_number rows are not collapsed together.
       // margin is recomputed from the aggregated revenue/profit rather than
-      // averaging monthly percentages.
+      // averaging monthly percentages. YTD sums every month; a quarter sums only
+      // its calendar months. Neither fabricates months absent from the books.
+      const filterMonths = quarterMonths; // null → all months (YTD)
       const { rows } = await pool.query(
         `SELECT MIN(id) AS id,
                 MAX(fiscal_year) AS fiscal_year,
@@ -946,16 +970,18 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
                 SUM(profit) AS profit,
                 MAX(source_doc_id) FILTER (WHERE revenue <> 0 OR cost <> 0) AS source_doc_id
          FROM project_revenue_actuals
+         ${filterMonths ? 'WHERE period = ANY($1)' : ''}
          GROUP BY COALESCE(project_id, contract_number, project_name)
          HAVING SUM(revenue) <> 0 OR SUM(cost) <> 0
          ORDER BY SUM(revenue) DESC`,
+        filterMonths ? [filterMonths] : [],
       );
       items = rows.map((r) => {
         const revenue = Number(r.revenue);
         const profit = Number(r.profit);
         return {
           id: Number(r.id),
-          period: 'YTD',
+          period: effectivePeriod,
           fiscal_year: Number(r.fiscal_year),
           quarter: r.quarter != null ? Number(r.quarter) : null,
           project_name: r.project_name as string,
@@ -997,6 +1023,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(successEnvelope({
       items,
       available_periods: availablePeriods,
+      available_months: rawPeriods,
+      available_quarters: availableQuarters,
       selected_period: effectivePeriod,
       meta: {
         table: 'project_revenue_actuals',
@@ -2696,6 +2724,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const n = Number(v ?? 0);
     return Number.isFinite(n) && n !== 0 ? n : null;
   };
+  // Gap 2 cost-composition columns are nullable in the DB: NULL means the row was
+  // not sourced from the cost-pool book ("not available", R1); a real 0 (a $0 of
+  // that element) is preserved. So pass null through unchanged rather than → 0.
+  const numOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
   function mapProjectRow(r: Record<string, unknown>) {
     return {
       id: Number(r.id),
@@ -2734,6 +2766,27 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       target_itd_costs: planOrNull(r.target_itd_costs),
       target_itd_profit: planOrNull(r.target_itd_profit),
       target_itd_revenue: planOrNull(r.target_itd_revenue),
+      // Gap 2 — cost composition & rate variance (null when not from cost-pool book)
+      direct_cost: numOrNull(r.direct_cost),
+      indirect_cost: numOrNull(r.indirect_cost),
+      dc_dl_offsite: numOrNull(r.dc_dl_offsite),
+      dc_dl_onsite: numOrNull(r.dc_dl_onsite),
+      dc_direct_travel: numOrNull(r.dc_direct_travel),
+      dc_subk_labor: numOrNull(r.dc_subk_labor),
+      dc_subk_travel: numOrNull(r.dc_subk_travel),
+      dc_subk_material: numOrNull(r.dc_subk_material),
+      dc_consultant_labor: numOrNull(r.dc_consultant_labor),
+      dc_consultant_travel: numOrNull(r.dc_consultant_travel),
+      dc_direct_material: numOrNull(r.dc_direct_material),
+      dc_direct_odc: numOrNull(r.dc_direct_odc),
+      ind_oh_offsite: numOrNull(r.ind_oh_offsite),
+      ind_oh_onsite: numOrNull(r.ind_oh_onsite),
+      ind_mhx: numOrNull(r.ind_mhx),
+      ind_gna: numOrNull(r.ind_gna),
+      gross_profit: numOrNull(r.gross_profit),
+      gross_profit_pct: numOrNull(r.gross_profit_pct),
+      total_indirect_tgt: numOrNull(r.total_indirect_tgt),
+      rate_variance: numOrNull(r.rate_variance),
       source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
     };
   }

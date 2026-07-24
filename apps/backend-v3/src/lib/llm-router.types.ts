@@ -757,6 +757,35 @@ export interface ProjectCostPoolExtractOutput {
     profit: number;
     /** Op Profit % as a percentage (e.g. 2.33), null when revenue is 0 */
     margin_pct: number | null;
+    // Gap 2 — cost composition & rate variance, straight from the book. Each is
+    // an actual-cost element the parser previously collapsed into direct/indirect.
+    // A 0 is a legitimate "$0 of this element"; the fields are only null when the
+    // source column is absent from the workbook (older layouts).
+    /** direct-cost composition */
+    dc_dl_offsite?: number | null;
+    dc_dl_onsite?: number | null;
+    dc_direct_travel?: number | null;
+    dc_subk_labor?: number | null;
+    dc_subk_travel?: number | null;
+    dc_subk_material?: number | null;
+    dc_consultant_labor?: number | null;
+    dc_consultant_travel?: number | null;
+    dc_direct_material?: number | null;
+    dc_direct_odc?: number | null;
+    /** per-contract indirect split */
+    ind_oh_offsite?: number | null;
+    ind_oh_onsite?: number | null;
+    ind_mhx?: number | null;
+    ind_gna?: number | null;
+    /** Gross Profit-Act (revenue − total direct), distinct from Op Income */
+    gross_profit?: number | null;
+    /** Gross Profit % as a percentage (e.g. 24.92) */
+    gross_profit_pct?: number | null;
+    /** Total Indirect-TGT — the indirect the provisional rates would have applied */
+    total_indirect_tgt?: number | null;
+    /** Rate Variance = Total Indirect-ACT − Total Indirect-TGT (signed);
+     *  negative = actual indirect underran target (favorable). */
+    rate_variance?: number | null;
   }[];
   notes: string;
   model_used: string;

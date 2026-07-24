@@ -1694,6 +1694,29 @@ export function parseRevenueSummaryByCostPool(
         marginPct = Math.round((profit / revenue) * 100 * 100) / 100;
       }
 
+      // Gap 2 — cost-composition & rate-variance detail. `money` returns null
+      // when the workbook has no such column (older layouts) so the detail is
+      // "not available" rather than a fabricated 0, but keeps a real 0 (a $0 of
+      // that element) when the column exists. Percentage columns are stored as
+      // fractions in the book; convert to points to match margin_pct.
+      const hasCol = (key: string): boolean => {
+        const lk = key.toLowerCase();
+        if (colMap.has(lk)) return true;
+        for (const h of colMap.keys()) if (h.includes(lk)) return true;
+        return false;
+      };
+      const money = (...keys: string[]): number | null => {
+        if (!keys.some(hasCol)) return null;
+        return Math.round(parseNum(getCol(cols, colMap, ...keys)) * 100) / 100;
+      };
+      const pct = (...keys: string[]): number | null => {
+        if (!keys.some(hasCol)) return null;
+        const raw = getCol(cols, colMap, ...keys);
+        if (!raw || raw.trim() === '') return null;
+        const v = parseNum(raw) * 100;
+        return Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
+      };
+
       const period = `FY${String(fiscalYear).slice(2)} ${MONTHS[pdNum - 1]}`;
 
       rows.push({
@@ -1710,6 +1733,24 @@ export function parseRevenueSummaryByCostPool(
         cost,
         profit,
         margin_pct: marginPct,
+        dc_dl_offsite: money('dl - co offsite', 'dl-co offsite'),
+        dc_dl_onsite: money('dl - co onsite', 'dl-co onsite'),
+        dc_direct_travel: money('direct travel'),
+        dc_subk_labor: money('subk labor'),
+        dc_subk_travel: money('subk travel'),
+        dc_subk_material: money('subk material'),
+        dc_consultant_labor: money('consultant labor'),
+        dc_consultant_travel: money('consultant travel'),
+        dc_direct_material: money('direct material'),
+        dc_direct_odc: money('direct odc'),
+        ind_oh_offsite: money('oh-co offsite', 'oh - co offsite'),
+        ind_oh_onsite: money('oh-cl onsite', 'oh - cl onsite', 'oh-co onsite'),
+        ind_mhx: money('mhx'),
+        ind_gna: money('g&a'),
+        gross_profit: money('gross profit-act', 'gross profit act'),
+        gross_profit_pct: pct('gross profit %'),
+        total_indirect_tgt: money('total indirect-tgt', 'total indirect tgt'),
+        rate_variance: money('rate variance'),
       });
     }
   }
