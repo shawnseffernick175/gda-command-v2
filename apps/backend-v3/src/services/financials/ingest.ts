@@ -1112,19 +1112,40 @@ export async function ingestProjectCostPoolRows(
         const y = ytdByKey.get(key) ?? { rev: r.revenue, cost: r.cost, profit: r.profit };
         const margin = storableMarginPct(r.margin_pct);
 
+        // Gap 2 cost-composition detail — same values for UPDATE and INSERT.
+        const comp = [
+          r.direct_cost, r.indirect_cost,
+          r.dc_dl_offsite ?? null, r.dc_dl_onsite ?? null, r.dc_direct_travel ?? null,
+          r.dc_subk_labor ?? null, r.dc_subk_travel ?? null, r.dc_subk_material ?? null,
+          r.dc_consultant_labor ?? null, r.dc_consultant_travel ?? null,
+          r.dc_direct_material ?? null, r.dc_direct_odc ?? null,
+          r.ind_oh_offsite ?? null, r.ind_oh_onsite ?? null, r.ind_mhx ?? null, r.ind_gna ?? null,
+          r.gross_profit ?? null, r.gross_profit_pct ?? null,
+          r.total_indirect_tgt ?? null, r.rate_variance ?? null,
+        ];
+
         if (!costPoolOnly.has(r.period)) {
           const upd = await client.query(
             `UPDATE project_revenue_actuals SET
                project_id = $1, revenue = $2, cost = $3, margin_pct = $4,
                actual_period_revenue = $5, actual_period_costs = $6, actual_period_profit = $7,
                actual_ytd_revenue = $8, actual_ytd_costs = $9, actual_ytd_profit = $10,
-               source_doc_id = $11
+               source_doc_id = $11,
+               direct_cost = $14, indirect_cost = $15,
+               dc_dl_offsite = $16, dc_dl_onsite = $17, dc_direct_travel = $18,
+               dc_subk_labor = $19, dc_subk_travel = $20, dc_subk_material = $21,
+               dc_consultant_labor = $22, dc_consultant_travel = $23,
+               dc_direct_material = $24, dc_direct_odc = $25,
+               ind_oh_offsite = $26, ind_oh_onsite = $27, ind_mhx = $28, ind_gna = $29,
+               gross_profit = $30, gross_profit_pct = $31,
+               total_indirect_tgt = $32, rate_variance = $33
              WHERE source = 'proj_revenue' AND period = $12 AND contract_number = $13`,
             [
               r.project_id, r.revenue, r.cost, margin,
               r.revenue, r.cost, r.profit,
               y.rev, y.cost, y.profit,
               sourceDocId ?? null, r.period, r.contract_number,
+              ...comp,
             ],
           );
           if (upd.rowCount && upd.rowCount > 0) {
@@ -1139,8 +1160,17 @@ export async function ingestProjectCostPoolRows(
               revenue, cost, margin_pct,
               actual_period_revenue, actual_period_costs, actual_period_profit,
               actual_ytd_revenue, actual_ytd_costs, actual_ytd_profit,
+              direct_cost, indirect_cost,
+              dc_dl_offsite, dc_dl_onsite, dc_direct_travel,
+              dc_subk_labor, dc_subk_travel, dc_subk_material,
+              dc_consultant_labor, dc_consultant_travel,
+              dc_direct_material, dc_direct_odc,
+              ind_oh_offsite, ind_oh_onsite, ind_mhx, ind_gna,
+              gross_profit, gross_profit_pct, total_indirect_tgt, rate_variance,
               source, source_doc_id)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                   $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
+                   $29, $30, $31, $32, $33, $34, $35, $36,
                    'proj_revenue', $16)
            ON CONFLICT (source, period, project_name, (COALESCE(project_id, '')))
            DO UPDATE SET
@@ -1155,6 +1185,26 @@ export async function ingestProjectCostPoolRows(
              actual_ytd_revenue = EXCLUDED.actual_ytd_revenue,
              actual_ytd_costs = EXCLUDED.actual_ytd_costs,
              actual_ytd_profit = EXCLUDED.actual_ytd_profit,
+             direct_cost = EXCLUDED.direct_cost,
+             indirect_cost = EXCLUDED.indirect_cost,
+             dc_dl_offsite = EXCLUDED.dc_dl_offsite,
+             dc_dl_onsite = EXCLUDED.dc_dl_onsite,
+             dc_direct_travel = EXCLUDED.dc_direct_travel,
+             dc_subk_labor = EXCLUDED.dc_subk_labor,
+             dc_subk_travel = EXCLUDED.dc_subk_travel,
+             dc_subk_material = EXCLUDED.dc_subk_material,
+             dc_consultant_labor = EXCLUDED.dc_consultant_labor,
+             dc_consultant_travel = EXCLUDED.dc_consultant_travel,
+             dc_direct_material = EXCLUDED.dc_direct_material,
+             dc_direct_odc = EXCLUDED.dc_direct_odc,
+             ind_oh_offsite = EXCLUDED.ind_oh_offsite,
+             ind_oh_onsite = EXCLUDED.ind_oh_onsite,
+             ind_mhx = EXCLUDED.ind_mhx,
+             ind_gna = EXCLUDED.ind_gna,
+             gross_profit = EXCLUDED.gross_profit,
+             gross_profit_pct = EXCLUDED.gross_profit_pct,
+             total_indirect_tgt = EXCLUDED.total_indirect_tgt,
+             rate_variance = EXCLUDED.rate_variance,
              source_doc_id = EXCLUDED.source_doc_id`,
           [
             r.period, r.fiscal_year, r.quarter, r.project_name, r.contract_number, r.project_id,
@@ -1162,6 +1212,7 @@ export async function ingestProjectCostPoolRows(
             r.revenue, r.cost, r.profit,
             y.rev, y.cost, y.profit,
             sourceDocId ?? null,
+            ...comp,
           ],
         );
         localCount++;
