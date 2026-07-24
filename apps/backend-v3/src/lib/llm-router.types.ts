@@ -694,6 +694,38 @@ export interface ProjectRevenueExtractOutput {
     revenue: number;
     cost: number;
     margin_pct: number | null;
+    // Full Proj Revenue Summary enrichment (Gap 1). The book supplies the
+    // per-contract plan/target, inception-to-date, prior-year, and open-AR
+    // figures the drill-down was built for. All optional so legacy callers and
+    // mocks that emit only revenue/cost/margin keep type-checking; a value of 0
+    // in the source is preserved as 0 here and mapped to "not available" (null)
+    // downstream (R1) rather than fabricated.
+    project_id?: string | null;
+    itd_value?: number;
+    itd_funding?: number;
+    itd_billed_amount?: number;
+    open_ar?: number;
+    prior_year_costs?: number;
+    prior_year_profit?: number;
+    prior_year_revenue?: number;
+    actual_period_costs?: number;
+    actual_period_profit?: number;
+    actual_period_revenue?: number;
+    actual_ytd_costs?: number;
+    actual_ytd_profit?: number;
+    actual_ytd_revenue?: number;
+    actual_itd_costs?: number;
+    actual_itd_profit?: number;
+    actual_itd_revenue?: number;
+    target_period_costs?: number;
+    target_period_profit?: number;
+    target_period_revenue?: number;
+    target_ytd_costs?: number;
+    target_ytd_profit?: number;
+    target_ytd_revenue?: number;
+    target_itd_costs?: number;
+    target_itd_profit?: number;
+    target_itd_revenue?: number;
   }[];
   notes: string;
   model_used: string;

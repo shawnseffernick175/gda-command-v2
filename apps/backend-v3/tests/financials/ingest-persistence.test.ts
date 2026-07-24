@@ -109,12 +109,12 @@ describe('financial ingest persistence (parser -> mapper -> INSERT payload)', ()
 
     for (const { params } of payloads) {
       // VALUES order: period, fiscal_year, quarter, project_name, contract_number,
-      //               revenue, cost, margin_pct, source_doc_id
+      //               project_id, revenue, cost, margin_pct, ...enrichment, source_doc_id
       expect(params[0]).toBeTruthy(); // period NOT NULL
       expect(params[1]).toBeTruthy(); // fiscal_year NOT NULL
       expect(params[3]).toBeTruthy(); // project_name NOT NULL
-      expect(typeof params[5]).toBe('number'); // revenue NUMERIC(15,2) NOT NULL
-      expect(typeof params[6]).toBe('number'); // cost NUMERIC(15,2) NOT NULL
+      expect(typeof params[6]).toBe('number'); // revenue NUMERIC(15,2) NOT NULL
+      expect(typeof params[7]).toBe('number'); // cost NUMERIC(15,2) NOT NULL
     }
   });
 
@@ -134,18 +134,18 @@ describe('financial ingest persistence (parser -> mapper -> INSERT payload)', ()
 
     expect(inserted).toBe(1); // row is NOT dropped
     expect(payloads.length).toBe(1);
-    // margin_pct param (index 7) must be null so Postgres won't raise numeric overflow.
-    expect(payloads[0].params[7]).toBeNull();
+    // margin_pct param (index 8) must be null so Postgres won't raise numeric overflow.
+    expect(payloads[0].params[8]).toBeNull();
     // revenue/cost remain intact (margin is recomputable from them).
-    expect(payloads[0].params[5]).toBe(0.01);
-    expect(payloads[0].params[6]).toBe(1_000_000);
+    expect(payloads[0].params[6]).toBe(0.01);
+    expect(payloads[0].params[7]).toBe(1_000_000);
   });
 
   it('an in-range margin is preserved unchanged', async () => {
     const parsed = parseProjectRevenueSummary(prText, 'proj-revenue-summary-may-2026.xlsx')!;
     const okRow = { ...parsed.rows[0], project_name: 'OK MARGIN', revenue: 1000, cost: 850, margin_pct: 15 };
     await ingestProjectRevenueRows([okRow], 1);
-    expect(insertCalls()[0].params[7]).toBe(15);
+    expect(insertCalls()[0].params[8]).toBe(15);
   });
 
   it('Trial Balance fixture rows persist with required NOT NULL columns', async () => {

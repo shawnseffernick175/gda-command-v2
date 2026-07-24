@@ -2684,11 +2684,18 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // ─── Project Financial Drill-Down (F-628) ───────────────────────
 
   // Helper: map a project_revenue_actuals row to full JSON shape.
-  // The authoritative per-contract book (Revenue Summary by Cost Pool) carries
-  // actuals only — no target/plan or inception-to-date-actual figures. Those
-  // columns are never populated by any parser (they carry only the DEFAULT 0),
-  // so they are reported as null ("not available", R1) rather than a fabricated
-  // $0. The sourced actual/contract-ITD/prior-year columns keep their value.
+  // The per-contract picture is assembled from two authoritative books: the
+  // Revenue Summary by Cost Pool book supplies real monthly/YTD actuals, and the
+  // Full Proj Revenue Summary book supplies contract-level ITD (value / funding /
+  // billed), prior-year, Open AR, and the plan/target + actual-ITD columns
+  // (Gap 1). Plan/target and lifetime columns are reported as null ("not
+  // available", R1) when the source carries a bare 0 for that contract — a
+  // reader interprets a blank plan as "no target set", not a $0 target — while
+  // actual period/YTD figures keep a real 0 (zero activity is a fact).
+  const planOrNull = (v: unknown): number | null => {
+    const n = Number(v ?? 0);
+    return Number.isFinite(n) && n !== 0 ? n : null;
+  };
   function mapProjectRow(r: Record<string, unknown>) {
     return {
       id: Number(r.id),
@@ -2715,19 +2722,18 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       actual_ytd_costs: Number(r.actual_ytd_costs ?? 0),
       actual_ytd_profit: Number(r.actual_ytd_profit ?? 0),
       actual_ytd_revenue: Number(r.actual_ytd_revenue ?? 0),
-      // ITD-actual and target/plan are not in the source book — unavailable, not 0.
-      actual_itd_costs: null,
-      actual_itd_profit: null,
-      actual_itd_revenue: null,
-      target_period_costs: null,
-      target_period_profit: null,
-      target_period_revenue: null,
-      target_ytd_costs: null,
-      target_ytd_profit: null,
-      target_ytd_revenue: null,
-      target_itd_costs: null,
-      target_itd_profit: null,
-      target_itd_revenue: null,
+      actual_itd_costs: planOrNull(r.actual_itd_costs),
+      actual_itd_profit: planOrNull(r.actual_itd_profit),
+      actual_itd_revenue: planOrNull(r.actual_itd_revenue),
+      target_period_costs: planOrNull(r.target_period_costs),
+      target_period_profit: planOrNull(r.target_period_profit),
+      target_period_revenue: planOrNull(r.target_period_revenue),
+      target_ytd_costs: planOrNull(r.target_ytd_costs),
+      target_ytd_profit: planOrNull(r.target_ytd_profit),
+      target_ytd_revenue: planOrNull(r.target_ytd_revenue),
+      target_itd_costs: planOrNull(r.target_itd_costs),
+      target_itd_profit: planOrNull(r.target_itd_profit),
+      target_itd_revenue: planOrNull(r.target_itd_revenue),
       source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
     };
   }
