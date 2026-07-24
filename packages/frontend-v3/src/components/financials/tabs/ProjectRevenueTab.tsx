@@ -188,7 +188,8 @@ export function ProjectRevenueTab() {
       ) : items.length === 0 ? (
         <p className="text-xs text-muted-foreground py-4 text-center">
           No project revenue rows for {periodLabel(selectedPeriod)}. Select
-          another period, or upload a Full Proj Revenue Summary to populate.
+          another period, or upload a Revenue Summary by Cost Pool book to
+          populate.
         </p>
       ) : (
         <>

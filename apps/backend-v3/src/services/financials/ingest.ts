@@ -33,7 +33,7 @@
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { aggregateDirectCostRows } from './deterministic-parsers.js';
-import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput, ApExtractOutput, ArExtractOutput, TrialBalanceExtractOutput, ProjectRevenueExtractOutput, ServiceCenterExtractOutput, PoolRateExtractOutput } from '../../lib/llm-router.types.js';
+import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput, ApExtractOutput, ArExtractOutput, TrialBalanceExtractOutput, ProjectRevenueExtractOutput, ProjectCostPoolExtractOutput, ServiceCenterExtractOutput, PoolRateExtractOutput } from '../../lib/llm-router.types.js';
 
 type FinancialRow = FinancialStatementExtractOutput['rows'][number];
 
@@ -960,7 +960,7 @@ export async function ingestProjectRevenueRows(
            (period, fiscal_year, quarter, project_name, contract_number,
             revenue, cost, margin_pct, source, source_doc_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'proj_revenue', $9)
-         ON CONFLICT (source, period, project_name)
+         ON CONFLICT (source, period, project_name, (COALESCE(project_id, '')))
          DO UPDATE SET
            contract_number = EXCLUDED.contract_number,
            revenue = EXCLUDED.revenue,
@@ -977,6 +977,151 @@ export async function ingestProjectRevenueRows(
       count++;
     } catch (err) {
       logger.warn({ err, period: row.period, project_name: row.project_name }, 'Project revenue row upsert failed');
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Per-contract Revenue Summary by Cost Pool ingest.
+//
+// The cost-pool book is the authoritative per-contract actuals source: it gives
+// real monthly revenue / fully-burdened cost / Op Income / margin per contract,
+// but no ITD or target/plan figures. The older "Full Proj Revenue Summary" book
+// carries per-contract ITD (contract value / funding / billed) but ships EMPTY
+// period/YTD actuals. The two books share one contract-id space (L2 Proj ID), so
+// we merge rather than replace: for periods that already have Full-Proj ITD rows
+// (Jan–May) we UPDATE the matching contract's actuals in place, preserving ITD;
+// for cost-pool-only periods (e.g. Jun, which has no Full-Proj file) we
+// snapshot-replace the period so re-ingest is lossless. YTD actuals are derived
+// here by cumulatively summing the monthly rows per contract — never taken from
+// ITD. Target/plan columns are left at their defaults (unavailable, per R1).
+// ---------------------------------------------------------------------------
+
+type ProjectCostPoolRow = ProjectCostPoolExtractOutput['rows'][number];
+
+export async function ingestProjectCostPoolRows(
+  rows: ProjectCostPoolRow[],
+  sourceDocId?: number | null,
+): Promise<number> {
+  const valid = rows.filter((r) => r.period && r.fiscal_year && r.project_id);
+
+  const byFy = new Map<number, ProjectCostPoolRow[]>();
+  for (const r of valid) {
+    const arr = byFy.get(r.fiscal_year) ?? [];
+    arr.push(r);
+    byFy.set(r.fiscal_year, arr);
+  }
+
+  let count = 0;
+  for (const [fy, fyRows] of byFy.entries()) {
+    // Cumulative YTD per contract, in fiscal-period order.
+    const acc = new Map<string, { rev: number; cost: number; profit: number }>();
+    const ytdByKey = new Map<string, { rev: number; cost: number; profit: number }>();
+    for (const r of [...fyRows].sort((a, b) => a.month_num - b.month_num)) {
+      const a = acc.get(r.contract_number ?? r.project_id) ?? { rev: 0, cost: 0, profit: 0 };
+      a.rev = Math.round((a.rev + r.revenue) * 100) / 100;
+      a.cost = Math.round((a.cost + r.cost) * 100) / 100;
+      a.profit = Math.round((a.profit + r.profit) * 100) / 100;
+      acc.set(r.contract_number ?? r.project_id, { ...a });
+      ytdByKey.set(`${r.period}|||${r.contract_number ?? r.project_id}`, { ...a });
+    }
+
+    const client = await pool.connect();
+    let localCount = 0;
+    try {
+      await client.query('BEGIN');
+
+      // A period is "cost-pool-only" when no Full-Proj ITD row backs it; such a
+      // period can be snapshot-replaced. Periods with ITD rows are merged so the
+      // ITD data is preserved.
+      const periods = [...new Set(fyRows.map((r) => r.period))];
+      const costPoolOnly = new Set<string>();
+      for (const p of periods) {
+        const res = await client.query(
+          `SELECT 1 FROM project_revenue_actuals
+             WHERE source = 'proj_revenue' AND period = $1
+               AND (COALESCE(itd_value,0) <> 0 OR COALESCE(itd_funding,0) <> 0
+                    OR COALESCE(itd_billed_amount,0) <> 0)
+             LIMIT 1`,
+          [p],
+        );
+        if (res.rowCount === 0) costPoolOnly.add(p);
+      }
+      for (const p of costPoolOnly) {
+        await client.query(
+          `DELETE FROM project_revenue_actuals WHERE source = 'proj_revenue' AND period = $1`,
+          [p],
+        );
+      }
+
+      for (const r of fyRows) {
+        const key = `${r.period}|||${r.contract_number ?? r.project_id}`;
+        const y = ytdByKey.get(key) ?? { rev: r.revenue, cost: r.cost, profit: r.profit };
+        const margin = storableMarginPct(r.margin_pct);
+
+        if (!costPoolOnly.has(r.period)) {
+          const upd = await client.query(
+            `UPDATE project_revenue_actuals SET
+               project_id = $1, revenue = $2, cost = $3, margin_pct = $4,
+               actual_period_revenue = $5, actual_period_costs = $6, actual_period_profit = $7,
+               actual_ytd_revenue = $8, actual_ytd_costs = $9, actual_ytd_profit = $10,
+               source_doc_id = $11
+             WHERE source = 'proj_revenue' AND period = $12 AND contract_number = $13`,
+            [
+              r.project_id, r.revenue, r.cost, margin,
+              r.revenue, r.cost, r.profit,
+              y.rev, y.cost, y.profit,
+              sourceDocId ?? null, r.period, r.contract_number,
+            ],
+          );
+          if (upd.rowCount && upd.rowCount > 0) {
+            localCount += upd.rowCount;
+            continue;
+          }
+        }
+
+        await client.query(
+          `INSERT INTO project_revenue_actuals
+             (period, fiscal_year, quarter, project_name, contract_number, project_id,
+              revenue, cost, margin_pct,
+              actual_period_revenue, actual_period_costs, actual_period_profit,
+              actual_ytd_revenue, actual_ytd_costs, actual_ytd_profit,
+              source, source_doc_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                   'proj_revenue', $16)
+           ON CONFLICT (source, period, project_name, (COALESCE(project_id, '')))
+           DO UPDATE SET
+             contract_number = EXCLUDED.contract_number,
+             project_id = EXCLUDED.project_id,
+             revenue = EXCLUDED.revenue,
+             cost = EXCLUDED.cost,
+             margin_pct = EXCLUDED.margin_pct,
+             actual_period_revenue = EXCLUDED.actual_period_revenue,
+             actual_period_costs = EXCLUDED.actual_period_costs,
+             actual_period_profit = EXCLUDED.actual_period_profit,
+             actual_ytd_revenue = EXCLUDED.actual_ytd_revenue,
+             actual_ytd_costs = EXCLUDED.actual_ytd_costs,
+             actual_ytd_profit = EXCLUDED.actual_ytd_profit,
+             source_doc_id = EXCLUDED.source_doc_id`,
+          [
+            r.period, r.fiscal_year, r.quarter, r.project_name, r.contract_number, r.project_id,
+            r.revenue, r.cost, margin,
+            r.revenue, r.cost, r.profit,
+            y.rev, y.cost, y.profit,
+            sourceDocId ?? null,
+          ],
+        );
+        localCount++;
+      }
+
+      await client.query('COMMIT');
+      count += localCount;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      logger.warn({ err, fiscal_year: fy }, 'Cost-pool project ingest failed — rolled back, prior rows kept');
+    } finally {
+      client.release();
     }
   }
   return count;

@@ -18,7 +18,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
     project.actual_period_profit,
     project.actual_period_revenue,
   ];
-  const periodTargets = [
+  const periodTargets: Array<number | null> = [
     project.target_period_costs,
     project.target_period_profit,
     project.target_period_revenue,
@@ -28,25 +28,25 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
     project.actual_ytd_profit,
     project.actual_ytd_revenue,
   ];
-  const ytdTargets = [
+  const ytdTargets: Array<number | null> = [
     project.target_ytd_costs,
     project.target_ytd_profit,
     project.target_ytd_revenue,
   ];
 
-  const allVals = [
-    ...periodActuals,
-    ...periodTargets,
-    ...ytdActuals,
-    ...ytdTargets,
-  ];
-  const hasData = allVals.some((v) => v !== 0);
+  const hasActuals = [...periodActuals, ...ytdActuals].some((v) => v !== 0);
+  // Target/plan figures are not in the authoritative per-contract book — the API
+  // returns null. Only draw the Target series when a real target exists (never a
+  // fabricated 0), and label the chart Actual-only otherwise.
+  const hasTargets = [...periodTargets, ...ytdTargets].some(
+    (v) => v != null && v !== 0,
+  );
 
-  if (!hasData) {
+  if (!hasActuals) {
     return (
       <div className="flex h-72 items-center justify-center rounded border border-dashed border-border bg-gda-panel/30">
         <p className="text-sm text-muted-foreground">
-          No actual vs target data for this period yet
+          No actual data for this period yet
         </p>
       </div>
     );
@@ -64,6 +64,41 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
   const actualData = [...periodActuals, ...ytdActuals];
   const targetData = [...periodTargets, ...ytdTargets];
 
+  const series: Record<string, unknown>[] = [
+    {
+      name: "Actual",
+      type: "bar",
+      data: actualData,
+      itemStyle: { color: TEAL, borderRadius: [2, 2, 0, 0] },
+      barGap: "15%",
+      barMaxWidth: 28,
+      label: {
+        show: true,
+        position: "top",
+        formatter: (p: { value: number }) => formatMoney(p.value),
+        color: INK,
+        fontSize: 12,
+      },
+    },
+  ];
+  if (hasTargets) {
+    series.push({
+      name: "Target",
+      type: "bar",
+      data: targetData,
+      itemStyle: { color: STONE, borderRadius: [2, 2, 0, 0], opacity: 0.5 },
+      barMaxWidth: 28,
+      label: {
+        show: true,
+        position: "top",
+        formatter: (p: { value: number | null }) =>
+          p.value != null ? formatMoney(p.value) : "",
+        color: STONE,
+        fontSize: 12,
+      },
+    });
+  }
+
   const option: Record<string, unknown> = {
     tooltip: {
       trigger: "axis",
@@ -71,7 +106,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
       formatter: (
         params: Array<{
           seriesName: string;
-          value: number;
+          value: number | null;
           marker: string;
           dataIndex: number;
         }>,
@@ -81,13 +116,13 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
         const cluster = idx < 3 ? "Period" : "YTD";
         const metric = CATEGORIES[idx % 3];
         const lines = params
-          .filter((p) => p.value !== 0)
-          .map((p) => `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}`);
+          .filter((p) => p.value != null && p.value !== 0)
+          .map((p) => `${p.marker} ${p.seriesName}: ${formatMoney(p.value as number)}`);
         return `<strong>${cluster} ${metric}</strong><br/>${lines.join("<br/>")}`;
       },
     },
     legend: {
-      data: ["Actual", "Target"],
+      data: hasTargets ? ["Actual", "Target"] : ["Actual"],
       bottom: 0,
       textStyle: { color: STONE, fontSize: 12 },
       itemWidth: 12,
@@ -122,47 +157,19 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
       splitLine: { lineStyle: { color: SAND, type: "dashed" } },
       axisLine: { show: false },
     },
-    series: [
-      {
-        name: "Actual",
-        type: "bar",
-        data: actualData,
-        itemStyle: { color: TEAL, borderRadius: [2, 2, 0, 0] },
-        barGap: "15%",
-        barMaxWidth: 28,
-        label: {
-          show: true,
-          position: "top",
-          formatter: (p: { value: number }) => formatMoney(p.value),
-          color: INK,
-          fontSize: 12,
-        },
-      },
-      {
-        name: "Target",
-        type: "bar",
-        data: targetData,
-        itemStyle: { color: STONE, borderRadius: [2, 2, 0, 0], opacity: 0.5 },
-        barMaxWidth: 28,
-        label: {
-          show: true,
-          position: "top",
-          formatter: (p: { value: number }) => formatMoney(p.value),
-          color: STONE,
-          fontSize: 12,
-        },
-      },
-    ],
+    series,
     markLine: undefined,
   };
 
   return (
     <div className="rounded border border-border bg-white p-4">
       <h3 className="mb-1 text-sm font-medium text-fin-ink">
-        Actual vs Target
+        {hasTargets ? "Actual vs Target" : "Actual"}
       </h3>
       <p className="mb-3 text-[12px] text-muted-foreground">
-        Period and YTD comparison across costs, profit, and revenue
+        {hasTargets
+          ? "Period and YTD comparison across costs, profit, and revenue"
+          : "Period and YTD actuals across costs, profit, and revenue — target/plan not available in the source book"}
       </p>
       <ReactEChartsCore
         echarts={echarts}

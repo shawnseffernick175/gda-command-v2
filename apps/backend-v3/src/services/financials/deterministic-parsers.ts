@@ -19,6 +19,7 @@ import type { TrialBalanceExtractOutput } from '../../lib/llm-router.types.js';
 import type { SieExtractOutput } from '../../lib/llm-router.types.js';
 import type { CostDetailExtractOutput } from '../../lib/llm-router.types.js';
 import type { ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js';
+import type { ProjectCostPoolExtractOutput } from '../../lib/llm-router.types.js';
 import type { ServiceCenterExtractOutput } from '../../lib/llm-router.types.js';
 import type { PoolRateExtractOutput } from '../../lib/llm-router.types.js';
 import type { FinancialStatementExtractOutput } from '../../lib/llm-router.types.js';
@@ -1538,6 +1539,129 @@ export function parseServiceCenterGlDetail(
     is_service_center: true,
     rows,
     notes: `Deterministic parser: extracted ${rows.length} service-center cost rows across ${periodsSeen} period(s) from ${filename}`,
+    model_used: 'deterministic',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Parser: Per-contract Revenue Summary by Cost Pool.
+// The authoritative FY per-contract actuals book. One workbook carries every
+// fiscal period as its own sheet ("## Sheet: 1".."6") plus a "YTD" rollup sheet.
+// Each data row is one contract for that period, keyed by L2 Proj ID. We emit
+// one monthly row per (period, contract) with:
+//   revenue  = Revenue
+//   cost     = Total Direct Cost + Total Indirect-ACT   (fully burdened)
+//   profit   = Op Income-ACT                            (== revenue - cost)
+//   margin   = Op Profit % (fraction) × 100             (percentage points)
+// The book has no ITD or target/plan figures — those stay unavailable upstream.
+// The "YTD" sheet and "Period N Total" subtotal rows are skipped so per-contract
+// monthly rows are never double-counted; YTD is derived at ingest by summing
+// the months.
+// ---------------------------------------------------------------------------
+
+export function parseRevenueSummaryByCostPool(
+  extractedText: string,
+  filename: string,
+): ProjectCostPoolExtractOutput | null {
+  const sheetNames = getAllSheetNames(extractedText);
+  // No sheet markers → treat the whole text as one section.
+  const sections: { name: string; lines: string[] }[] = [];
+  if (sheetNames.length === 0) {
+    const lines = extractedText.split('\n').filter((l) => l.trim().length > 0);
+    if (lines.length > 0) sections.push({ name: '', lines });
+  } else {
+    for (const name of sheetNames) {
+      // The YTD rollup sheet duplicates the monthly figures cumulatively.
+      if (/^ytd$/i.test(name.trim())) continue;
+      const lines = getSheetLines(extractedText, name);
+      if (lines && lines.length > 0) sections.push({ name, lines });
+    }
+  }
+  if (sections.length === 0) return null;
+
+  const HEADER_SIG = ['l2 proj id', 'revenue', 'total direct cost', 'op income-act'];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const rows: ProjectCostPoolExtractOutput['rows'] = [];
+
+  for (const section of sections) {
+    const headerIdx = findHeaderRow(section.lines, HEADER_SIG);
+    if (headerIdx === -1) continue;
+    const colMap = buildColumnMap(section.lines[headerIdx]);
+
+    const fyIdx = colMap.get('fy') ?? -1;
+    const pdIdx = colMap.get('pd') ?? -1;
+    const projIdIdx =
+      colMap.get('l2 proj id') ?? colMap.get('proj id') ?? colMap.get('project id') ?? -1;
+    const projNameIdx = colMap.get('project name') ?? colMap.get('name') ?? -1;
+    if (fyIdx === -1 || pdIdx === -1 || projIdIdx === -1) continue;
+
+    for (let i = headerIdx + 1; i < section.lines.length; i++) {
+      const cols = splitRow(section.lines[i]);
+      if (cols.length < 10) continue;
+
+      // Skip "Period N Total" subtotal rows (every cell repeats the label).
+      const first = (cols[0] || '').trim();
+      if (/total/i.test(first)) continue;
+
+      const fyRaw = (cols[fyIdx] || '').trim();
+      if (!/^\d{4}$/.test(fyRaw)) continue;
+      const fiscalYear = parseInt(fyRaw, 10);
+
+      const pdRaw = (cols[pdIdx] || '').trim();
+      const pdNum = parseInt(pdRaw, 10);
+      if (Number.isNaN(pdNum) || pdNum < 1 || pdNum > 12) continue;
+
+      const projectId = (cols[projIdIdx] || '').trim();
+      if (!projectId) continue;
+      const projectName =
+        projNameIdx >= 0 && projNameIdx < cols.length ? (cols[projNameIdx] || '').trim() : '';
+
+      const revenue = parseNum(getCol(cols, colMap, 'revenue'));
+      const directCost = parseNum(getCol(cols, colMap, 'total direct cost'));
+      const indirectCost = parseNum(getCol(cols, colMap, 'total indirect-act', 'total indirect'));
+      const opIncome = parseNum(getCol(cols, colMap, 'op income-act', 'op income'));
+      const opProfitPctRaw = getCol(cols, colMap, 'op profit %', 'op profit');
+
+      const cost = Math.round((directCost + indirectCost) * 100) / 100;
+      const profit = Math.round(opIncome * 100) / 100;
+
+      // Op Profit % is stored as a fraction (0.2331); DB convention is points.
+      let marginPct: number | null = null;
+      if (opProfitPctRaw && opProfitPctRaw.trim() !== '') {
+        const raw = parseNum(opProfitPctRaw) * 100;
+        marginPct = Number.isFinite(raw) ? Math.round(raw * 100) / 100 : null;
+      } else if (revenue !== 0) {
+        marginPct = Math.round((profit / revenue) * 100 * 100) / 100;
+      }
+
+      const period = `FY${String(fiscalYear).slice(2)} ${MONTHS[pdNum - 1]}`;
+
+      rows.push({
+        period,
+        fiscal_year: fiscalYear,
+        quarter: Math.ceil(pdNum / 3),
+        month_num: pdNum,
+        project_id: projectId,
+        project_name: projectName || projectId,
+        contract_number: projectId,
+        revenue: Math.round(revenue * 100) / 100,
+        direct_cost: Math.round(directCost * 100) / 100,
+        indirect_cost: Math.round(indirectCost * 100) / 100,
+        cost,
+        profit,
+        margin_pct: marginPct,
+      });
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  const periodsSeen = new Set(rows.map((r) => r.period)).size;
+  return {
+    is_project_cost_pool: true,
+    rows,
+    notes: `Deterministic parser: extracted ${rows.length} per-contract cost-pool rows across ${periodsSeen} period(s) from ${filename}`,
     model_used: 'deterministic',
   };
 }

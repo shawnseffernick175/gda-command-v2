@@ -29,7 +29,9 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
       : null,
   );
   const targets = items.map((r) =>
-    r.target_period_revenue > 0 ? r.target_period_revenue : null,
+    r.target_period_revenue != null && r.target_period_revenue > 0
+      ? r.target_period_revenue
+      : null,
   );
 
   const option: Record<string, unknown> = {

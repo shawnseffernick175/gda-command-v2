@@ -32,7 +32,9 @@ function buildKpis(p: ProjectFullRow): KpiItem[] {
       label: "Profit Margin %",
       actual: p.margin_pct ?? 0,
       target:
-        p.target_period_revenue > 0
+        p.target_period_revenue != null &&
+        p.target_period_revenue > 0 &&
+        p.target_period_profit != null
           ? (p.target_period_profit / p.target_period_revenue) * 100
           : null,
       format: "pct",

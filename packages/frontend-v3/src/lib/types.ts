@@ -678,6 +678,7 @@ export interface ProjectRevenueRow {
   fiscal_year: number;
   quarter: number | null;
   project_name: string;
+  project_id: string | null;
   contract_number: string | null;
   revenue: number;
   cost: number;
@@ -765,18 +766,20 @@ export interface ProjectFullRow {
   actual_ytd_costs: number;
   actual_ytd_profit: number;
   actual_ytd_revenue: number;
-  actual_itd_costs: number;
-  actual_itd_profit: number;
-  actual_itd_revenue: number;
-  target_period_costs: number;
-  target_period_profit: number;
-  target_period_revenue: number;
-  target_ytd_costs: number;
-  target_ytd_profit: number;
-  target_ytd_revenue: number;
-  target_itd_costs: number;
-  target_itd_profit: number;
-  target_itd_revenue: number;
+  // ITD-actual and target/plan figures are not in the authoritative per-contract
+  // book, so the API returns null ("not available", R1) — never a fabricated 0.
+  actual_itd_costs: number | null;
+  actual_itd_profit: number | null;
+  actual_itd_revenue: number | null;
+  target_period_costs: number | null;
+  target_period_profit: number | null;
+  target_period_revenue: number | null;
+  target_ytd_costs: number | null;
+  target_ytd_profit: number | null;
+  target_ytd_revenue: number | null;
+  target_itd_costs: number | null;
+  target_itd_profit: number | null;
+  target_itd_revenue: number | null;
   source_doc_id: number | null;
 }
 

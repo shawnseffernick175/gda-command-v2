@@ -28,6 +28,7 @@ import {
   ingestArRows,
   ingestTrialBalanceRows,
   ingestProjectRevenueRows,
+  ingestProjectCostPoolRows,
   ingestServiceCenterRows,
   ingestPoolRateRows,
   assessAgingBatch,
@@ -38,6 +39,7 @@ import {
   parseTrialBalance,
   parseTrendSie,
   parseProjectRevenueSummary,
+  parseRevenueSummaryByCostPool,
   parseProjectActualsTargets,
   parseTrendedStatement,
   parseServiceCenterGlDetail,
@@ -61,6 +63,15 @@ export interface FinancialDocClassification {
   is_ar: boolean;
   is_trial_balance: boolean;
   is_project_revenue: boolean;
+  /**
+   * Per-contract "Revenue Summary by Cost Pool" book — the authoritative FY
+   * per-contract actuals source (Revenue / Total Direct + Indirect / Op Income /
+   * Op Profit %). Distinct from the 29-column "Full Proj Revenue Summary" ITD
+   * book (is_project_revenue), which ships empty actuals. Mutually exclusive with
+   * is_project_revenue so the cost-pool book never falls through to the ITD
+   * parser / LLM.
+   */
+  is_project_cost_pool: boolean;
   /**
    * YTD GL Detail routed to the Cost Service Centers parser (INDIRECT side).
    * A GL Detail also matches is_cost_detail; that overlap is fine — the two
@@ -126,8 +137,21 @@ export function classifyFinancialDoc(
   // company format, NOT the 29-column project-revenue ITD format.
   const is_project_actuals_targets = /\bl[12]\b[\s-]*(actual|target)/i.test(fn);
 
+  // The per-contract "Revenue Summary by Cost Pool" book — real monthly actuals
+  // per contract, one sheet per fiscal period. Recognised by the filename or by
+  // its own header signature (L2 Proj ID + Op Income-ACT + Total Indirect-ACT).
+  // This MUST win over is_project_revenue: its filename also matches
+  // "revenue.*summary", but it is NOT the 29-column ITD format.
+  const is_project_cost_pool =
+    !is_project_actuals_targets &&
+    (/revenue.?summary.?by.?cost.?pool|cost.?pool/i.test(fn) ||
+      (/l2 proj id/.test(headNorm) &&
+        /op income-act/.test(headNorm) &&
+        /total indirect-act/.test(headNorm)));
+
   const is_project_revenue =
     !is_project_actuals_targets &&
+    !is_project_cost_pool &&
     (/proj.*revenue|revenue.*summary|full.?proj/i.test(fn) ||
       (/revenue project/.test(headNorm) && /\bitd\b/.test(headNorm)));
 
@@ -218,6 +242,7 @@ export function classifyFinancialDoc(
     is_ar ||
     is_trial_balance ||
     is_project_revenue ||
+    is_project_cost_pool ||
     is_gl_service_center ||
     is_project_actuals_targets ||
     is_income_statement;
@@ -239,6 +264,7 @@ export function classifyFinancialDoc(
     is_ar,
     is_trial_balance,
     is_project_revenue,
+    is_project_cost_pool,
     is_gl_service_center,
     is_project_actuals_targets,
     is_income_statement,
@@ -256,6 +282,7 @@ export interface ReingestResult {
   ar: number;
   trial_balance: number;
   project_revenue: number;
+  project_cost_pool: number;
   service_center: number;
   pool_rate: number;
   income_statement: number;
@@ -296,6 +323,7 @@ export async function reingestFinancialDoc(params: {
     ar: 0,
     trial_balance: 0,
     project_revenue: 0,
+    project_cost_pool: 0,
     service_center: 0,
     pool_rate: 0,
     income_statement: 0,
@@ -326,7 +354,12 @@ export async function reingestFinancialDoc(params: {
   // can be re-uploaded as .xlsx) rather than silently corrupting the totals.
   const isPdf = /\.pdf$/i.test(filename);
   const skipTabularPdf =
-    isPdf && (cls.is_ap || cls.is_ar || cls.is_trial_balance || cls.is_project_revenue);
+    isPdf &&
+    (cls.is_ap ||
+      cls.is_ar ||
+      cls.is_trial_balance ||
+      cls.is_project_revenue ||
+      cls.is_project_cost_pool);
 
   // --- Parser 0: Trended Income Statement / Trended Balance Sheet ---
   // This runs FIRST and is the authoritative, reconcilable source for per-month
@@ -662,6 +695,31 @@ export async function reingestFinancialDoc(params: {
     }
   }
 
+  // --- Parser 8b: Per-contract Revenue Summary by Cost Pool ---
+  // The authoritative per-contract actuals book (real monthly revenue / burdened
+  // cost / Op Income / margin). Deterministic-only — no LLM fallback, since the
+  // format is fixed and an LLM pass here previously produced the mislabeled
+  // single-"FY26 Jun" rollup rows.
+  if (cls.is_project_cost_pool && skipTabularPdf) {
+    result.parse_warnings.push(
+      'project_cost_pool_extract: skipped PDF of a tabular Revenue Summary by Cost Pool report — the .xlsx is authoritative; upload/keep the .xlsx for accurate ingest.',
+    );
+  } else if (cls.is_project_cost_pool && !skipParsers.includes('project_cost_pool_extract')) {
+    try {
+      const detCp = parseRevenueSummaryByCostPool(extractedText, filename);
+      if (detCp && detCp.rows.length > 0) {
+        result.parsers_run.push('project_cost_pool_extract (deterministic)');
+        result.project_cost_pool = await ingestProjectCostPoolRows(detCp.rows, docId);
+        if (result.project_cost_pool > 0) result.any_ingested = true;
+      } else {
+        logger.warn({ docId, filename }, 'reingest: project_cost_pool returned 0 rows — expected sheets with FY | Pd | L2 Proj ID | Revenue | Total Direct Cost | Total Indirect-ACT | Op Income-ACT headers');
+        result.parse_warnings.push('project_cost_pool_extract: 0 rows (header/row detection failed)');
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: Project Cost Pool parser failed');
+    }
+  }
+
   // --- Parser 9: L2/L1 ACTUAL & TARGET company P&L (Bug 2) ---
   if (cls.is_project_actuals_targets && !skipParsers.includes('project_actuals_targets_extract')) {
     try {
@@ -693,6 +751,7 @@ export async function reingestFinancialDoc(params: {
     { key: 'ar_extract', matched: cls.is_ar },
     { key: 'trial_balance_extract', matched: cls.is_trial_balance },
     { key: 'project_revenue_extract', matched: cls.is_project_revenue },
+    { key: 'project_cost_pool_extract', matched: cls.is_project_cost_pool },
     { key: 'project_actuals_targets_extract', matched: cls.is_project_actuals_targets },
     { key: 'income_statement_extract', matched: cls.is_income_statement },
   ];
@@ -743,6 +802,7 @@ export function computeVerdict(r: ReingestResult): VerdictResult {
     if (r.ar > 0) parts.push(`ar=${r.ar}`);
     if (r.trial_balance > 0) parts.push(`trial_balance=${r.trial_balance}`);
     if (r.project_revenue > 0) parts.push(`project_revenue=${r.project_revenue}`);
+    if (r.project_cost_pool > 0) parts.push(`project_cost_pool=${r.project_cost_pool}`);
     if (r.service_center > 0) parts.push(`service_center=${r.service_center}`);
     if (r.pool_rate > 0) parts.push(`pool_rate=${r.pool_rate}`);
     return { verdict: 'INGESTED', detail: parts.join(', ') || 'rows ingested' };

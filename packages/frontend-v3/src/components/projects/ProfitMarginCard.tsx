@@ -3,8 +3,11 @@
 import type { ProjectFullRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-function safeMargin(profit: number, revenue: number): number | null {
-  if (revenue === 0) return null;
+function safeMargin(
+  profit: number | null,
+  revenue: number | null,
+): number | null {
+  if (profit == null || revenue == null || revenue === 0) return null;
   return (profit / revenue) * 100;
 }
 
