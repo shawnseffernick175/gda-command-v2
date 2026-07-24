@@ -100,11 +100,19 @@ function shortPeriod(period: string): string {
   return period.replace(/^FY\d{2}\s+/, "");
 }
 
+/*
+ * The income-statement quarter rows are stored as CALENDAR quarters
+ * (ceil(month/3): Q1=Jan-Mar … Q4=Oct-Dec) by the financial_actuals ingestion
+ * convention, and the /v3/financials/p2 endpoint reads them back unchanged.
+ * Detail rows (which have no stored quarter aggregate) are summed client-side
+ * from their monthly values, so this map MUST match that calendar-quarter
+ * grouping — otherwise a detail quarter cell sums the wrong months.
+ */
 const QUARTER_MONTHS: Record<string, string[]> = {
-  Q1: ["Oct", "Nov", "Dec"],
-  Q2: ["Jan", "Feb", "Mar"],
-  Q3: ["Apr", "May", "Jun"],
-  Q4: ["Jul", "Aug", "Sep"],
+  Q1: ["Jan", "Feb", "Mar"],
+  Q2: ["Apr", "May", "Jun"],
+  Q3: ["Jul", "Aug", "Sep"],
+  Q4: ["Oct", "Nov", "Dec"],
 };
 
 function resolveDetailValue(
@@ -164,6 +172,58 @@ function resolveCellValue(
   }
 
   return null;
+}
+
+/**
+ * Year-to-date total for a row across every month present.
+ *
+ * Money rows (summary and detail) sum their monthly cell values. Percent rows
+ * cannot be summed, so they are derived revenue-weighted from the aggregate
+ * monthly figures (gross margin = ΣGross Profit / ΣRevenue, ROS = ΣEBIT /
+ * ΣRevenue). Returns null when no month carries a value, rendering "—" rather
+ * than a fabricated 0.
+ */
+function resolveTotalValue(
+  row: StatementRowDef,
+  months: IncomeStatementLineItem[],
+  monthByPeriod: Map<string, IncomeStatementLineItem>,
+  directDetail: Record<string, CostDetailItem[]>,
+  indirectDetail: Record<string, CostDetailItem[]>,
+): number | null {
+  if (row.kind === "section" || row.kind === "separator") return null;
+
+  if (row.format === "percent" && row.key) {
+    let revenue = 0;
+    let numerator = 0;
+    let hasAny = false;
+    for (const m of months) {
+      const pd = monthByPeriod.get(m.period);
+      if (!pd) continue;
+      revenue += pd.revenue;
+      if (row.key === "gross_margin_pct") numerator += pd.gross_profit;
+      else if (row.key === "ros_pct") numerator += pd.ebit;
+      hasAny = true;
+    }
+    if (!hasAny || revenue === 0) return null;
+    return (numerator / revenue) * 100;
+  }
+
+  let sum = 0;
+  let hasAny = false;
+  for (const m of months) {
+    const val = resolveCellValue(
+      monthByPeriod.get(m.period),
+      row,
+      m.period,
+      directDetail,
+      indirectDetail,
+    );
+    if (val !== null && val !== undefined) {
+      sum += val;
+      hasAny = true;
+    }
+  }
+  return hasAny ? sum : null;
 }
 
 export function P2FinancialsTab() {
@@ -376,6 +436,9 @@ export function P2FinancialsTab() {
                       {shortPeriod(q.period)}
                     </th>
                   ))}
+                  <th className="py-2 px-3 text-right font-semibold border-l-2 border-border whitespace-nowrap text-foreground">
+                    YTD
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -383,7 +446,7 @@ export function P2FinancialsTab() {
                   if (row.kind === "separator") {
                     return (
                       <tr key={`sep-${idx}`} className="h-2">
-                        <td colSpan={1 + months.length + quarters.length} />
+                        <td colSpan={2 + months.length + quarters.length} />
                       </tr>
                     );
                   }
@@ -395,7 +458,7 @@ export function P2FinancialsTab() {
                         className="bg-gda-bg-base"
                       >
                         <td
-                          colSpan={1 + months.length + quarters.length}
+                          colSpan={2 + months.length + quarters.length}
                           className="py-2 pl-4 text-[12px] uppercase tracking-wider text-muted-foreground font-medium"
                         >
                           {row.label}
@@ -463,6 +526,19 @@ export function P2FinancialsTab() {
                           </td>
                         );
                       })}
+                      <td className="py-2 px-3 text-right border-l-2 border-border">
+                        <NumberCell
+                          value={resolveTotalValue(
+                            row,
+                            months,
+                            monthByPeriod,
+                            directDetail,
+                            indirectDetail,
+                          )}
+                          format={row.format}
+                          className="font-semibold"
+                        />
+                      </td>
                     </tr>
                   );
                 })}
