@@ -19,6 +19,8 @@ import type { TrialBalanceExtractOutput } from '../../lib/llm-router.types.js';
 import type { SieExtractOutput } from '../../lib/llm-router.types.js';
 import type { CostDetailExtractOutput } from '../../lib/llm-router.types.js';
 import type { ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js';
+import type { ServiceCenterExtractOutput } from '../../lib/llm-router.types.js';
+import type { PoolRateExtractOutput } from '../../lib/llm-router.types.js';
 import type { FinancialStatementExtractOutput } from '../../lib/llm-router.types.js';
 import type { BalanceSheetExtractOutput } from '../../lib/llm-router.types.js';
 
@@ -1112,6 +1114,131 @@ export function parseTrendSie(
 }
 
 // ---------------------------------------------------------------------------
+// Parser: Trend SIE "Trend Rate Summary" pool rates (Cost Service Centers).
+// The top table of the Trend SIE workbook: Pool Number | Pool Name |
+// ACT JAN.. | ACT <month>.. | ACT YTD<yyyy> | PROV YTD<yyyy>. Emits one row per
+// (pool, month) actual rate plus a YTD summary row carrying YTD actual + PROV.
+// ---------------------------------------------------------------------------
+
+const RATE_MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+export function parsePoolRateSummary(
+  extractedText: string,
+  filename: string,
+): PoolRateExtractOutput | null {
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['pool number', 'pool name'],
+    ['Page1', 'Sheet1'],
+  );
+  if (!lines || lines.length < 4) return null;
+
+  // Header row (Pool Number / Pool Name), within the first rows (row 0 is title).
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 15); i++) {
+    const lower = lines[i].toLowerCase();
+    if (lower.includes('pool number') || lower.includes('pool name')) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx === -1) return null;
+
+  const headerCols = splitRow(lines[headerIdx]);
+
+  // Left-table boundary: stop at the empty separator column or a second
+  // "pool number"/"pool name" header (the right-side wrap-rate table).
+  let leftTableEnd = headerCols.length;
+  for (let c = 2; c < headerCols.length; c++) {
+    const val = headerCols[c].trim().toLowerCase();
+    if (val === '' && c > 2) { leftTableEnd = c; break; }
+    if (val === 'pool number' || val === 'pool name') { leftTableEnd = c; break; }
+  }
+
+  // Map each left-table column to a month (ACT JAN..), YTD actual, or PROV YTD.
+  const monthCols = new Map<number, number>(); // month_num -> col idx
+  let ytdActColIdx = -1;
+  let provYtdColIdx = -1;
+  let fiscalYear: number | null = null;
+  for (let c = 2; c < leftTableEnd; c++) {
+    const colLower = headerCols[c].toLowerCase().trim();
+    const yearMatch = colLower.match(/(20\d{2})/);
+    if (yearMatch) fiscalYear = parseInt(yearMatch[1], 10);
+    if (/\bprov\b.*ytd/.test(colLower)) {
+      provYtdColIdx = c;
+    } else if (/\bact\b.*ytd/.test(colLower)) {
+      ytdActColIdx = c;
+    } else if (/\bact\b/.test(colLower)) {
+      const m = RATE_MONTHS.findIndex((mn) => colLower.includes(mn));
+      if (m >= 0) monthCols.set(m + 1, c);
+    }
+  }
+
+  // Positional fallback when headers render as "[object Object]": months are
+  // the contiguous ACT columns starting at col 2 in chronological order.
+  if (monthCols.size === 0) {
+    for (let c = 2; c < leftTableEnd - 2; c++) monthCols.set(c - 1, c);
+  }
+  if (fiscalYear == null) {
+    const inferred = inferPeriod(filename);
+    fiscalYear = inferred?.fiscal_year ?? null;
+  }
+  if (fiscalYear == null) return null;
+
+  const rows: PoolRateExtractOutput['rows'] = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = splitRow(lines[i]);
+    if (cols.length < 3) continue;
+    const poolNumber = (cols[0] || '').trim();
+    const poolName = (cols[1] || '').trim();
+    if (!poolNumber && !poolName) continue;
+    if (/^pool\s*detail/i.test(poolNumber) || /^pool\s*detail/i.test(poolName)) break;
+    if (/^(trend|rate|summary|acct)/i.test(poolNumber)) continue;
+    if (/^(trend|rate|summary|acct)/i.test(poolName)) continue;
+    // Pool number must be numeric in the rate summary.
+    if (!poolNumber || !/^\d+$/.test(poolNumber)) continue;
+
+    for (const [monthNum, colIdx] of monthCols.entries()) {
+      if (colIdx >= cols.length) continue;
+      const raw = (cols[colIdx] || '').trim();
+      if (raw === '') continue;
+      rows.push({
+        fiscal_year: fiscalYear,
+        pool_number: poolNumber,
+        pool_name: poolName || `Pool ${poolNumber}`,
+        month_num: monthNum,
+        actual_rate: parseNum(raw),
+        provisional_rate: null,
+      });
+    }
+
+    const ytdActual = ytdActColIdx >= 0 && ytdActColIdx < cols.length
+      ? parseNum(cols[ytdActColIdx]) : null;
+    const provRate = provYtdColIdx >= 0 && provYtdColIdx < cols.length
+      ? parseNum(cols[provYtdColIdx]) : null;
+    if (ytdActual != null || provRate != null) {
+      rows.push({
+        fiscal_year: fiscalYear,
+        pool_number: poolNumber,
+        pool_name: poolName || `Pool ${poolNumber}`,
+        month_num: null,
+        actual_rate: ytdActual,
+        provisional_rate: provRate,
+      });
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  return {
+    is_pool_rate: true,
+    rows,
+    notes: `Deterministic parser: extracted ${rows.length} pool-rate rows from ${filename}`,
+    model_used: 'deterministic',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Parser: 192 YTD GL Detail — sheet "Page1", 8776 rows × 26 cols
 // Aggregates journal entries into cost_element × pool groupings.
 // ---------------------------------------------------------------------------
@@ -1266,6 +1393,151 @@ export function parseYtdGlDetail(
     is_cost_detail: true,
     rows,
     notes: `Deterministic parser: extracted ${rows.length} GL detail cost rows across ${periodsSeen} period(s) (aggregated by period × classification × account) from ${filename}`,
+    model_used: 'deterministic',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Parser: Cost Service Centers — YTD GL Detail (INDIRECT side).
+// Same ledger as parseYtdGlDetail, but aggregates the INDIRECT rows into one row
+// per (service center = Project ID, pool = PAG, org = Org ID, month = PD). Keeps
+// the human Project Name and preserves signed amounts (credits stay negative).
+// Direct project rows are excluded — this view is service-center cost only.
+// ---------------------------------------------------------------------------
+
+export function parseServiceCenterGlDetail(
+  extractedText: string,
+  filename: string,
+): ServiceCenterExtractOutput | null {
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['fy', 'pd', 'proj classification', 'project id'],
+    ['Page1', 'Sheet1'],
+  );
+  if (!lines || lines.length < 3) return null;
+
+  const periodInfo = inferPeriod(filename);
+  const dataFallbackFy = (() => {
+    for (const ln of lines) {
+      const first = splitRow(ln)[0]?.trim() ?? '';
+      if (/^\d{4}$/.test(first)) return parseInt(first, 10);
+    }
+    return null;
+  })();
+  const fallbackFy = periodInfo?.fiscal_year ?? dataFallbackFy;
+
+  let effectiveHeaderIdx = findHeaderRow(lines, ['fy', 'pd', 'proj classification', 'project id']);
+  if (effectiveHeaderIdx === -1) {
+    effectiveHeaderIdx = findHeaderRow(lines, ['fy', 'pd', 'project', 'account']);
+    if (effectiveHeaderIdx === -1) return null;
+  }
+  const colMap = buildColumnMap(lines[effectiveHeaderIdx]);
+  const headerCols = splitRow(lines[effectiveHeaderIdx]);
+
+  const fyIdx = colMap.get('fy') ?? 0;
+  const pdIdx = colMap.get('pd') ?? 1;
+  const projClassIdx = colMap.get('proj classification') ?? colMap.get('project classification') ?? 5;
+  const projectIdIdx = colMap.get('project id') ?? 6;
+  const projectNameIdx = colMap.get('project name') ?? 7;
+  const orgIdIdx = colMap.get('org id') ?? -1;
+  const pagIdx = colMap.get('pag') ?? -1;
+
+  let amountIdx = colMap.get('amount') ?? -1;
+  if (amountIdx === -1) {
+    for (const [key, idx] of colMap.entries()) {
+      if (key.includes('amount') || key.includes('amt')) { amountIdx = idx; break; }
+    }
+  }
+  if (amountIdx === -1) return null;
+  // Amount sits past the comma-containing "Name" column, so on a legacy
+  // comma-delimited export the row can left-shift; read it by its distance from
+  // the end of the row (0 = last column), which is stable in both formats.
+  const amountFromEnd = headerCols.length - 1 - amountIdx;
+
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Aggregate INDIRECT postings by month × service center × pool × org.
+  const aggregates = new Map<
+    string,
+    {
+      period: string; fiscal_year: number; quarter: number; month_num: number;
+      service_center_id: string; service_center_name: string | null;
+      pool: string | null; org_id: string | null; amount: number;
+    }
+  >();
+
+  for (let i = effectiveHeaderIdx + 1; i < lines.length; i++) {
+    const cols = splitRow(lines[i]);
+    if (cols.length < 5) continue;
+
+    const fyRaw = (cols[fyIdx] || '').trim();
+    if (fyRaw && !/^\d{4}$/.test(fyRaw)) continue;
+
+    const pdRaw = (cols[pdIdx] || '').trim();
+    const pdNum = parseInt(pdRaw, 10);
+    if (isNaN(pdNum) || pdNum < 1 || pdNum > 12) continue;
+
+    const projClass = (cols[projClassIdx] || '').trim();
+    // Service-center cost only — the INDIRECT side of the ledger.
+    if (!/^indirect/i.test(projClass)) continue;
+
+    const serviceCenterId = (cols[projectIdIdx] || '').trim();
+    if (!serviceCenterId) continue;
+
+    const serviceCenterName =
+      projectNameIdx >= 0 && projectNameIdx < cols.length ? (cols[projectNameIdx] || '').trim() : '';
+    const orgId = orgIdIdx >= 0 && orgIdIdx < cols.length ? (cols[orgIdIdx] || '').trim() : '';
+    const pag = pagIdx >= 0 && pagIdx < cols.length ? (cols[pagIdx] || '').trim() : '';
+
+    const ai = cols.length - 1 - amountFromEnd;
+    const amount = ai >= 0 && ai < cols.length ? parseNum(cols[ai]) : 0;
+    if (amount === 0) continue; // signed amounts preserved; zero postings add nothing
+
+    const fyNum = fyRaw ? parseInt(fyRaw, 10) : fallbackFy;
+    if (!fyNum || Number.isNaN(fyNum)) continue;
+    const period = `FY${String(fyNum).slice(2)} ${MONTHS[pdNum - 1]}`;
+    const quarter = Math.ceil(pdNum / 3);
+
+    const pool = pag || null;
+    const key = `${fyNum}|||${pdNum}|||${serviceCenterId}|||${pool ?? ''}`;
+    const existing = aggregates.get(key);
+    if (existing) {
+      existing.amount += amount;
+      if (!existing.service_center_name && serviceCenterName) existing.service_center_name = serviceCenterName;
+      if (!existing.org_id && orgId) existing.org_id = orgId;
+    } else {
+      aggregates.set(key, {
+        period, fiscal_year: fyNum, quarter, month_num: pdNum,
+        service_center_id: serviceCenterId,
+        service_center_name: serviceCenterName || null,
+        pool, org_id: orgId || null, amount,
+      });
+    }
+  }
+
+  const rows: ServiceCenterExtractOutput['rows'] = [];
+  for (const v of aggregates.values()) {
+    rows.push({
+      period: v.period,
+      fiscal_year: v.fiscal_year,
+      quarter: v.quarter,
+      month_num: v.month_num,
+      service_center_id: v.service_center_id,
+      service_center_name: v.service_center_name,
+      pool: v.pool,
+      org_id: v.org_id,
+      classification: 'INDIRECT',
+      amount: Math.round(v.amount * 100) / 100,
+    });
+  }
+
+  if (rows.length === 0) return null;
+
+  const periodsSeen = new Set(rows.map((r) => r.period)).size;
+  return {
+    is_service_center: true,
+    rows,
+    notes: `Deterministic parser: extracted ${rows.length} service-center cost rows across ${periodsSeen} period(s) from ${filename}`,
     model_used: 'deterministic',
   };
 }

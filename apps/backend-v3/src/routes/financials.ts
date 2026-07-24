@@ -934,6 +934,150 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }, req.requestId));
   });
 
+  // GET /v3/financials/service-centers?fy=2026
+  // Cost Service Centers (Financial Bible). Returns per-service-center INDIRECT
+  // cost by month + YTD, grouped by pool (PAG), plus the pool-rate strip from the
+  // Trend SIE rate summary. Every figure is source-linked via source_doc_id (R1);
+  // the response only contains figures the official books actually provide.
+  app.get('/v3/financials/service-centers', async (req, reply) => {
+    noStore(reply);
+    const qp = req.query as Record<string, string>;
+    const fyFilter = qp.fy ? parseInt(qp.fy, 10) : null;
+
+    // Available fiscal years, most recent first; default to the latest.
+    const { rows: fyRows } = await pool.query(
+      `SELECT DISTINCT fiscal_year FROM service_center_actuals ORDER BY fiscal_year DESC`,
+    );
+    const availableYears = fyRows.map((r) => Number(r.fiscal_year));
+    const fiscalYear = fyFilter ?? availableYears[0] ?? null;
+
+    if (fiscalYear == null) {
+      return reply.send(successEnvelope({
+        fiscal_year: null,
+        available_years: [],
+        months: [],
+        centers: [],
+        pools: [],
+        rates: [],
+        meta: { table: 'service_center_actuals', row_count: 0 },
+      }, req.requestId));
+    }
+
+    const { rows } = await pool.query(
+      `SELECT service_center_id, service_center_name, pool, org_id,
+              month_num, quarter, amount, source_doc_id
+       FROM service_center_actuals
+       WHERE fiscal_year = $1
+       ORDER BY pool NULLS LAST, service_center_id, month_num`,
+      [fiscalYear],
+    );
+
+    const monthsPresent = new Set<number>();
+
+    // One entry per (service center + pool): monthly map + YTD.
+    type CenterAgg = {
+      service_center_id: string;
+      service_center_name: string | null;
+      pool: string | null;
+      org_id: string | null;
+      months: Record<number, number>;
+      ytd: number;
+      source_doc_id: number | null;
+    };
+    const centerMap = new Map<string, CenterAgg>();
+    // Pool subtotals.
+    type PoolAgg = { pool: string; months: Record<number, number>; ytd: number };
+    const poolMap = new Map<string, PoolAgg>();
+
+    for (const r of rows) {
+      const monthNum = Number(r.month_num);
+      const amount = Number(r.amount);
+      monthsPresent.add(monthNum);
+
+      const scId = r.service_center_id as string;
+      const poolName = (r.pool as string) ?? null;
+      const key = `${scId}\u0000${poolName ?? ''}`;
+      let center = centerMap.get(key);
+      if (!center) {
+        center = {
+          service_center_id: scId,
+          service_center_name: (r.service_center_name as string) ?? null,
+          pool: poolName,
+          org_id: (r.org_id as string) ?? null,
+          months: {},
+          ytd: 0,
+          source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+        };
+        centerMap.set(key, center);
+      }
+      center.months[monthNum] = (center.months[monthNum] ?? 0) + amount;
+      center.ytd += amount;
+
+      const poolKey = poolName ?? 'UNCLASSIFIED';
+      let poolAgg = poolMap.get(poolKey);
+      if (!poolAgg) {
+        poolAgg = { pool: poolKey, months: {}, ytd: 0 };
+        poolMap.set(poolKey, poolAgg);
+      }
+      poolAgg.months[monthNum] = (poolAgg.months[monthNum] ?? 0) + amount;
+      poolAgg.ytd += amount;
+    }
+
+    const centers = [...centerMap.values()].sort((a, b) => b.ytd - a.ytd);
+    const pools = [...poolMap.values()].sort((a, b) => b.ytd - a.ytd);
+    const months = [...monthsPresent].sort((a, b) => a - b);
+
+    // Pool-rate strip from the Trend SIE rate summary (same fiscal year).
+    const { rows: rateRows } = await pool.query(
+      `SELECT pool_number, pool_name, month_num, actual_rate, provisional_rate, source_doc_id
+       FROM indirect_pool_rates
+       WHERE fiscal_year = $1
+       ORDER BY pool_number, month_num NULLS LAST`,
+      [fiscalYear],
+    );
+    type RateAgg = {
+      pool_number: string;
+      pool_name: string;
+      months: Record<number, number>;
+      ytd_actual: number | null;
+      provisional: number | null;
+      source_doc_id: number | null;
+    };
+    const rateMap = new Map<string, RateAgg>();
+    for (const r of rateRows) {
+      const poolNumber = r.pool_number as string;
+      let agg = rateMap.get(poolNumber);
+      if (!agg) {
+        agg = {
+          pool_number: poolNumber,
+          pool_name: r.pool_name as string,
+          months: {},
+          ytd_actual: null,
+          provisional: null,
+          source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+        };
+        rateMap.set(poolNumber, agg);
+      }
+      if (r.month_num == null) {
+        agg.ytd_actual = r.actual_rate != null ? Number(r.actual_rate) : null;
+        agg.provisional = r.provisional_rate != null ? Number(r.provisional_rate) : null;
+      } else {
+        agg.months[Number(r.month_num)] = Number(r.actual_rate);
+      }
+    }
+    const rates = [...rateMap.values()];
+
+    return reply.send(successEnvelope({
+      fiscal_year: fiscalYear,
+      available_years: availableYears,
+      months,
+      centers,
+      pools,
+      rates,
+      meta: { table: 'service_center_actuals', row_count: rows.length },
+    }, req.requestId));
+  });
+
   // GET /v3/financials/ingestion-coverage
   // For each financial vault doc, show destination table + row count, or an
   // explicit, human-readable reason it did not ingest. Zero-touch requirement

@@ -18,6 +18,7 @@ import type {
   ArByContractData,
   TrialBalanceData,
   ProjectRevenueData,
+  ServiceCentersData,
   IngestionCoverageData,
 } from "@/lib/types";
 
@@ -246,6 +247,18 @@ export function useProjectRevenue() {
   return useQuery({
     queryKey: ["financials", "project-revenue"],
     queryFn: () => apiGet<ProjectRevenueData>("/v3/financials/project-revenue"),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useServiceCenters(fy?: number | null) {
+  const qs = fy != null ? `?fy=${fy}` : "";
+  return useQuery({
+    queryKey: ["financials", "service-centers", fy ?? "latest"],
+    queryFn: () =>
+      apiGet<ServiceCentersData>(`/v3/financials/service-centers${qs}`),
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",

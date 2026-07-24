@@ -33,7 +33,7 @@
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { aggregateDirectCostRows } from './deterministic-parsers.js';
-import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput, ApExtractOutput, ArExtractOutput, TrialBalanceExtractOutput, ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js';
+import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput, ApExtractOutput, ArExtractOutput, TrialBalanceExtractOutput, ProjectRevenueExtractOutput, ServiceCenterExtractOutput, PoolRateExtractOutput } from '../../lib/llm-router.types.js';
 
 type FinancialRow = FinancialStatementExtractOutput['rows'][number];
 
@@ -587,6 +587,131 @@ export async function ingestSieRows(
       count++;
     } catch (err) {
       logger.warn({ err, period: row.period, pool: row.pool }, 'SIE row upsert failed');
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Cost Service Centers ingest — YTD GL Detail INDIRECT rows + SIE pool rates.
+// ---------------------------------------------------------------------------
+
+type ServiceCenterRow = ServiceCenterExtractOutput['rows'][number];
+
+/**
+ * Snapshot-replace service-center ingest. The YTD GL Detail is one cumulative
+ * file per fiscal year (all posted periods PD1..PDn in a single export), so a
+ * re-ingest replaces that fiscal year's whole snapshot in one transaction:
+ * every stale row is purged and the freshly-parsed set re-inserted. This makes
+ * a re-parse self-cleaning and never leaves orphaned service-center rows.
+ */
+export async function ingestServiceCenterRows(
+  rows: ServiceCenterRow[],
+  sourceDocId?: number | null,
+  source = 'gl_service_center',
+): Promise<number> {
+  const valid = rows.filter((r) => r.period && r.fiscal_year && r.service_center_id);
+  if (valid.length === 0) return 0;
+
+  // Group by fiscal year so each year's snapshot is replaced independently.
+  const byFy = new Map<number, ServiceCenterRow[]>();
+  for (const r of valid) {
+    const list = byFy.get(r.fiscal_year);
+    if (list) list.push(r);
+    else byFy.set(r.fiscal_year, [r]);
+  }
+
+  let count = 0;
+  for (const [fy, group] of byFy.entries()) {
+    const client = await pool.connect();
+    // Tally per-fiscal-year and only fold into the returned total AFTER COMMIT,
+    // so a rolled-back batch contributes 0 and is never reported as ingested.
+    let seq = 0;
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM service_center_actuals WHERE source = $1 AND fiscal_year = $2`,
+        [source, fy],
+      );
+      for (const row of group) {
+        await client.query(
+          `INSERT INTO service_center_actuals
+             (period, fiscal_year, quarter, month_num, service_center_id,
+              service_center_name, pool, org_id, classification, amount,
+              source, source_doc_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [
+            row.period, row.fiscal_year, row.quarter, row.month_num,
+            row.service_center_id, row.service_center_name, row.pool, row.org_id,
+            row.classification, row.amount, source, sourceDocId ?? null,
+          ],
+        );
+        seq++;
+      }
+      await client.query('COMMIT');
+      count += seq;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.warn({ err, fy }, 'Service-center snapshot ingest failed; rolled back to prior snapshot');
+    } finally {
+      client.release();
+    }
+  }
+  return count;
+}
+
+type PoolRateRow = PoolRateExtractOutput['rows'][number];
+
+/**
+ * Snapshot-replace pool-rate ingest. The Trend SIE rate summary is one file per
+ * fiscal year, so a re-ingest replaces that year's rate snapshot atomically.
+ */
+export async function ingestPoolRateRows(
+  rows: PoolRateRow[],
+  sourceDocId?: number | null,
+  source = 'sie_pool_rate',
+): Promise<number> {
+  const valid = rows.filter((r) => r.fiscal_year && r.pool_number && r.pool_name);
+  if (valid.length === 0) return 0;
+
+  const byFy = new Map<number, PoolRateRow[]>();
+  for (const r of valid) {
+    const list = byFy.get(r.fiscal_year);
+    if (list) list.push(r);
+    else byFy.set(r.fiscal_year, [r]);
+  }
+
+  let count = 0;
+  for (const [fy, group] of byFy.entries()) {
+    const client = await pool.connect();
+    // Only fold into the returned total AFTER COMMIT (see ingestServiceCenterRows).
+    let seq = 0;
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM indirect_pool_rates WHERE source = $1 AND fiscal_year = $2`,
+        [source, fy],
+      );
+      for (const row of group) {
+        await client.query(
+          `INSERT INTO indirect_pool_rates
+             (fiscal_year, pool_number, pool_name, month_num,
+              actual_rate, provisional_rate, source, source_doc_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            row.fiscal_year, row.pool_number, row.pool_name, row.month_num,
+            row.actual_rate, row.provisional_rate, source, sourceDocId ?? null,
+          ],
+        );
+        seq++;
+      }
+      await client.query('COMMIT');
+      count += seq;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.warn({ err, fy }, 'Pool-rate snapshot ingest failed; rolled back to prior snapshot');
+    } finally {
+      client.release();
     }
   }
   return count;

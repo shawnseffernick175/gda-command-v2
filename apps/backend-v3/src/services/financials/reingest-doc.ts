@@ -28,6 +28,8 @@ import {
   ingestArRows,
   ingestTrialBalanceRows,
   ingestProjectRevenueRows,
+  ingestServiceCenterRows,
+  ingestPoolRateRows,
   assessAgingBatch,
 } from './ingest.js';
 import {
@@ -38,6 +40,8 @@ import {
   parseProjectRevenueSummary,
   parseProjectActualsTargets,
   parseTrendedStatement,
+  parseServiceCenterGlDetail,
+  parsePoolRateSummary,
   sanitizeExtractedText,
 } from './deterministic-parsers.js';
 
@@ -57,6 +61,12 @@ export interface FinancialDocClassification {
   is_ar: boolean;
   is_trial_balance: boolean;
   is_project_revenue: boolean;
+  /**
+   * YTD GL Detail routed to the Cost Service Centers parser (INDIRECT side).
+   * A GL Detail also matches is_cost_detail; that overlap is fine — the two
+   * parsers read different slices and neither is the generic P&L parser.
+   */
+  is_gl_service_center: boolean;
   /** L2/L1 ACTUAL & TARGET company P&L (DataSetLandTbl "Period Cost/Prof/Rev"). */
   is_project_actuals_targets: boolean;
   /**
@@ -167,6 +177,14 @@ export function classifyFinancialDoc(
     /cost.?detail|gl.?detail/i.test(head) ||
     /proj classification/.test(headNorm);
 
+  // A YTD GL Detail ledger — recognised by the GL filename or its Proj
+  // Classification header — feeds the Cost Service Centers parser (INDIRECT rows
+  // aggregated per service center). This is a slice of the same GL doc that
+  // is_cost_detail matches; both may be true.
+  const is_gl_service_center =
+    /gl.?detail|ytd.?gl/i.test(fn) ||
+    /proj classification/.test(headNorm);
+
   // Trended Income Statement structural fingerprint (content, not filename): an
   // "Account Name | Jan | Feb | Mar | ..." month grid together with the Total
   // Direct Costs / Total Cost of Operations F/S subtotals. Scanned over a wide
@@ -200,6 +218,7 @@ export function classifyFinancialDoc(
     is_ar ||
     is_trial_balance ||
     is_project_revenue ||
+    is_gl_service_center ||
     is_project_actuals_targets ||
     is_income_statement;
 
@@ -220,6 +239,7 @@ export function classifyFinancialDoc(
     is_ar,
     is_trial_balance,
     is_project_revenue,
+    is_gl_service_center,
     is_project_actuals_targets,
     is_income_statement,
   };
@@ -236,6 +256,8 @@ export interface ReingestResult {
   ar: number;
   trial_balance: number;
   project_revenue: number;
+  service_center: number;
+  pool_rate: number;
   income_statement: number;
   parsers_run: string[];
   parsers_skipped: string[];
@@ -274,6 +296,8 @@ export async function reingestFinancialDoc(params: {
     ar: 0,
     trial_balance: 0,
     project_revenue: 0,
+    service_center: 0,
+    pool_rate: 0,
     income_statement: 0,
     parsers_run: [],
     parsers_skipped: [],
@@ -414,7 +438,43 @@ export async function reingestFinancialDoc(params: {
     );
   }
 
+  // --- Parser 3b: Cost Service Centers (YTD GL Detail, INDIRECT side) ---
+  // Aggregates the GL Detail's INDIRECT postings into per-service-center monthly
+  // cost (service_center_actuals). Deterministic-only: the GL Detail is a
+  // structured ledger, so there is no LLM fallback. Snapshot-replaces the fiscal
+  // year, so a re-ingest self-cleans.
+  if (cls.is_gl_service_center && !skipParsers.includes('service_center_extract')) {
+    try {
+      const detSc = parseServiceCenterGlDetail(extractedText, filename);
+      if (detSc && detSc.rows.length > 0) {
+        result.parsers_run.push('service_center_extract (deterministic)');
+        result.service_center = await ingestServiceCenterRows(detSc.rows, docId);
+        if (result.service_center > 0) result.any_ingested = true;
+      } else {
+        result.parse_warnings.push('service_center_extract: 0 INDIRECT rows (not a GL Detail ledger, or no indirect postings)');
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: service-center parser failed');
+    }
+  }
+
   // --- Parser 4: SIE (Statement of Indirect Expenses / Trend Rate Summary) ---
+  // The Trend SIE workbook also carries the top "Trend Rate Summary" pool rates,
+  // which drive the Cost Service Centers rate strip. Parse + ingest those first;
+  // it is independent of the pool-detail SIE rows below.
+  if (cls.is_sie && !skipParsers.includes('pool_rate_extract')) {
+    try {
+      const detRates = parsePoolRateSummary(extractedText, filename);
+      if (detRates && detRates.rows.length > 0) {
+        result.parsers_run.push('pool_rate_extract (deterministic)');
+        result.pool_rate = await ingestPoolRateRows(detRates.rows, docId);
+        if (result.pool_rate > 0) result.any_ingested = true;
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: pool-rate parser failed');
+    }
+  }
+
   if (cls.is_sie && !skipParsers.includes('sie_extract')) {
     try {
       // Try deterministic Trend SIE parser first
@@ -683,6 +743,8 @@ export function computeVerdict(r: ReingestResult): VerdictResult {
     if (r.ar > 0) parts.push(`ar=${r.ar}`);
     if (r.trial_balance > 0) parts.push(`trial_balance=${r.trial_balance}`);
     if (r.project_revenue > 0) parts.push(`project_revenue=${r.project_revenue}`);
+    if (r.service_center > 0) parts.push(`service_center=${r.service_center}`);
+    if (r.pool_rate > 0) parts.push(`pool_rate=${r.pool_rate}`);
     return { verdict: 'INGESTED', detail: parts.join(', ') || 'rows ingested' };
   }
   const handlerAttempted = r.parsers_run.length > 0 || r.parse_warnings.length > 0;
