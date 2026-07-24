@@ -158,7 +158,6 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
       axisLine: { show: false },
     },
     series,
-    markLine: undefined,
   };
 
   return (
