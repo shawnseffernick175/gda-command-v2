@@ -699,6 +699,37 @@ export interface ProjectRevenueExtractOutput {
   model_used: string;
 }
 
+// Per-contract revenue/cost/profit from the "Revenue Summary by Cost Pool" book.
+// Deterministic-only — not part of the LLM router task map. One row per contract
+// per fiscal period; the book carries no ITD or target/plan figures (those stay
+// unavailable). See parseRevenueSummaryByCostPool.
+export interface ProjectCostPoolExtractOutput {
+  is_project_cost_pool: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    month_num: number;
+    project_id: string;
+    project_name: string;
+    contract_number: string | null;
+    /** period Revenue */
+    revenue: number;
+    /** period Total Direct Cost */
+    direct_cost: number;
+    /** period Total Indirect-ACT */
+    indirect_cost: number;
+    /** fully burdened period cost = direct + indirect */
+    cost: number;
+    /** period Op Income-ACT (== revenue - cost) */
+    profit: number;
+    /** Op Profit % as a percentage (e.g. 2.33), null when revenue is 0 */
+    margin_pct: number | null;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
 // Cost Service Centers (Financial Bible). Deterministic-only extraction from the
 // YTD GL Detail ledger and the Trend SIE rate summary — not part of the LLM
 // router task map. See parseServiceCenterGlDetail / parsePoolRateSummary.

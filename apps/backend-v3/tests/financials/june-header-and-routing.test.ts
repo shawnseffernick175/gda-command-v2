@@ -36,12 +36,12 @@ describe('classifyFinancialDoc — every June Bible file hits a parser branch (B
   const anyHandler = (c: FinancialDocClassification): boolean =>
     c.is_financial || c.is_balance_sheet || c.is_cost_detail || c.is_sie ||
     c.is_ap || c.is_ar || c.is_trial_balance || c.is_project_revenue ||
-    c.is_project_actuals_targets;
+    c.is_project_cost_pool || c.is_project_actuals_targets;
 
   const cases: Array<[string, keyof FinancialDocClassification]> = [
     ['YTD GL Detail JUN-26.xlsx', 'is_cost_detail'],
     ['Trended Income Statement JUN-26.xlsx', 'is_financial'],
-    ['Revenue Summary by Cost Pool JUN-26.xlsx', 'is_project_revenue'],
+    ['Revenue Summary by Cost Pool JUN-26.xlsx', 'is_project_cost_pool'],
     ['Trial Balance JUN-26.xlsx', 'is_trial_balance'],
     ['Trend SIE JUN-26.xlsx', 'is_sie'],
     ['Balance Sheet JUN-26.pdf', 'is_balance_sheet'],

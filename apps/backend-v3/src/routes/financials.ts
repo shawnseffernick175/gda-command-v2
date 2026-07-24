@@ -878,43 +878,38 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /v3/financials/project-revenue?period=YTD
-  // Period selector for the Project Revenue tab. The raw table stores true
-  // monthly rows (FY26 Jan..May) plus one document whose period label is
-  // 'FY26 Jun' but which is actually the full YTD-through-June rollup (it sums
-  // to the P&L YTD to the dollar). We therefore:
-  //   - expose that rollup only as the 'YTD' option (relabeled), never as 'Jun',
-  //   - derive the true standalone June month at query time (YTD minus Jan..May,
-  //     per contract), never writing derived rows to the DB.
+  // Period selector for the Project Revenue tab. The table now stores TRUE
+  // monthly per-contract rows (FY26 Jan..Jun) sourced from the authoritative
+  // "Revenue Summary by Cost Pool" book: revenue = Revenue, cost = Total Direct +
+  // Total Indirect (fully burdened), profit = Op Income (the generated
+  // revenue-cost column), margin = Op Profit %. YTD is derived here by summing
+  // the official months per contract — never from ITD. Contracts with no activity
+  // in the selected period (e.g. Full-Proj ITD-only rows carrying $0 actuals) are
+  // excluded so the view shows only contracts the books report revenue/cost for.
   app.get('/v3/financials/project-revenue', async (req, reply) => {
     noStore(reply);
     const qp = req.query as Record<string, string>;
 
     // Fiscal-month ordering for the selector so options read Jan..Jun, not
-    // alphabetically. Raw distinct periods drive which months actually exist.
+    // alphabetically. Only periods that actually carry actuals are offered.
     const MONTH_ORDER: Record<string, number> = {
       Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
       Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
     };
     const { rows: periodRows } = await pool.query(
-      `SELECT DISTINCT period FROM project_revenue_actuals`,
+      `SELECT DISTINCT period FROM project_revenue_actuals
+         WHERE revenue <> 0 OR cost <> 0`,
     );
     const rawPeriods = periodRows
       .map((r) => r.period as string)
       .sort((a, b) => (MONTH_ORDER[a.slice(-3)] ?? 99) - (MONTH_ORDER[b.slice(-3)] ?? 99));
-    // 'YTD' is always first; the raw 'FY26 Jun' slot is the DERIVED month.
     const availablePeriods = ['YTD', ...rawPeriods];
-
-    // The raw label that carries the YTD rollup. May..Jan are true months.
-    const ROLLUP_PERIOD = 'FY26 Jun';
-    const MONTH_PERIODS = ['FY26 Jan', 'FY26 Feb', 'FY26 Mar', 'FY26 Apr', 'FY26 May'];
 
     // Normalize the requested period; default and unknown values fall back to YTD.
     const requested = (qp.period || '').trim();
     let effectivePeriod: string;
     if (!requested || requested.toUpperCase() === 'YTD') {
       effectivePeriod = 'YTD';
-    } else if (requested.toUpperCase() === ROLLUP_PERIOD.toUpperCase()) {
-      effectivePeriod = 'FY26 Jun';
     } else if (rawPeriods.some((p) => p.toUpperCase() === requested.toUpperCase())) {
       effectivePeriod = rawPeriods.find((p) => p.toUpperCase() === requested.toUpperCase()) as string;
     } else {
@@ -923,76 +918,64 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
     type PrRow = {
       id: number; period: string; fiscal_year: number; quarter: number | null;
-      project_name: string; contract_number: string | null;
+      project_name: string; project_id: string | null; contract_number: string | null;
       revenue: number; cost: number; profit: number; margin_pct: number | null;
       source_doc_id: number | null;
     };
     let items: PrRow[] = [];
 
-    if (effectivePeriod === 'FY26 Jun') {
-      // Derived standalone June = rollup per contract minus that contract's Jan..May.
-      // contract_number is the join key (never null here); the rollup is coarser
-      // (fewer rows) than monthly, so monthly is aggregated by contract first.
+    if (effectivePeriod === 'YTD') {
+      // Sum the official monthly rows per contract. Identity is the L2 Proj ID
+      // (project_id) — falling back to contract_number then project_name for
+      // legacy rows — so distinct contracts that share a Project Name are NOT
+      // merged, and legacy null-contract_number rows are not collapsed together.
+      // margin is recomputed from the aggregated revenue/profit rather than
+      // averaging monthly percentages.
       const { rows } = await pool.query(
-        `WITH rollup AS (
-           SELECT contract_number, MIN(id) AS id, MIN(project_name) AS project_name,
-                  MAX(fiscal_year) AS fiscal_year, MAX(quarter) AS quarter,
-                  SUM(revenue) AS revenue, SUM(cost) AS cost, SUM(profit) AS profit,
-                  MIN(source_doc_id) AS source_doc_id
-           FROM project_revenue_actuals
-           WHERE period = $1
-           GROUP BY contract_number
-         ),
-         monthly AS (
-           SELECT contract_number,
-                  SUM(revenue) AS revenue, SUM(cost) AS cost, SUM(profit) AS profit
-           FROM project_revenue_actuals
-           WHERE period = ANY($2)
-           GROUP BY contract_number
-         )
-         SELECT r.id, r.project_name, r.contract_number, r.fiscal_year, r.quarter,
-                r.source_doc_id,
-                (r.revenue - COALESCE(m.revenue, 0)) AS revenue,
-                (r.cost - COALESCE(m.cost, 0)) AS cost,
-                (r.profit - COALESCE(m.profit, 0)) AS profit
-         FROM rollup r
-         LEFT JOIN monthly m ON m.contract_number = r.contract_number
-         ORDER BY revenue DESC`,
-        [ROLLUP_PERIOD, MONTH_PERIODS],
+        `SELECT MIN(id) AS id,
+                MAX(fiscal_year) AS fiscal_year,
+                MAX(quarter) AS quarter,
+                COALESCE(
+                  MAX(project_name) FILTER (WHERE revenue <> 0 OR cost <> 0),
+                  MAX(project_name)
+                ) AS project_name,
+                MAX(project_id) AS project_id,
+                MAX(contract_number) AS contract_number,
+                SUM(revenue) AS revenue,
+                SUM(cost) AS cost,
+                SUM(profit) AS profit,
+                MAX(source_doc_id) FILTER (WHERE revenue <> 0 OR cost <> 0) AS source_doc_id
+         FROM project_revenue_actuals
+         GROUP BY COALESCE(project_id, contract_number, project_name)
+         HAVING SUM(revenue) <> 0 OR SUM(cost) <> 0
+         ORDER BY SUM(revenue) DESC`,
       );
-      // Clamp tiny rounding noise (values in (-1, 0)) to 0; keep only contracts
-      // with a non-zero derived June revenue.
-      const clamp = (v: number) => (v < 0 && v > -1 ? 0 : v);
-      items = rows
-        .map((r) => {
-          const revenue = clamp(Number(r.revenue));
-          const cost = clamp(Number(r.cost));
-          const profit = clamp(Number(r.profit));
-          return {
-            id: Number(r.id),
-            period: 'FY26 Jun',
-            fiscal_year: Number(r.fiscal_year),
-            quarter: r.quarter != null ? Number(r.quarter) : null,
-            project_name: r.project_name as string,
-            contract_number: (r.contract_number as string) ?? null,
-            revenue,
-            cost,
-            profit,
-            margin_pct: revenue > 0 ? (profit / revenue) * 100 : null,
-            source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
-          };
-        })
-        .filter((r) => r.revenue !== 0);
+      items = rows.map((r) => {
+        const revenue = Number(r.revenue);
+        const profit = Number(r.profit);
+        return {
+          id: Number(r.id),
+          period: 'YTD',
+          fiscal_year: Number(r.fiscal_year),
+          quarter: r.quarter != null ? Number(r.quarter) : null,
+          project_name: r.project_name as string,
+          project_id: (r.project_id as string) ?? null,
+          contract_number: (r.contract_number as string) ?? null,
+          revenue,
+          cost: Number(r.cost),
+          profit,
+          margin_pct: revenue !== 0 ? Math.round((profit / revenue) * 100 * 100) / 100 : null,
+          source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+        };
+      });
     } else {
-      // YTD sources the rollup rows (relabeled 'YTD'); a true month returns as-is.
-      const dbPeriod = effectivePeriod === 'YTD' ? ROLLUP_PERIOD : effectivePeriod;
       const { rows } = await pool.query(
-        `SELECT id, fiscal_year, quarter, project_name, contract_number,
+        `SELECT id, fiscal_year, quarter, project_name, project_id, contract_number,
                 revenue, cost, profit, margin_pct, source_doc_id
          FROM project_revenue_actuals
-         WHERE period = $1
-         ORDER BY project_name`,
-        [dbPeriod],
+         WHERE period = $1 AND (revenue <> 0 OR cost <> 0)
+         ORDER BY revenue DESC`,
+        [effectivePeriod],
       );
       items = rows.map((r) => ({
         id: Number(r.id),
@@ -1000,6 +983,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         fiscal_year: Number(r.fiscal_year),
         quarter: r.quarter != null ? Number(r.quarter) : null,
         project_name: r.project_name as string,
+        project_id: (r.project_id as string) ?? null,
         contract_number: (r.contract_number as string) ?? null,
         revenue: Number(r.revenue),
         cost: Number(r.cost),
@@ -2699,7 +2683,12 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Project Financial Drill-Down (F-628) ───────────────────────
 
-  // Helper: map a project_revenue_actuals row to full JSON shape
+  // Helper: map a project_revenue_actuals row to full JSON shape.
+  // The authoritative per-contract book (Revenue Summary by Cost Pool) carries
+  // actuals only — no target/plan or inception-to-date-actual figures. Those
+  // columns are never populated by any parser (they carry only the DEFAULT 0),
+  // so they are reported as null ("not available", R1) rather than a fabricated
+  // $0. The sourced actual/contract-ITD/prior-year columns keep their value.
   function mapProjectRow(r: Record<string, unknown>) {
     return {
       id: Number(r.id),
@@ -2726,18 +2715,19 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       actual_ytd_costs: Number(r.actual_ytd_costs ?? 0),
       actual_ytd_profit: Number(r.actual_ytd_profit ?? 0),
       actual_ytd_revenue: Number(r.actual_ytd_revenue ?? 0),
-      actual_itd_costs: Number(r.actual_itd_costs ?? 0),
-      actual_itd_profit: Number(r.actual_itd_profit ?? 0),
-      actual_itd_revenue: Number(r.actual_itd_revenue ?? 0),
-      target_period_costs: Number(r.target_period_costs ?? 0),
-      target_period_profit: Number(r.target_period_profit ?? 0),
-      target_period_revenue: Number(r.target_period_revenue ?? 0),
-      target_ytd_costs: Number(r.target_ytd_costs ?? 0),
-      target_ytd_profit: Number(r.target_ytd_profit ?? 0),
-      target_ytd_revenue: Number(r.target_ytd_revenue ?? 0),
-      target_itd_costs: Number(r.target_itd_costs ?? 0),
-      target_itd_profit: Number(r.target_itd_profit ?? 0),
-      target_itd_revenue: Number(r.target_itd_revenue ?? 0),
+      // ITD-actual and target/plan are not in the source book — unavailable, not 0.
+      actual_itd_costs: null,
+      actual_itd_profit: null,
+      actual_itd_revenue: null,
+      target_period_costs: null,
+      target_period_profit: null,
+      target_period_revenue: null,
+      target_ytd_costs: null,
+      target_ytd_profit: null,
+      target_ytd_revenue: null,
+      target_itd_costs: null,
+      target_itd_profit: null,
+      target_itd_revenue: null,
       source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
     };
   }
