@@ -152,3 +152,4 @@ v3_143_ap_actuals_status.sql
 v3_144_apar_lossless_snapshot.sql
 v3_145_service_center_actuals.sql
 v3_146_project_revenue_identity.sql
+v3_147_project_cost_composition.sql

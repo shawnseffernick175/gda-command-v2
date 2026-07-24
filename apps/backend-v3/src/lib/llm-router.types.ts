@@ -694,6 +694,38 @@ export interface ProjectRevenueExtractOutput {
     revenue: number;
     cost: number;
     margin_pct: number | null;
+    // Full Proj Revenue Summary enrichment (Gap 1). The book supplies the
+    // per-contract plan/target, inception-to-date, prior-year, and open-AR
+    // figures the drill-down was built for. All optional so legacy callers and
+    // mocks that emit only revenue/cost/margin keep type-checking; a value of 0
+    // in the source is preserved as 0 here and mapped to "not available" (null)
+    // downstream (R1) rather than fabricated.
+    project_id?: string | null;
+    itd_value?: number;
+    itd_funding?: number;
+    itd_billed_amount?: number;
+    open_ar?: number;
+    prior_year_costs?: number;
+    prior_year_profit?: number;
+    prior_year_revenue?: number;
+    actual_period_costs?: number;
+    actual_period_profit?: number;
+    actual_period_revenue?: number;
+    actual_ytd_costs?: number;
+    actual_ytd_profit?: number;
+    actual_ytd_revenue?: number;
+    actual_itd_costs?: number;
+    actual_itd_profit?: number;
+    actual_itd_revenue?: number;
+    target_period_costs?: number;
+    target_period_profit?: number;
+    target_period_revenue?: number;
+    target_ytd_costs?: number;
+    target_ytd_profit?: number;
+    target_ytd_revenue?: number;
+    target_itd_costs?: number;
+    target_itd_profit?: number;
+    target_itd_revenue?: number;
   }[];
   notes: string;
   model_used: string;
@@ -725,6 +757,35 @@ export interface ProjectCostPoolExtractOutput {
     profit: number;
     /** Op Profit % as a percentage (e.g. 2.33), null when revenue is 0 */
     margin_pct: number | null;
+    // Gap 2 — cost composition & rate variance, straight from the book. Each is
+    // an actual-cost element the parser previously collapsed into direct/indirect.
+    // A 0 is a legitimate "$0 of this element"; the fields are only null when the
+    // source column is absent from the workbook (older layouts).
+    /** direct-cost composition */
+    dc_dl_offsite?: number | null;
+    dc_dl_onsite?: number | null;
+    dc_direct_travel?: number | null;
+    dc_subk_labor?: number | null;
+    dc_subk_travel?: number | null;
+    dc_subk_material?: number | null;
+    dc_consultant_labor?: number | null;
+    dc_consultant_travel?: number | null;
+    dc_direct_material?: number | null;
+    dc_direct_odc?: number | null;
+    /** per-contract indirect split */
+    ind_oh_offsite?: number | null;
+    ind_oh_onsite?: number | null;
+    ind_mhx?: number | null;
+    ind_gna?: number | null;
+    /** Gross Profit-Act (revenue − total direct), distinct from Op Income */
+    gross_profit?: number | null;
+    /** Gross Profit % as a percentage (e.g. 24.92) */
+    gross_profit_pct?: number | null;
+    /** Total Indirect-TGT — the indirect the provisional rates would have applied */
+    total_indirect_tgt?: number | null;
+    /** Rate Variance = Total Indirect-ACT − Total Indirect-TGT (signed);
+     *  negative = actual indirect underran target (favorable). */
+    rate_variance?: number | null;
   }[];
   notes: string;
   model_used: string;

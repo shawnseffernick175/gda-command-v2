@@ -281,6 +281,28 @@ describe('deterministic-parsers (real fixture files)', () => {
       const projectNames = result.rows.map((r) => r.project_name);
       expect(projectNames).toContain('OY4');
     });
+
+    // Gap 1: the Full Proj book supplies per-contract plan/target, ITD, prior-year
+    // and Open AR figures — the parser must now carry them, not just revenue/cost.
+    it('extracts target / actual-ytd / ITD enrichment fields (May)', () => {
+      const result = parseProjectRevenueSummary(prTextMay, 'proj-revenue-summary-may-2026.xlsx')!;
+      const row = result.rows.find((r) => r.contract_number === '1047.008')!;
+      expect(row).toBeTruthy();
+      expect(row.project_id).toBe('1047.008');
+      expect(row.itd_value).toBeCloseTo(9644887.03, 2);
+      expect(row.actual_ytd_revenue).toBeCloseTo(1411281.64, 2);
+      expect(row.target_ytd_revenue).toBeCloseTo(1228927.64, 2);
+      // ITD costs/profit and target/actual triplets are present as numbers.
+      expect(typeof row.target_ytd_costs).toBe('number');
+      expect(typeof row.actual_itd_revenue).toBe('number');
+    });
+
+    it('captures contracts with only ITD value (no period activity)', () => {
+      const result = parseProjectRevenueSummary(prTextMay, 'proj-revenue-summary-may-2026.xlsx')!;
+      // At least one row should carry an ITD value even where period revenue is 0.
+      const itdOnly = result.rows.filter((r) => (r.itd_value ?? 0) !== 0 && r.revenue === 0);
+      expect(itdOnly.length).toBeGreaterThan(0);
+    });
   });
 });
 

@@ -481,17 +481,50 @@ export function parseProjectRevenueSummary(
       'actual period profit', 'period profit', 'current profit',
       'current period profit', 'act period profit', 'act per profit'));
 
-    // ITD columns (only used as signal that a row has data, never as revenue)
+    // ITD / contract-level columns
     const itdFunding = parseNum(getCol(cols, colMap, 'itd funding'));
     const itdValue = parseNum(getCol(cols, colMap, 'itd value', 'itd revenue', 'total revenue'));
+    const itdBilled = parseNum(getCol(cols, colMap, 'itd billed amount', 'itd billed'));
+    const openAr = parseNum(getCol(cols, colMap, 'open ar'));
+
+    // Prior-year breakdown
+    const priorYearCosts = parseNum(getCol(cols, colMap, 'prior year costs'));
+    const priorYearProfit = parseNum(getCol(cols, colMap, 'prior year profit'));
+    const priorYearRevenue = parseNum(getCol(cols, colMap, 'prior year revenue'));
+
+    // Actual — YTD / ITD (period actuals already read above)
+    const actualYtdCosts = parseNum(getCol(cols, colMap, 'actual ytd costs'));
+    const actualYtdProfit = parseNum(getCol(cols, colMap, 'actual ytd profit'));
+    const actualYtdRevenue = parseNum(getCol(cols, colMap, 'actual ytd revenue'));
+    const actualItdCosts = parseNum(getCol(cols, colMap, 'actual itd costs'));
+    const actualItdProfit = parseNum(getCol(cols, colMap, 'actual itd profit'));
+    const actualItdRevenue = parseNum(getCol(cols, colMap, 'actual itd revenue'));
+
+    // Target — Period / YTD / ITD (the plan side for variance)
+    const targetPeriodCosts = parseNum(getCol(cols, colMap, 'target period costs'));
+    const targetPeriodProfit = parseNum(getCol(cols, colMap, 'target period profit'));
+    const targetPeriodRevenue = parseNum(getCol(cols, colMap, 'target period revenue'));
+    const targetYtdCosts = parseNum(getCol(cols, colMap, 'target ytd costs'));
+    const targetYtdProfit = parseNum(getCol(cols, colMap, 'target ytd profit'));
+    const targetYtdRevenue = parseNum(getCol(cols, colMap, 'target ytd revenue'));
+    const targetItdCosts = parseNum(getCol(cols, colMap, 'target itd costs'));
+    const targetItdProfit = parseNum(getCol(cols, colMap, 'target itd profit'));
+    const targetItdRevenue = parseNum(getCol(cols, colMap, 'target itd revenue'));
 
     // Revenue/cost: use period columns only — never fall back to ITD cumulative
     // values which inflate monthly totals by the full contract lifetime amount.
     const revenue = periodRevenue;
     const cost = periodCosts;
 
-    // Skip rows with no financial data at all
-    if (revenue === 0 && cost === 0 && itdFunding === 0 && itdValue === 0) continue;
+    // Skip rows with no financial data at all. Include the contract-level ITD
+    // signals so a contract with only ITD funding/value/billed (no period
+    // activity yet) is still captured for the backlog/plan view.
+    if (
+      revenue === 0 && cost === 0 &&
+      itdFunding === 0 && itdValue === 0 && itdBilled === 0 &&
+      actualYtdRevenue === 0 && actualItdRevenue === 0 &&
+      targetYtdRevenue === 0 && targetItdRevenue === 0
+    ) continue;
 
     // Compute margin from period values; clamp to plausible range
     let marginPct: number | null = null;
@@ -506,9 +539,35 @@ export function parseProjectRevenueSummary(
       quarter: periodInfo.quarter,
       project_name: displayName,
       contract_number: contractNum,
+      project_id: projectId || null,
       revenue,
       cost,
       margin_pct: marginPct,
+      itd_value: itdValue,
+      itd_funding: itdFunding,
+      itd_billed_amount: itdBilled,
+      open_ar: openAr,
+      prior_year_costs: priorYearCosts,
+      prior_year_profit: priorYearProfit,
+      prior_year_revenue: priorYearRevenue,
+      actual_period_costs: periodCosts,
+      actual_period_profit: periodProfit,
+      actual_period_revenue: periodRevenue,
+      actual_ytd_costs: actualYtdCosts,
+      actual_ytd_profit: actualYtdProfit,
+      actual_ytd_revenue: actualYtdRevenue,
+      actual_itd_costs: actualItdCosts,
+      actual_itd_profit: actualItdProfit,
+      actual_itd_revenue: actualItdRevenue,
+      target_period_costs: targetPeriodCosts,
+      target_period_profit: targetPeriodProfit,
+      target_period_revenue: targetPeriodRevenue,
+      target_ytd_costs: targetYtdCosts,
+      target_ytd_profit: targetYtdProfit,
+      target_ytd_revenue: targetYtdRevenue,
+      target_itd_costs: targetItdCosts,
+      target_itd_profit: targetItdProfit,
+      target_itd_revenue: targetItdRevenue,
     });
   }
 
@@ -1635,6 +1694,29 @@ export function parseRevenueSummaryByCostPool(
         marginPct = Math.round((profit / revenue) * 100 * 100) / 100;
       }
 
+      // Gap 2 — cost-composition & rate-variance detail. `money` returns null
+      // when the workbook has no such column (older layouts) so the detail is
+      // "not available" rather than a fabricated 0, but keeps a real 0 (a $0 of
+      // that element) when the column exists. Percentage columns are stored as
+      // fractions in the book; convert to points to match margin_pct.
+      const hasCol = (key: string): boolean => {
+        const lk = key.toLowerCase();
+        if (colMap.has(lk)) return true;
+        for (const h of colMap.keys()) if (h.includes(lk)) return true;
+        return false;
+      };
+      const money = (...keys: string[]): number | null => {
+        if (!keys.some(hasCol)) return null;
+        return Math.round(parseNum(getCol(cols, colMap, ...keys)) * 100) / 100;
+      };
+      const pct = (...keys: string[]): number | null => {
+        if (!keys.some(hasCol)) return null;
+        const raw = getCol(cols, colMap, ...keys);
+        if (!raw || raw.trim() === '') return null;
+        const v = parseNum(raw) * 100;
+        return Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
+      };
+
       const period = `FY${String(fiscalYear).slice(2)} ${MONTHS[pdNum - 1]}`;
 
       rows.push({
@@ -1651,6 +1733,24 @@ export function parseRevenueSummaryByCostPool(
         cost,
         profit,
         margin_pct: marginPct,
+        dc_dl_offsite: money('dl - co offsite', 'dl-co offsite'),
+        dc_dl_onsite: money('dl - co onsite', 'dl-co onsite'),
+        dc_direct_travel: money('direct travel'),
+        dc_subk_labor: money('subk labor'),
+        dc_subk_travel: money('subk travel'),
+        dc_subk_material: money('subk material'),
+        dc_consultant_labor: money('consultant labor'),
+        dc_consultant_travel: money('consultant travel'),
+        dc_direct_material: money('direct material'),
+        dc_direct_odc: money('direct odc'),
+        ind_oh_offsite: money('oh-co offsite', 'oh - co offsite'),
+        ind_oh_onsite: money('oh-cl onsite', 'oh - cl onsite', 'oh-co onsite'),
+        ind_mhx: money('mhx'),
+        ind_gna: money('g&a'),
+        gross_profit: money('gross profit-act', 'gross profit act'),
+        gross_profit_pct: pct('gross profit %'),
+        total_indirect_tgt: money('total indirect-tgt', 'total indirect tgt'),
+        rate_variance: money('rate variance'),
       });
     }
   }

@@ -12,6 +12,7 @@ import { ActualVsTargetChart } from "@/components/projects/ActualVsTargetChart";
 import { ProfitMarginCard } from "@/components/projects/ProfitMarginCard";
 import { ItdBurnChart } from "@/components/projects/ItdBurnChart";
 import { MonthlyRevenueTrend } from "@/components/projects/MonthlyRevenueTrend";
+import { CostCompositionCard } from "@/components/projects/CostCompositionCard";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
@@ -123,6 +124,8 @@ function ProjectSnapshotView({
           <MonthlyRevenueTrend items={trendItems} />
         )}
       </div>
+
+      <CostCompositionCard project={project} />
     </div>
   );
 }

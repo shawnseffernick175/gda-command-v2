@@ -690,6 +690,10 @@ export interface ProjectRevenueRow {
 export interface ProjectRevenueData {
   items: ProjectRevenueRow[];
   available_periods: string[];
+  /** month period strings that carry actuals (e.g. "FY26 Jan") */
+  available_months?: string[];
+  /** calendar quarters that have data (e.g. "Q1", "Q2") */
+  available_quarters?: string[];
   selected_period: string;
   meta: {
     table: string;
@@ -780,6 +784,29 @@ export interface ProjectFullRow {
   target_itd_costs: number | null;
   target_itd_profit: number | null;
   target_itd_revenue: number | null;
+  // Gap 2 — cost composition & rate variance from the Revenue Summary by Cost
+  // Pool book. null == not sourced for this row ("not available", R1); a real 0
+  // is a genuine $0 of that element.
+  direct_cost: number | null;
+  indirect_cost: number | null;
+  dc_dl_offsite: number | null;
+  dc_dl_onsite: number | null;
+  dc_direct_travel: number | null;
+  dc_subk_labor: number | null;
+  dc_subk_travel: number | null;
+  dc_subk_material: number | null;
+  dc_consultant_labor: number | null;
+  dc_consultant_travel: number | null;
+  dc_direct_material: number | null;
+  dc_direct_odc: number | null;
+  ind_oh_offsite: number | null;
+  ind_oh_onsite: number | null;
+  ind_mhx: number | null;
+  ind_gna: number | null;
+  gross_profit: number | null;
+  gross_profit_pct: number | null;
+  total_indirect_tgt: number | null;
+  rate_variance: number | null;
   source_doc_id: number | null;
 }
 

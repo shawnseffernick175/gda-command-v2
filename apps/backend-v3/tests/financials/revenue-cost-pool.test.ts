@@ -109,6 +109,33 @@ describe('parseRevenueSummaryByCostPool', () => {
     expect(jan.margin_pct).toBeCloseTo(23.31, 2); // 0.233077... × 100
   });
 
+  it('captures the Gap 2 cost-composition detail from the source columns', () => {
+    const jan = out!.rows.find(
+      (r) => r.period === 'FY26 Jan' && r.project_id === '1039.005',
+    )!;
+    // Direct-cost mix (Mega II is all consultant labor).
+    expect(jan.dc_consultant_labor).toBeCloseTo(9258.4, 2);
+    expect(jan.dc_dl_offsite).toBeCloseTo(0, 2);
+    expect(jan.dc_dl_onsite).toBeCloseTo(0, 2);
+    // Indirect split.
+    expect(jan.ind_mhx).toBeCloseTo(158.66, 2);
+    expect(jan.ind_gna).toBeCloseTo(40.66, 2);
+    // Gross Profit (distinct from Op Income) + its percentage.
+    expect(jan.gross_profit).toBeCloseTo(3073.64, 2);
+    expect(jan.gross_profit_pct).toBeCloseTo(24.92, 2); // 0.24924... × 100
+    // Target indirect + signed Rate Variance (ACT − TGT; negative = underran).
+    expect(jan.total_indirect_tgt).toBeCloseTo(236.08, 2);
+    expect(jan.rate_variance).toBeCloseTo(-36.76, 2);
+  });
+
+  it('preserves a positive (unfavorable) rate variance sign', () => {
+    const neg = out!.rows.find(
+      (r) => r.period === 'FY26 Jan' && r.project_id === '1047.031',
+    )!;
+    // Total Indirect-ACT 14342.14 − Total Indirect-TGT 12709.91 = 1632.23 (overran).
+    expect(neg.rate_variance).toBeCloseTo(1632.23, 2);
+  });
+
   it('preserves negative Op Income / margin', () => {
     const neg = out!.rows.find((r) => r.project_id === '1047.031')!;
     expect(neg.profit).toBeCloseTo(-91.88, 2);
@@ -174,6 +201,24 @@ describe('ingestProjectCostPoolRows — YTD derived by summing official months',
     for (const c of inserts) {
       expect(c.sql).not.toMatch(/target_/i);
     }
+  });
+
+  it('writes the Gap 2 cost-composition params in the right INSERT slots', async () => {
+    const out = parseRevenueSummaryByCostPool(text, FILE)!;
+    await ingestProjectCostPoolRows(out.rows, 219);
+    const inserts = calls.filter((c) => /INSERT INTO project_revenue_actuals/i.test(c.sql));
+    const jan = inserts.find(
+      (c) => c.params[0] === 'FY26 Jan' && c.params[4] === '1039.005',
+    )!;
+    // comp array begins right after source_doc_id (index 15): direct_cost=16,
+    // indirect_cost=17, … gross_profit=32, gross_profit_pct=33,
+    // total_indirect_tgt=34, rate_variance=35.
+    expect(jan.params[16]).toBeCloseTo(9258.4, 2); // direct_cost
+    expect(jan.params[17]).toBeCloseTo(199.32, 2); // indirect_cost
+    expect(jan.params[32]).toBeCloseTo(3073.64, 2); // gross_profit
+    expect(jan.params[34]).toBeCloseTo(236.08, 2); // total_indirect_tgt
+    expect(jan.params[35]).toBeCloseTo(-36.76, 2); // rate_variance (signed)
+    expect(jan.sql).toMatch(/rate_variance/i);
   });
 });
 
