@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useProjectRevenue } from "@/hooks/use-financial-bible";
 import { formatMoney, formatMoneyFull } from "@/lib/format-money";
 import { Kpi } from "@/components/financials/primitives/Kpi";
@@ -20,11 +20,24 @@ const PR_SORT_COLS: ColumnSortConfig[] = [
   { field: "margin_pct", type: "number" },
 ];
 
+const MONTH_NAMES: Record<string, string> = {
+  Jan: "January", Feb: "February", Mar: "March", Apr: "April",
+  May: "May", Jun: "June", Jul: "July", Aug: "August",
+  Sep: "September", Oct: "October", Nov: "November", Dec: "December",
+};
+
+function periodLabel(p: string): string {
+  if (p === "YTD") return "YTD";
+  return MONTH_NAMES[p.slice(-3)] ?? p;
+}
+
 export function ProjectRevenueTab() {
-  const { data, isLoading } = useProjectRevenue();
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("YTD");
+  const { data, isLoading } = useProjectRevenue(selectedPeriod);
   const { sortBy, sortDir, handleSort } = useTableSort("projrev");
 
   const items = useMemo(() => data?.items ?? [], [data]);
+  const periodOptions = data?.available_periods ?? ["YTD"];
 
   const sortedItems = useMemo(() => {
     if (!sortBy) return items;
@@ -36,29 +49,44 @@ export function ProjectRevenueTab() {
     ) as unknown as typeof items;
   }, [items, sortBy, sortDir]);
 
-  if (isLoading) {
-    return <div className="h-48 animate-pulse rounded bg-gda-skeleton" />;
-  }
-
-  if (items.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground py-4 text-center">
-        Project revenue data not yet ingested. Upload a Full Proj Revenue
-        Summary to populate.
-      </p>
-    );
-  }
-
   const totalRevenue = items.reduce((s, r) => s + r.revenue, 0);
   const totalCost = items.reduce((s, r) => s + r.cost, 0);
   const totalProfit = items.reduce((s, r) => s + r.profit, 0);
   const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+  const headerTotal = data?.meta?.period_total ?? totalRevenue;
 
   // All projects by revenue (retain every project — no top-N truncation)
   const ranked = [...items].sort((a, b) => b.revenue - a.revenue);
 
-  const periods = [...new Set(items.map((r) => r.period))];
-  const periodLabel = periods.length === 1 ? periods[0] : `${periods.length} periods`;
+  const sourceStripPeriod = periodLabel(selectedPeriod);
+
+  const periodSelector = (
+    <div className="flex flex-wrap items-baseline justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <label
+          htmlFor="projrev-period"
+          className="text-[12px] uppercase tracking-wider text-muted-foreground"
+        >
+          Period
+        </label>
+        <select
+          id="projrev-period"
+          value={selectedPeriod}
+          onChange={(e) => setSelectedPeriod(e.target.value)}
+          className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground"
+        >
+          {periodOptions.map((p) => (
+            <option key={p} value={p}>
+              {periodLabel(p)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="text-sm font-medium text-foreground">
+        {periodLabel(selectedPeriod)} — {formatMoneyFull(headerTotal)}
+      </p>
+    </div>
+  );
 
   // Revenue by project — horizontal bars scale to project count without crush.
   const revByProject = {
@@ -153,6 +181,17 @@ export function ProjectRevenueTab() {
 
   return (
     <div className="space-y-6">
+      {periodSelector}
+
+      {isLoading ? (
+        <div className="h-48 animate-pulse rounded bg-gda-skeleton" />
+      ) : items.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-4 text-center">
+          No project revenue rows for {periodLabel(selectedPeriod)}. Select
+          another period, or upload a Full Proj Revenue Summary to populate.
+        </p>
+      ) : (
+        <>
       {/* KPI tiles */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Kpi label="Total Revenue" value={formatMoney(totalRevenue)} subtitle={`${items.length} projects`} />
@@ -224,9 +263,11 @@ export function ProjectRevenueTab() {
       <FinSourceStrip
         table="project_revenue_actuals"
         rowCount={items.length}
-        period={periodLabel}
+        period={sourceStripPeriod}
         note="contract-type / Gov-vs-Commercial split not in ingest — see Income Statement"
       />
+        </>
+      )}
     </div>
   );
 }

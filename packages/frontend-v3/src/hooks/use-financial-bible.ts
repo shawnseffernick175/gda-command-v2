@@ -243,10 +243,12 @@ export function useTrialBalance() {
   });
 }
 
-export function useProjectRevenue() {
+export function useProjectRevenue(period?: string) {
+  const qs = period ? `?period=${encodeURIComponent(period)}` : "";
   return useQuery({
-    queryKey: ["financials", "project-revenue"],
-    queryFn: () => apiGet<ProjectRevenueData>("/v3/financials/project-revenue"),
+    queryKey: ["financials", "project-revenue", period ?? "default"],
+    queryFn: () =>
+      apiGet<ProjectRevenueData>(`/v3/financials/project-revenue${qs}`),
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",
