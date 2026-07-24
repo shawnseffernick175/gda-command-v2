@@ -688,7 +688,14 @@ export interface ProjectRevenueRow {
 
 export interface ProjectRevenueData {
   items: ProjectRevenueRow[];
-  meta: { table: string; row_count: number };
+  available_periods: string[];
+  selected_period: string;
+  meta: {
+    table: string;
+    row_count: number;
+    effective_period: string;
+    period_total: number;
+  };
 }
 
 /* ── Cost Service Centers (Financial Bible) ───────────────────── */

@@ -877,60 +877,149 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }, req.requestId));
   });
 
-  // GET /v3/financials/project-revenue?period=FY26+May
-  // PR-1: Supports optional period filter so tiles reflect a single period,
-  // not a blind sum of every month. Returns available_periods for the selector.
+  // GET /v3/financials/project-revenue?period=YTD
+  // Period selector for the Project Revenue tab. The raw table stores true
+  // monthly rows (FY26 Jan..May) plus one document whose period label is
+  // 'FY26 Jun' but which is actually the full YTD-through-June rollup (it sums
+  // to the P&L YTD to the dollar). We therefore:
+  //   - expose that rollup only as the 'YTD' option (relabeled), never as 'Jun',
+  //   - derive the true standalone June month at query time (YTD minus Jan..May,
+  //     per contract), never writing derived rows to the DB.
   app.get('/v3/financials/project-revenue', async (req, reply) => {
     noStore(reply);
     const qp = req.query as Record<string, string>;
-    const periodFilter = qp.period || null;
 
-    // Fetch available periods for the selector dropdown
+    // Fiscal-month ordering for the selector so options read Jan..Jun, not
+    // alphabetically. Raw distinct periods drive which months actually exist.
+    const MONTH_ORDER: Record<string, number> = {
+      Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
+      Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+    };
     const { rows: periodRows } = await pool.query(
-      `SELECT DISTINCT period FROM project_revenue_actuals ORDER BY period DESC`,
+      `SELECT DISTINCT period FROM project_revenue_actuals`,
     );
-    const availablePeriods = periodRows.map((r) => r.period as string);
+    const rawPeriods = periodRows
+      .map((r) => r.period as string)
+      .sort((a, b) => (MONTH_ORDER[a.slice(-3)] ?? 99) - (MONTH_ORDER[b.slice(-3)] ?? 99));
+    // 'YTD' is always first; the raw 'FY26 Jun' slot is the DERIVED month.
+    const availablePeriods = ['YTD', ...rawPeriods];
 
-    // Apply period filter if provided; otherwise default to latest period
-    const effectivePeriod = periodFilter || availablePeriods[0] || null;
+    // The raw label that carries the YTD rollup. May..Jan are true months.
+    const ROLLUP_PERIOD = 'FY26 Jun';
+    const MONTH_PERIODS = ['FY26 Jan', 'FY26 Feb', 'FY26 Mar', 'FY26 Apr', 'FY26 May'];
 
-    let rows;
-    if (effectivePeriod) {
-      ({ rows } = await pool.query(
-        `SELECT id, period, fiscal_year, quarter, project_name, contract_number,
-                revenue, cost, profit, margin_pct, source_doc_id, created_at
+    // Normalize the requested period; default and unknown values fall back to YTD.
+    const requested = (qp.period || '').trim();
+    let effectivePeriod: string;
+    if (!requested || requested.toUpperCase() === 'YTD') {
+      effectivePeriod = 'YTD';
+    } else if (requested.toUpperCase() === ROLLUP_PERIOD.toUpperCase()) {
+      effectivePeriod = 'FY26 Jun';
+    } else if (rawPeriods.some((p) => p.toUpperCase() === requested.toUpperCase())) {
+      effectivePeriod = rawPeriods.find((p) => p.toUpperCase() === requested.toUpperCase()) as string;
+    } else {
+      effectivePeriod = 'YTD';
+    }
+
+    type PrRow = {
+      id: number; period: string; fiscal_year: number; quarter: number | null;
+      project_name: string; contract_number: string | null;
+      revenue: number; cost: number; profit: number; margin_pct: number | null;
+      source_doc_id: number | null;
+    };
+    let items: PrRow[] = [];
+
+    if (effectivePeriod === 'FY26 Jun') {
+      // Derived standalone June = rollup per contract minus that contract's Jan..May.
+      // contract_number is the join key (never null here); the rollup is coarser
+      // (fewer rows) than monthly, so monthly is aggregated by contract first.
+      const { rows } = await pool.query(
+        `WITH rollup AS (
+           SELECT contract_number, MIN(id) AS id, MIN(project_name) AS project_name,
+                  MAX(fiscal_year) AS fiscal_year, MAX(quarter) AS quarter,
+                  SUM(revenue) AS revenue, SUM(cost) AS cost, SUM(profit) AS profit,
+                  MIN(source_doc_id) AS source_doc_id
+           FROM project_revenue_actuals
+           WHERE period = $1
+           GROUP BY contract_number
+         ),
+         monthly AS (
+           SELECT contract_number,
+                  SUM(revenue) AS revenue, SUM(cost) AS cost, SUM(profit) AS profit
+           FROM project_revenue_actuals
+           WHERE period = ANY($2)
+           GROUP BY contract_number
+         )
+         SELECT r.id, r.project_name, r.contract_number, r.fiscal_year, r.quarter,
+                r.source_doc_id,
+                (r.revenue - COALESCE(m.revenue, 0)) AS revenue,
+                (r.cost - COALESCE(m.cost, 0)) AS cost,
+                (r.profit - COALESCE(m.profit, 0)) AS profit
+         FROM rollup r
+         LEFT JOIN monthly m ON m.contract_number = r.contract_number
+         ORDER BY revenue DESC`,
+        [ROLLUP_PERIOD, MONTH_PERIODS],
+      );
+      // Clamp tiny rounding noise (values in (-1, 0)) to 0; keep only contracts
+      // with a non-zero derived June revenue.
+      const clamp = (v: number) => (v < 0 && v > -1 ? 0 : v);
+      items = rows
+        .map((r) => {
+          const revenue = clamp(Number(r.revenue));
+          const cost = clamp(Number(r.cost));
+          const profit = clamp(Number(r.profit));
+          return {
+            id: Number(r.id),
+            period: 'FY26 Jun',
+            fiscal_year: Number(r.fiscal_year),
+            quarter: r.quarter != null ? Number(r.quarter) : null,
+            project_name: r.project_name as string,
+            contract_number: (r.contract_number as string) ?? null,
+            revenue,
+            cost,
+            profit,
+            margin_pct: revenue > 0 ? (profit / revenue) * 100 : null,
+            source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+          };
+        })
+        .filter((r) => r.revenue !== 0);
+    } else {
+      // YTD sources the rollup rows (relabeled 'YTD'); a true month returns as-is.
+      const dbPeriod = effectivePeriod === 'YTD' ? ROLLUP_PERIOD : effectivePeriod;
+      const { rows } = await pool.query(
+        `SELECT id, fiscal_year, quarter, project_name, contract_number,
+                revenue, cost, profit, margin_pct, source_doc_id
          FROM project_revenue_actuals
          WHERE period = $1
          ORDER BY project_name`,
-        [effectivePeriod],
-      ));
-    } else {
-      ({ rows } = await pool.query(
-        `SELECT id, period, fiscal_year, quarter, project_name, contract_number,
-                revenue, cost, profit, margin_pct, source_doc_id, created_at
-         FROM project_revenue_actuals
-         ORDER BY fiscal_year DESC, quarter DESC, period DESC, project_name`,
-      ));
+        [dbPeriod],
+      );
+      items = rows.map((r) => ({
+        id: Number(r.id),
+        period: effectivePeriod,
+        fiscal_year: Number(r.fiscal_year),
+        quarter: r.quarter != null ? Number(r.quarter) : null,
+        project_name: r.project_name as string,
+        contract_number: (r.contract_number as string) ?? null,
+        revenue: Number(r.revenue),
+        cost: Number(r.cost),
+        profit: Number(r.profit),
+        margin_pct: r.margin_pct != null ? Number(r.margin_pct) : null,
+        source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+      }));
     }
 
-    const items = rows.map((r) => ({
-      id: Number(r.id),
-      period: r.period as string,
-      fiscal_year: Number(r.fiscal_year),
-      quarter: r.quarter != null ? Number(r.quarter) : null,
-      project_name: r.project_name as string,
-      contract_number: (r.contract_number as string) ?? null,
-      revenue: Number(r.revenue),
-      cost: Number(r.cost),
-      profit: Number(r.profit),
-      margin_pct: r.margin_pct != null ? Number(r.margin_pct) : null,
-      source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
-    }));
+    const periodTotal = items.reduce((s, r) => s + r.revenue, 0);
     return reply.send(successEnvelope({
       items,
       available_periods: availablePeriods,
       selected_period: effectivePeriod,
-      meta: { table: 'project_revenue_actuals', row_count: items.length },
+      meta: {
+        table: 'project_revenue_actuals',
+        row_count: items.length,
+        effective_period: effectivePeriod,
+        period_total: Math.round(periodTotal * 100) / 100,
+      },
     }, req.requestId));
   });
 
@@ -2405,9 +2494,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // operating margin distinction). No fabrication: empty tabs return an
   // explicit not-ingested note naming the source needed.
   app.post('/v3/financials/ai-analyze', async (req, reply) => {
-    const body = (req.body ?? {}) as { tab?: string };
+    const body = (req.body ?? {}) as { tab?: string; period?: string };
 
-    const built = await buildTabAnalysisInput(body.tab);
+    const built = await buildTabAnalysisInput(body.tab, { period: body.period });
 
     const result = await llmRouter.route({
       task: 'financial_analyze',
