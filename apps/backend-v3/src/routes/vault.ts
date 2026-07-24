@@ -57,6 +57,7 @@ interface ReingestDocResult {
   ar: number;
   trial_balance: number;
   project_revenue: number;
+  project_cost_pool: number;
   rejected: number;
   parsers_run: string[];
   parsers_skipped: string[];
@@ -92,6 +93,7 @@ function summarizeJob(job: ReingestJob): Record<string, number> {
     total_ar: job.results.reduce((s, r) => s + r.ar, 0),
     total_trial_balance: job.results.reduce((s, r) => s + r.trial_balance, 0),
     total_project_revenue: job.results.reduce((s, r) => s + r.project_revenue, 0),
+    total_project_cost_pool: job.results.reduce((s, r) => s + r.project_cost_pool, 0),
     total_rejected: job.results.reduce((s, r) => s + r.rejected, 0),
   };
 }
@@ -444,7 +446,7 @@ async function resolveDocument(doc: {
           doc.id,
           'financials_ingested',
           'admin',
-          `resolve-all: plan=${fin.plan}, actual=${fin.actual}, bs=${fin.balance_sheet}, cd=${fin.cost_detail}, sie=${fin.sie}, ap=${fin.ap}, ar=${fin.ar}, tb=${fin.trial_balance}, pr=${fin.project_revenue}, rejected=${fin.rejected}`,
+          `resolve-all: plan=${fin.plan}, actual=${fin.actual}, bs=${fin.balance_sheet}, cd=${fin.cost_detail}, sie=${fin.sie}, ap=${fin.ap}, ar=${fin.ar}, tb=${fin.trial_balance}, pr=${fin.project_revenue}, pcp=${fin.project_cost_pool}, rejected=${fin.rejected}`,
         );
       }
     } catch (err) {
@@ -1297,7 +1299,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             Number(id),
             'financials_ingested',
             'admin',
-            `re-ingest: plan=${reingest.financial.plan}, actual=${reingest.financial.actual}, bs=${reingest.financial.balance_sheet}, cd=${reingest.financial.cost_detail}, sie=${reingest.financial.sie}, ap=${reingest.financial.ap}, ar=${reingest.financial.ar}, tb=${reingest.financial.trial_balance}, pr=${reingest.financial.project_revenue}, rejected=${reingest.financial.rejected}`,
+            `re-ingest: plan=${reingest.financial.plan}, actual=${reingest.financial.actual}, bs=${reingest.financial.balance_sheet}, cd=${reingest.financial.cost_detail}, sie=${reingest.financial.sie}, ap=${reingest.financial.ap}, ar=${reingest.financial.ar}, tb=${reingest.financial.trial_balance}, pr=${reingest.financial.project_revenue}, pcp=${reingest.financial.project_cost_pool}, rejected=${reingest.financial.rejected}`,
           );
         }
       } catch (err) {
@@ -1564,7 +1566,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             docType: doc.doc_type,
           });
           if (r.any_ingested) {
-            const auditMsg = `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, ap=${r.ap}, ar=${r.ar}, tb=${r.trial_balance}, pr=${r.project_revenue}, rejected=${r.rejected}` +
+            const auditMsg = `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, ap=${r.ap}, ar=${r.ar}, tb=${r.trial_balance}, pr=${r.project_revenue}, pcp=${r.project_cost_pool}, rejected=${r.rejected}` +
               (r.parse_warnings.length > 0 ? ` | WARNINGS: ${r.parse_warnings.join('; ')}` : '');
             await insertAudit(
               doc.id,
@@ -1589,6 +1591,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             ar: r.ar,
             trial_balance: r.trial_balance,
             project_revenue: r.project_revenue,
+            project_cost_pool: r.project_cost_pool,
             rejected: r.rejected,
             parsers_run: r.parsers_run,
             parsers_skipped: r.parsers_skipped,
@@ -1602,7 +1605,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             status: 'error',
             verdict: 'FAILED',
             verdict_detail: err instanceof Error ? err.message : String(err),
-            plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, ap: 0, ar: 0, trial_balance: 0, project_revenue: 0, rejected: 0,
+            plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, ap: 0, ar: 0, trial_balance: 0, project_revenue: 0, project_cost_pool: 0, rejected: 0,
             parsers_run: [],
             parsers_skipped: [],
             parse_warnings: [],

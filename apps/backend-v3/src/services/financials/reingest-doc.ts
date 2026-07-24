@@ -802,6 +802,7 @@ export function computeVerdict(r: ReingestResult): VerdictResult {
     if (r.ar > 0) parts.push(`ar=${r.ar}`);
     if (r.trial_balance > 0) parts.push(`trial_balance=${r.trial_balance}`);
     if (r.project_revenue > 0) parts.push(`project_revenue=${r.project_revenue}`);
+    if (r.project_cost_pool > 0) parts.push(`project_cost_pool=${r.project_cost_pool}`);
     if (r.service_center > 0) parts.push(`service_center=${r.service_center}`);
     if (r.pool_rate > 0) parts.push(`pool_rate=${r.pool_rate}`);
     return { verdict: 'INGESTED', detail: parts.join(', ') || 'rows ingested' };
