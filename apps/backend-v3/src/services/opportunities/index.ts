@@ -5,6 +5,7 @@
 import { pool } from '../../lib/db.js';
 import { resolveFieldSources, type SourceRef } from '../../lib/sources.js';
 import { evaluateTeamingFlags } from './teaming.js';
+import { classifyOpportunityVehicle, vehicleClassSqlCondition } from './vehicle-class.js';
 import { resolveSetAsideEligibility } from './eligibility.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import { parseFederalOrg } from '../../lib/orgHierarchy.js';
@@ -130,6 +131,11 @@ function buildSummaryFromSources(
   hasPipelineStage?: boolean,
 ): OpportunitySummary {
   const teamingFlags = evaluateTeamingFlags(row);
+  const vehicleClass = classifyOpportunityVehicle({
+    title: row.title,
+    description: row.description,
+    is_idiq: row.is_idiq,
+  });
   return {
     id: String(row.id),
     title: row.title,
@@ -157,6 +163,8 @@ function buildSummaryFromSources(
     date_confidence: row.date_confidence ?? null,
     teaming_flags: teamingFlags,
     is_idiq: row.is_idiq ?? false,
+    opportunity_class: vehicleClass.class,
+    opportunity_class_source: vehicleClass.source,
     ai_analyzed_at: row.ai_analyzed_at,
     analysis_version: row.analysis_version,
     source_uri: row.source_uri ?? null,
@@ -579,6 +587,11 @@ function buildFilterConditions(
     conditions.push(`o.is_idiq = TRUE`);
   } else if (filters.idiq === 'exclude') {
     conditions.push(`o.is_idiq = FALSE`);
+  }
+  // Vehicle-class isolation (report item 1): BAA / OTA / IDIQ / standard.
+  if (filters.opportunity_class) {
+    const classCondition = vehicleClassSqlCondition(filters.opportunity_class);
+    if (classCondition) conditions.push(classCondition);
   }
   // SB Play filter: NAICS in ENVISION_SMALL_NAICS AND set_aside matches SB set-aside values
   if (filters.sb_play) {

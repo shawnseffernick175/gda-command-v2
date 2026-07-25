@@ -62,6 +62,26 @@ import { useTeamingFit, type TeamingFitResult } from "@/hooks/use-partners";
 
 const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[12px] font-mono text-gda-green";
 
+const VEHICLE_CLASS_BADGE_CLS = "rounded border border-gda-cyan/40 bg-gda-cyan/10 px-1.5 py-0.5 text-[12px] font-mono text-gda-cyan";
+
+/**
+ * BAA/OTA vehicle-class badge (report item 1). IDIQ keeps its own IDIQ badge in
+ * the value cell, so this only renders for baa/ota. The `title` attribute
+ * exposes the R1 classification source on hover.
+ */
+function VehicleClassBadge({ opp }: { opp: { opportunity_class?: string | null; opportunity_class_source?: string | null } }) {
+  const cls = opp.opportunity_class;
+  if (cls !== "baa" && cls !== "ota") return null;
+  return (
+    <span
+      className={VEHICLE_CLASS_BADGE_CLS}
+      title={opp.opportunity_class_source ?? undefined}
+    >
+      {cls.toUpperCase()}
+    </span>
+  );
+}
+
 export default function OpportunitiesPage() {
   return (
     <Suspense fallback={<Skeleton className="h-8 w-64 bg-gda-panel" />}>
@@ -208,6 +228,7 @@ interface OppsListState {
   sourceFilter: string[];
   relevantOnly: boolean;
   idiqFilter: "only" | "exclude" | undefined;
+  classFilter: "baa" | "ota" | undefined;
   sbPlayOnly: boolean;
   stageTab: string;
   groupBy: "none" | "vehicle";
@@ -248,6 +269,8 @@ function OpportunityList() {
   const [sourceFilter, setSourceFilter] = useState<string[]>(saved?.sourceFilter ?? []);
   const [relevantOnly, setRelevantOnly] = useState(saved?.relevantOnly ?? true);
   const [idiqFilter, setIdiqFilter] = useState<'only' | 'exclude' | undefined>(saved?.idiqFilter);
+  // Vehicle-class isolation (report item 1). IDIQ keeps its own is_idiq chip.
+  const [classFilter, setClassFilter] = useState<'baa' | 'ota' | undefined>(saved?.classFilter);
   const [sbPlayOnly, setSbPlayOnly] = useState(saved?.sbPlayOnly ?? false);
   const [stageTab, setStageTab] = useState(saved?.stageTab ?? "active");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">(saved?.groupBy ?? "none");
@@ -293,12 +316,13 @@ function OpportunityList() {
       stage: stageTab !== "all" ? stageTab : undefined,
       relevant_only: relevantOnly,
       idiq: idiqFilter,
+      opportunity_class: classFilter,
       sb_play: sbPlayOnly || undefined,
       sort_by: querySortBy,
       sort_dir: querySortDir,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, sbPlayOnly, querySortBy, querySortDir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, classFilter, sbPlayOnly, querySortBy, querySortDir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -336,7 +360,8 @@ function OpportunityList() {
 
   const hasActiveFilters =
     debouncedQ || agencyFilter || hotFilter || setAsideFilter.length > 0 ||
-    valueRange !== 0 || sourceFilter.length > 0 || idiqFilter !== undefined || sbPlayOnly;
+    valueRange !== 0 || sourceFilter.length > 0 || idiqFilter !== undefined ||
+    classFilter !== undefined || sbPlayOnly;
 
   const handleClearFilters = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -348,6 +373,7 @@ function OpportunityList() {
     setValueRange(0);
     setSourceFilter([]);
     setIdiqFilter(undefined);
+    setClassFilter(undefined);
     setSbPlayOnly(false);
     // Strip ?agency from the URL so a remount does not re-apply a stale filter
     if (searchParams.get("agency")) {
@@ -408,6 +434,7 @@ function OpportunityList() {
       sourceFilter,
       relevantOnly,
       idiqFilter,
+      classFilter,
       sbPlayOnly,
       stageTab,
       groupBy,
@@ -420,7 +447,7 @@ function OpportunityList() {
     } catch {
       // sessionStorage unavailable (private mode / quota) — non-fatal.
     }
-  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, relevantOnly, idiqFilter, sbPlayOnly, stageTab, groupBy, page, sortBy, sortDir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, relevantOnly, idiqFilter, classFilter, sbPlayOnly, stageTab, groupBy, page, sortBy, sortDir]);
 
   return (
     <div className="flex flex-col h-full">
@@ -467,9 +494,32 @@ function OpportunityList() {
                 icon="I"
                 label={`${meta.idiq_count} IDIQ`}
                 active={idiqFilter === 'only'}
-                onClick={() => setIdiqFilter((prev) => prev === 'only' ? undefined : 'only')}
+                onClick={() => {
+                  setClassFilter(undefined);
+                  setIdiqFilter((prev) => prev === 'only' ? undefined : 'only');
+                }}
               />
             )}
+            {/* Vehicle-class isolation (report item 1). BAA/OTA classified from
+                SAM title/description phrases; ambiguous rows stay unclassified. */}
+            <IntelChip
+              icon="B"
+              label="BAA"
+              active={classFilter === 'baa'}
+              onClick={() => {
+                setIdiqFilter(undefined);
+                setClassFilter((prev) => prev === 'baa' ? undefined : 'baa');
+              }}
+            />
+            <IntelChip
+              icon="O"
+              label="OTA"
+              active={classFilter === 'ota'}
+              onClick={() => {
+                setIdiqFilter(undefined);
+                setClassFilter((prev) => prev === 'ota' ? undefined : 'ota');
+              }}
+            />
             {(meta.sb_play_count > 0 || sbPlayOnly) && (
               <IntelChip
                 icon="S"
@@ -1043,6 +1093,7 @@ function OpportunityRow({
                 SB PLAY
               </span>
             )}
+            <VehicleClassBadge opp={opp} />
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             {sources.length > 0 && (
@@ -1617,6 +1668,12 @@ function OpportunityDetail({ id }: { id: string }) {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Value</span>
                   <FieldStatusBadge reason="no_source_data" />
+                </div>
+              )}
+              {(opp.opportunity_class === "baa" || opp.opportunity_class === "ota" || opp.opportunity_class === "idiq") && (
+                <div className="flex items-center justify-between" title={opp.opportunity_class_source ?? undefined}>
+                  <span className="text-muted-foreground">Vehicle</span>
+                  <span className={VEHICLE_CLASS_BADGE_CLS}>{opp.opportunity_class.toUpperCase()}</span>
                 </div>
               )}
               <MetaRow label="Solicitation" value={opp.solicitation_number ?? "---"} mono />

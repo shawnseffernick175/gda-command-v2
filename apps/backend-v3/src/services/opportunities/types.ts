@@ -119,6 +119,10 @@ export interface OpportunitySummary {
   date_confidence: string | null;
   teaming_flags: TeamingFlag[];
   is_idiq: boolean;
+  /** Vehicle categorization: 'baa' | 'ota' | 'idiq' | 'standard' (report item 1). */
+  opportunity_class: 'baa' | 'ota' | 'idiq' | 'standard';
+  /** R1 lineage for opportunity_class; null when 'standard'. */
+  opportunity_class_source: string | null;
   ai_analyzed_at: string | null;
   analysis_version: string | null;
   source_uri: string | null;
@@ -216,6 +220,8 @@ export interface ListFilters {
   relevantOnly?: boolean;
   /** Filter by IDIQ status: 'only' = IDIQs only, 'exclude' = hide IDIQs */
   idiq?: 'only' | 'exclude';
+  /** Isolate a single vehicle class: 'baa' | 'ota' | 'idiq' | 'standard' (report item 1). */
+  opportunity_class?: 'baa' | 'ota' | 'idiq' | 'standard';
   /** When true, show only SB Play opportunities (employee-based NAICS + SB set-aside) */
   sb_play?: boolean;
   limit?: number;
