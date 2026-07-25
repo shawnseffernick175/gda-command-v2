@@ -55,6 +55,8 @@ export interface OpportunitySummary {
   eligibility?: SetAsideEligibility | null;
   hot?: boolean;
   is_idiq?: boolean;
+  opportunity_class?: "baa" | "ota" | "idiq" | "standard";
+  opportunity_class_source?: string | null;
   created_at: string;
   updated_at: string;
   pwin?: PwinScore | null;

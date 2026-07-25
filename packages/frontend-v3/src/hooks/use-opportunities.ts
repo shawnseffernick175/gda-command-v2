@@ -81,6 +81,7 @@ export interface UseOpportunitiesPagedParams {
   stage?: string;
   relevant_only?: boolean;
   idiq?: 'only' | 'exclude';
+  opportunity_class?: 'baa' | 'ota' | 'idiq' | 'standard';
   sb_play?: boolean;
   sort_by?: string;
   sort_dir?: "asc" | "desc";
@@ -109,6 +110,7 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         stage: params.stage,
         relevant_only: params.relevant_only === false ? "false" : undefined,
         idiq: params.idiq,
+        opportunity_class: params.opportunity_class,
         sb_play: params.sb_play ? '1' : undefined,
         sort_by: params.sort_by,
         sort_dir: params.sort_dir,

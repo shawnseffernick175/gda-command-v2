@@ -62,6 +62,7 @@ import {
   OVERRIDABLE_FIELDS,
 } from '../services/opportunities/field-override.js';
 import { resolveOpportunityId, UUID_RE } from '../services/opportunities/resolve-id.js';
+import { parseOpportunityClass } from '../services/opportunities/vehicle-class.js';
 
 const VALID_SORT_FIELDS: readonly SortField[] = [
   'value', 'pwin', 'stage', 'due', 'agency', 'set_aside', 'title', 'recency',
@@ -553,6 +554,8 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     const sbPlayRaw = query.sb_play as string | undefined;
     const sb_play = sbPlayRaw === '1' || sbPlayRaw === 'true';
 
+    const opportunityClass = parseOpportunityClass(query.opportunity_class as string | undefined);
+
     const filters: ListFilters = {
       q: query.q as string | undefined,
       status: query.status as string | undefined,
@@ -571,6 +574,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       stage: query.stage as string | undefined,
       relevantOnly,
       idiq,
+      opportunity_class: opportunityClass ?? undefined,
       sb_play: sb_play || undefined,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor as string | undefined,
@@ -584,7 +588,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     // buildOrderByClause, but cursor keyset pagination (id < cursor_id)
     // only works for recency-desc, so the paged path is canonical for
     // any other sort field or ascending direction.
-    if (filters.page || (filters.sort_by && filters.sort_by !== 'recency') || filters.sort_dir === 'asc') {
+    if (filters.page || filters.opportunity_class || (filters.sort_by && filters.sort_by !== 'recency') || filters.sort_dir === 'asc') {
       const result = await listOpportunitiesPaged(filters);
       return reply.status(200).send(successEnvelope(result, req.requestId));
     }
