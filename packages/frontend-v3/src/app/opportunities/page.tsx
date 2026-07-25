@@ -31,6 +31,7 @@ import { isSmallBizPlay, sbPlayTooltip } from "@/lib/sb-play";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
+import type { SortDirection } from "@/lib/sort-utils";
 import {
   STAGE_TABS as CANONICAL_STAGE_TABS,
   STAGE_ACTIONS as CANONICAL_STAGE_ACTIONS,
@@ -188,33 +189,95 @@ const SET_ASIDE_OPTIONS = [
   "SDVOSB", "8(a)", "HUBZone", "WOSB", "VOSB", "SB",
 ] as const;
 
+/* ── Sticky list state (report item 3) ──────────────────────────────
+ * The list unmounts when a detail opens (?id=…), so all local filter/tab/
+ * sort/page state is persisted to sessionStorage and restored on return,
+ * keeping the analyst's previous view instead of resetting to defaults. */
+
+const OPPS_LIST_STATE_KEY = "opps:list-state:v1";
+
+/** Default list sort — highest Pwin first (report item 4). */
+const DEFAULT_SORT: { by: string; dir: SortDirection } = { by: "pwin", dir: "desc" };
+
+interface OppsListState {
+  q: string;
+  agencyFilter: string;
+  hotFilter: boolean;
+  setAsideFilter: string[];
+  valueRange: number;
+  sourceFilter: string[];
+  relevantOnly: boolean;
+  idiqFilter: "only" | "exclude" | undefined;
+  sbPlayOnly: boolean;
+  stageTab: string;
+  groupBy: "none" | "vehicle";
+  page: number;
+  sortBy: string | null;
+  sortDir: SortDirection;
+}
+
+function loadOppsListState(): Partial<OppsListState> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(OPPS_LIST_STATE_KEY);
+    return raw ? (JSON.parse(raw) as Partial<OppsListState>) : null;
+  } catch {
+    return null;
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════ */
 
 function OpportunityList() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Filter state
-  const [q, setQ] = useState("");
-  const [debouncedQ, setDebouncedQ] = useState("");
-  const [agencyFilter, setAgencyFilter] = useState(searchParams.get("agency") ?? "");
-  const [hotFilter, setHotFilter] = useState(false);
-  const [setAsideFilter, setSetAsideFilter] = useState<string[]>([]);
-  const [valueRange, setValueRange] = useState(0);
+  // Previously-saved list view, restored once on mount (report item 3).
+  const [saved] = useState<Partial<OppsListState> | null>(() => loadOppsListState());
+  // An explicit ?agency link is a fresh intent and overrides the saved filter.
+  const agencyParam = searchParams.get("agency");
 
-  const [sourceFilter, setSourceFilter] = useState<string[]>([]);
-  const [relevantOnly, setRelevantOnly] = useState(true);
-  const [idiqFilter, setIdiqFilter] = useState<'only' | 'exclude' | undefined>(undefined);
-  const [sbPlayOnly, setSbPlayOnly] = useState(false);
-  const [stageTab, setStageTab] = useState("active");
-  const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
+  // Filter state
+  const [q, setQ] = useState(saved?.q ?? "");
+  const [debouncedQ, setDebouncedQ] = useState(saved?.q ?? "");
+  const [agencyFilter, setAgencyFilter] = useState(agencyParam ?? saved?.agencyFilter ?? "");
+  const [hotFilter, setHotFilter] = useState(saved?.hotFilter ?? false);
+  const [setAsideFilter, setSetAsideFilter] = useState<string[]>(saved?.setAsideFilter ?? []);
+  const [valueRange, setValueRange] = useState(saved?.valueRange ?? 0);
+
+  const [sourceFilter, setSourceFilter] = useState<string[]>(saved?.sourceFilter ?? []);
+  const [relevantOnly, setRelevantOnly] = useState(saved?.relevantOnly ?? true);
+  const [idiqFilter, setIdiqFilter] = useState<'only' | 'exclude' | undefined>(saved?.idiqFilter);
+  const [sbPlayOnly, setSbPlayOnly] = useState(saved?.sbPlayOnly ?? false);
+  const [stageTab, setStageTab] = useState(saved?.stageTab ?? "active");
+  const [groupBy, setGroupBy] = useState<"none" | "vehicle">(saved?.groupBy ?? "none");
   const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
   const [showQualifyQueue, setShowQualifyQueue] = useState(false);
   const qualifyStage = useUpdateStage();
   const { toast } = useToast();
-  const [page, setPage] = useState(1);
-  const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
+  const [page, setPage] = useState(saved?.page ?? 1);
+  const { sortBy, sortDir, handleSort } = useTableSort();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sort resolution (report item 4). URL sort wins; otherwise fall back to the
+  // saved sort (until the user touches sort this session) and finally the
+  // Pwin-descending default. The header reflects the resolved sort; the query
+  // always sends a concrete sort so the default Pwin ordering applies.
+  const [sortTouched, setSortTouched] = useState(false);
+  const onSort = useCallback((field: string) => {
+    setSortTouched(true);
+    handleSort(field);
+  }, [handleSort]);
+
+  const resolvedSort: { by: string; dir: SortDirection } | null = sortBy
+    ? { by: sortBy, dir: sortDir }
+    : sortTouched
+      ? null
+      : { by: saved?.sortBy ?? DEFAULT_SORT.by, dir: saved?.sortDir ?? DEFAULT_SORT.dir };
+  const headerSortBy = resolvedSort?.by ?? null;
+  const headerSortDir = resolvedSort?.dir ?? "asc";
+  const querySortBy = resolvedSort?.by ?? DEFAULT_SORT.by;
+  const querySortDir = resolvedSort?.dir ?? DEFAULT_SORT.dir;
 
   const filterParams = useMemo(() => {
     const range = VALUE_RANGES[valueRange];
@@ -231,11 +294,11 @@ function OpportunityList() {
       relevant_only: relevantOnly,
       idiq: idiqFilter,
       sb_play: sbPlayOnly || undefined,
-      sort_by: sortParams.sort_by,
-      sort_dir: sortParams.sort_dir,
+      sort_by: querySortBy,
+      sort_dir: querySortDir,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, sbPlayOnly, sortParams.sort_by, sortParams.sort_dir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, sbPlayOnly, querySortBy, querySortDir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -331,6 +394,33 @@ function OpportunityList() {
     },
     [meta],
   );
+
+  // Persist the current view so it survives navigating into a detail and back
+  // (report item 3). Sort is stored as the raw URL selection (null = default).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const state: OppsListState = {
+      q: debouncedQ,
+      agencyFilter,
+      hotFilter,
+      setAsideFilter,
+      valueRange,
+      sourceFilter,
+      relevantOnly,
+      idiqFilter,
+      sbPlayOnly,
+      stageTab,
+      groupBy,
+      page,
+      sortBy,
+      sortDir,
+    };
+    try {
+      window.sessionStorage.setItem(OPPS_LIST_STATE_KEY, JSON.stringify(state));
+    } catch {
+      // sessionStorage unavailable (private mode / quota) — non-fatal.
+    }
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, relevantOnly, idiqFilter, sbPlayOnly, stageTab, groupBy, page, sortBy, sortDir]);
 
   return (
     <div className="flex flex-col h-full">
@@ -570,17 +660,17 @@ function OpportunityList() {
                   <thead className="sticky top-0 z-10 bg-gda-bg-base">
                     <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground [&>th]:sticky [&>th]:top-0 [&>th]:z-10">
                       <th className="w-[3px] p-0 bg-gda-bg-base" />
-                      <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                      <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="140px" />
-                      <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" infoTooltip={<HeaderInfoTooltip text="Value pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin estimates (shown with ~ and in muted color). Empty means no source had data." />} />
-                      <SortableHeader label="Pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Probability of Win (0-100%). AI-scored from opportunity fit, competition, and Envision positioning. Green = forecast (65%+), amber = signal (45-64%), red = discovery (<45%)." />} />
-                      <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="150px" />
+                      <SortableHeader label="Title" field="title" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} />
+                      <SortableHeader label="Agency" field="agency" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="140px" />
+                      <SortableHeader label="Value" field="value" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="100px" infoTooltip={<HeaderInfoTooltip text="Value pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin estimates (shown with ~ and in muted color). Empty means no source had data." />} />
+                      <SortableHeader label="Pwin" field="pwin" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Probability of Win (0-100%). AI-scored from opportunity fit, competition, and Envision positioning. Green = forecast (65%+), amber = signal (45-64%), red = discovery (<45%)." />} />
+                      <SortableHeader label="Stage" field="stage" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="150px" />
                       <SortableHeader
                         label="Set-Aside"
                         field="set_aside"
-                        sortBy={sortBy}
-                        sortDir={sortDir}
-                        onSort={handleSort}
+                        sortBy={headerSortBy}
+                        sortDir={headerSortDir}
+                        onSort={onSort}
                         width="120px"
                         filter={{
                           options: SET_ASIDE_OPTIONS,
@@ -588,7 +678,7 @@ function OpportunityList() {
                           onToggle: (v) => toggleArrayFilter(setSetAsideFilter, v),
                         }}
                       />
-                      <SortableHeader label="Due" field="due" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Due date pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin forecasts (shown with ~ and in muted color). Empty means no source had data." />} />
+                      <SortableHeader label="Due" field="due" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Due date pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin forecasts (shown with ~ and in muted color). Empty means no source had data." />} />
                       <th className="px-3 py-2 text-left font-medium w-[60px] bg-gda-bg-base">Actions</th>
                     </tr>
                   </thead>
