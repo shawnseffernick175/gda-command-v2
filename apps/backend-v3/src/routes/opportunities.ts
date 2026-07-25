@@ -1011,11 +1011,26 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       [id, predictedPwin, outcome],
     );
 
+    // Reconcile the pipeline stage so the outcome is a single fact across tabs
+    // (report item 5). won/lost/no_bid are terminal pipeline stages; without
+    // this, a recorded win never advanced pipeline_items, so the Opportunities
+    // list (which derives status from pipeline_items) still showed it active.
+    const outcomeUser = (req as typeof req & { user?: { sub: string } }).user;
+    const captureOwner = (body?.capture_owner as string) ?? outcomeUser?.sub ?? 'system';
+    let pipelineStage: string | null = null;
+    try {
+      const { row } = await updateOpportunity(id, { stage: outcome, capture_owner: captureOwner });
+      pipelineStage = await getPipelineStage(String(row.id));
+    } catch (err) {
+      logger.warn({ err, opportunityId: id }, 'outcome recorded but pipeline stage reconciliation failed');
+    }
+
     return reply.status(200).send(
       successEnvelope({
         opportunity_id: id,
         predicted_pwin: predictedPwin,
         actual_outcome: outcome,
+        pipeline_stage: pipelineStage,
       }, req.requestId),
     );
   });
