@@ -312,6 +312,14 @@ export async function listOpportunities(
   const params: unknown[] = [];
   let paramIdx = 1;
 
+  // Contract-vehicle task orders (e.g. OASIS TOs) belong to the Vehicles tab
+  // only — they are competed under a vehicle we already track and are surfaced
+  // there via /v3/vehicles/:id/opportunities. Exclude any opportunity linked to
+  // a contract vehicle from the general Opportunities list so it never appears
+  // in both places. The link (opportunity_vehicle_links) is deterministic and
+  // source-backed (match_evidence per row).
+  conditions.push(`NOT EXISTS (SELECT 1 FROM opportunity_vehicle_links ovl WHERE ovl.opportunity_id = o.id)`);
+
   if (filters.q) {
     conditions.push(`(title ILIKE $${paramIdx} OR agency ILIKE $${paramIdx})`);
     params.push(`%${filters.q}%`);
@@ -479,6 +487,12 @@ function buildFilterConditions(
   const conditions: string[] = ['o.deleted_at IS NULL'];
   const params: unknown[] = [];
   let paramIdx = 1;
+
+  // Contract-vehicle task orders (e.g. OASIS TOs) belong to the Vehicles tab
+  // only — exclude any opportunity linked to a contract vehicle from the
+  // general list and its meta counts (this builder feeds both). See the note
+  // in listOpportunities for rationale.
+  conditions.push(`NOT EXISTS (SELECT 1 FROM opportunity_vehicle_links ovl WHERE ovl.opportunity_id = o.id)`);
 
   if (filters.q) {
     conditions.push(

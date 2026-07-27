@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useMemo, lazy, Suspense } from "react";
-import Link from "next/link";
 import {
   useVehicles,
   useReingestAllVehicles,
@@ -283,14 +282,17 @@ export default function VehiclesPage() {
                         <StatusBadge status={v.status} expiration={v.expiration_date} />
                       </td>
                       <td className="px-3 py-2">
-                        <Link
-                          href="/opportunities"
+                        <button
+                          type="button"
                           className="text-xs font-mono text-gda-green hover:underline"
-                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                          title="View opportunities"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            setSelectedId(v.id);
+                          }}
+                          title="View this vehicle's task orders"
                         >
                           {v.opportunity_count}
-                        </Link>
+                        </button>
                       </td>
                     </tr>
                   ))

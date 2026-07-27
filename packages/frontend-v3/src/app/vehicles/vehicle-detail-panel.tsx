@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import Link from "next/link";
-import { useVehicleDetail } from "@/hooks/use-vehicles";
+import { useVehicleDetail, useVehicleOpportunities } from "@/hooks/use-vehicles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreTooltip } from "@/components/shared/score-tooltip";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,8 @@ export default function VehicleDetailPanel({
   onClose: () => void;
 }) {
   const { data, isLoading } = useVehicleDetail(vehicleId);
+  const { data: opportunities, isLoading: oppsLoading } =
+    useVehicleOpportunities(vehicleId);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -156,6 +158,48 @@ export default function VehicleDetailPanel({
           ))}
         </div>
       )}
+
+      <div className="space-y-2">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Task Orders & Opportunities
+        </h3>
+        {oppsLoading ? (
+          <Skeleton className="h-12 bg-gda-panel" />
+        ) : opportunities && opportunities.length > 0 ? (
+          <div className="space-y-1.5">
+            {opportunities.map((opp) => (
+              <Link
+                key={opp.id}
+                href={`/opportunities?id=${opp.id}`}
+                className="block rounded border border-border p-2 text-xs hover:bg-gda-bg-base transition-colors"
+                title={opp.match_evidence ?? undefined}
+              >
+                <span className="block font-medium text-foreground line-clamp-2">
+                  {opp.title}
+                </span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-muted-foreground">
+                  {opp.agency && <span>{opp.agency}</span>}
+                  {opp.set_aside && (
+                    <span className="text-gda-green">{opp.set_aside}</span>
+                  )}
+                  {opp.pipeline_stage && (
+                    <span className="capitalize">
+                      {opp.pipeline_stage.replace(/_/g, " ")}
+                    </span>
+                  )}
+                  {opp.response_due_at && (
+                    <span>Due {formatDate(opp.response_due_at)}</span>
+                  )}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No task orders linked to this vehicle yet.
+          </p>
+        )}
+      </div>
 
       {data.status && (
         <ScoreTooltip
