@@ -461,7 +461,7 @@ function OpportunityList() {
           <p className="text-xs leading-relaxed text-muted-foreground">
             Every government opportunity in your wheelhouse — forecasts, sources
             sought, and active solicitations. Search and filter the list, open one
-            to see its automatic analysis and PWin, and advance the ones worth
+            to see its automatic analysis and Priority Score, and advance the ones worth
             pursuing into capture.
           </p>
         </div>
@@ -713,7 +713,7 @@ function OpportunityList() {
                       <SortableHeader label="Title" field="title" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} />
                       <SortableHeader label="Agency" field="agency" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="140px" />
                       <SortableHeader label="Value" field="value" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="100px" infoTooltip={<HeaderInfoTooltip text="Value pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin estimates (shown with ~ and in muted color). Empty means no source had data." />} />
-                      <SortableHeader label="Pwin" field="pwin" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Probability of Win (0-100%). AI-scored from opportunity fit, competition, and Envision positioning. Green = forecast (65%+), amber = signal (45-64%), red = discovery (<45%)." />} />
+                      <SortableHeader label="Priority" field="pwin" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Priority Score (0-100): a deterministic rules-based ranking of how attractive an opportunity is to pursue (fit, competition, Envision positioning). It is an uncalibrated heuristic, not a literal win probability. Green = forecast (65+), amber = signal (45-64), red = discovery (<45)." />} />
                       <SortableHeader label="Stage" field="stage" sortBy={headerSortBy} sortDir={headerSortDir} onSort={onSort} width="150px" />
                       <SortableHeader
                         label="Set-Aside"
@@ -812,7 +812,7 @@ function HotChip({
       </button>
       {showTip && (
         <div className="absolute bottom-full left-0 z-50 mb-2 w-56 rounded border border-border bg-gda-bg-raised p-2.5 text-xs text-muted-foreground shadow-lg normal-case font-normal">
-          {"Hot = opportunities with Pwin (probability of win) \u2265 70%. Count reflects the current filter / tab."}
+          {"Hot = opportunities with a Priority Score \u2265 70. Count reflects the current filter / tab."}
         </div>
       )}
     </span>
@@ -1260,7 +1260,7 @@ function QualifyStagingQueue() {
           <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground uppercase tracking-wider">
             <th className="px-3 py-2 text-left font-medium">Opportunity</th>
             <th className="px-3 py-2 text-left font-medium w-[140px]">Agency</th>
-            <th className="px-3 py-2 text-left font-medium w-[80px]">Pwin</th>
+            <th className="px-3 py-2 text-left font-medium w-[80px]">Priority</th>
             <th className="px-3 py-2 text-left font-medium w-[100px]">Source</th>
             <th className="px-3 py-2 text-left font-medium w-[120px]">Date Staged</th>
             <th className="px-3 py-2 text-left font-medium w-[160px]">Actions</th>
