@@ -24,6 +24,21 @@ export interface PwinWeights {
   existing_customer?: number;
 }
 
+/**
+ * Default rules-scorer weights.
+ *
+ * NOTE — currently-inert levers. The production feature-extraction path
+ * (`feature-extraction.ts`) hardcodes the features these two weights depend on,
+ * so they never actually move a score today:
+ *   - `margin_penalty`  — gated on `below_margin_floor`, which is always `false`
+ *     (no per-opportunity margin data is extracted). Never applied.
+ *   - `teaming_bonus`   — gated on `candidate_partners.length >= 1`, but
+ *     `candidate_partners` is always `[]`, so a teaming-required set-aside can
+ *     only ever take the `teaming_penalty`. The bonus is never applied.
+ * They are retained (not deleted) because the scorer implements them correctly
+ * and they activate the moment those features are populated. Do not read them
+ * as active tuning knobs until the driving features are wired.
+ */
 export const DEFAULT_PWIN_WEIGHTS: PwinWeights = {
   base: 30,
   incumbency_bonus: 30,
@@ -32,8 +47,8 @@ export const DEFAULT_PWIN_WEIGHTS: PwinWeights = {
   vehicle_access: 10,
   clearance_fit: 5,
   doctrine_bonus_max: 10,
-  margin_penalty: -20,
-  teaming_bonus: 5,
+  margin_penalty: -20, // inert: below_margin_floor never set (see note above)
+  teaming_bonus: 5, // inert: candidate_partners never populated (see note above)
   teaming_penalty: -10,
   naics_small_setaside: 20,
   naics_small_fullopen: 10,

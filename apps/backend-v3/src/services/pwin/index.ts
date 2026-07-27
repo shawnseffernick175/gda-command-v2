@@ -137,17 +137,19 @@ export async function getTrainingData(): Promise<Array<{
 }
 
 /**
- * Check if retraining is needed and perform it.
- * - >= 20 outcomes: train logistic (v2)
- * - >= 100 outcomes: train xgboost (v3)
+ * Check whether enough resolved outcomes exist to (re)train a data-driven
+ * model and, if so, record the readiness with the REAL counts we have.
  *
- * Actual ML training requires scikit-learn/xgboost in Python.
- * This function implements the orchestration logic; the actual
- * training is a placeholder that records the attempt.
+ * Real ML training (logistic / xgboost) is not implemented in-process yet.
+ * This function deliberately does NOT fabricate model-quality metrics
+ * (AUC / accuracy / calibration) and NEVER auto-promotes a model. Doing so
+ * would surface unsupported numbers (R1) and could silently swap the active
+ * scorer on invented evidence. It records a non-active readiness marker with
+ * only measured facts (outcome/win/loss counts); promotion of any real model
+ * is an explicit, human-reviewed step.
  */
 export async function trainIfReady(): Promise<RetrainResult | null> {
   const outcomeCount = await countResolvedOutcomes();
-  const currentModel = await getActiveModel();
 
   if (outcomeCount < 20) {
     logger.info({ outcomeCount }, '[pwin] Not enough outcomes for ML training (<20)');
@@ -156,47 +158,30 @@ export async function trainIfReady(): Promise<RetrainResult | null> {
 
   const modelKind = outcomeCount >= 100 ? 'xgboost' : 'logistic';
   const dateStr = new Date().toISOString().slice(0, 10);
-  const newVersion = modelKind === 'xgboost'
-    ? `v3-xgb-${dateStr}`
-    : `v2-logistic-${dateStr}`;
+  const newVersion = `${modelKind === 'xgboost' ? 'v3-xgb' : 'v2-logistic'}-ready-${dateStr}`;
 
-  // Check if we already trained this version today
+  // Only record the readiness marker once per day.
   const existingCheck = await pool.query<{ id: string }>(
     'SELECT id FROM pwin_model_versions WHERE version = $1',
     [newVersion],
   );
   if (existingCheck.rows.length > 0) {
-    logger.info({ version: newVersion }, '[pwin] Already trained today, skipping');
+    logger.info({ version: newVersion }, '[pwin] Readiness already recorded today, skipping');
     return null;
   }
 
   const trainingData = await getTrainingData();
-
-  // Compute synthetic metrics for the training run.
-  // Real ML training would happen here via Python subprocess or in-process.
   const winCount = trainingData.filter((d) => d.outcome === 'won').length;
   const lossCount = trainingData.filter((d) => d.outcome === 'lost').length;
-  const total = trainingData.length;
-  const winRate = total > 0 ? winCount / total : 0;
 
-  // Synthetic AUC estimate based on data quality
-  const syntheticAuc = 0.5 + (Math.min(outcomeCount, 200) / 200) * 0.3 + (winRate > 0.1 && winRate < 0.9 ? 0.05 : 0);
+  // Only measured facts — no fabricated quality metrics.
   const metrics = {
-    auc: Math.round(syntheticAuc * 1000) / 1000,
-    accuracy: Math.round((0.5 + (outcomeCount / 500) * 0.3) * 1000) / 1000,
-    calibration: Math.round((0.8 + Math.random() * 0.15) * 1000) / 1000,
-    training_samples: total,
+    training_samples: trainingData.length,
     win_count: winCount,
     loss_count: lossCount,
   };
 
-  const promotionThreshold = 0.65;
-  const shouldPromote = metrics.auc > promotionThreshold;
-
-  // Get feature schema from current model
-  const featureSchema = currentModel?.feature_schema ?? {};
-
-  // Insert new model version
+  // Record a NON-active readiness marker. Never auto-promote.
   await pool.query(
     `INSERT INTO pwin_model_versions (
       version, model_kind, trained_on_outcomes_count,
@@ -206,44 +191,22 @@ export async function trainIfReady(): Promise<RetrainResult | null> {
       newVersion,
       modelKind,
       outcomeCount,
-      JSON.stringify(featureSchema),
+      JSON.stringify({}),
       JSON.stringify(metrics),
-      `Auto-trained on ${outcomeCount} outcomes. AUC=${metrics.auc}. ${shouldPromote ? 'Promoted.' : 'Not promoted (AUC below threshold).'}`,
+      `Training data ready (${outcomeCount} outcomes: ${winCount} won / ${lossCount} lost). ` +
+        `In-process ${modelKind} training is not implemented; no model was fit and none was promoted. ` +
+        `Promotion of a real trained model is a separate, human-reviewed step.`,
     ],
   );
 
-  if (shouldPromote) {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(
-        'UPDATE pwin_model_versions SET is_active = FALSE WHERE is_active = TRUE',
-      );
-      await client.query(
-        'UPDATE pwin_model_versions SET is_active = TRUE WHERE version = $1',
-        [newVersion],
-      );
-      await client.query('COMMIT');
-    } catch (txErr) {
-      await client.query('ROLLBACK');
-      throw txErr;
-    } finally {
-      client.release();
-    }
-    logger.info(
-      { version: newVersion, metrics, modelKind },
-      '[pwin] New model promoted to active',
-    );
-  } else {
-    logger.info(
-      { version: newVersion, metrics, threshold: promotionThreshold },
-      '[pwin] New model trained but not promoted (AUC below threshold)',
-    );
-  }
+  logger.info(
+    { version: newVersion, metrics, modelKind },
+    '[pwin] Training-readiness recorded (no model fit, no auto-promotion)',
+  );
 
   return {
     new_version: newVersion,
-    promoted: shouldPromote,
+    promoted: false,
     metrics,
   };
 }

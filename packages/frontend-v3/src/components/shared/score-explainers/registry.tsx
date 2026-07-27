@@ -57,7 +57,7 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
   /* ── 1. Pwin ────────────────────────────────────────────────── */
   pwin: {
     description:
-      "Likelihood Envision wins the opportunity if pursued. Deterministic rules-based model (v1).",
+      "Priority Score (0–100): a deterministic rules-based ranking of how attractive an opportunity is to pursue. It is an uncalibrated heuristic, not a literal win probability — higher means higher priority.",
     renderFormula: () => (
       <ul className="space-y-0.5">
         <Bullet>Base score: 30</Bullet>
@@ -67,10 +67,9 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
         <Bullet>Vehicle access: +10</Bullet>
         <Bullet>Clearance fit: +5</Bullet>
         <Bullet>Doctrine alignment: (score/40) × 10</Bullet>
-        <Bullet>Margin penalty: −20 if below floor</Bullet>
-        <Bullet>Teaming: +5 partner found / −10 partner needed but missing</Bullet>
         <Bullet>NAICS size: +20 (SB set-aside) / +10 (SB full-open)</Bullet>
         <Bullet>Existing customer: +5</Bullet>
+        <Bullet>Teaming: −10 when a set-aside partner is required</Bullet>
         <Bullet>Exclusion kill: clamps to 0</Bullet>
       </ul>
     ),
