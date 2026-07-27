@@ -161,7 +161,7 @@ export default function VehicleDetailPanel({
 
       <div className="space-y-2">
         <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Task Orders &amp; Opportunities
+          Task Orders & Opportunities
         </h3>
         {oppsLoading ? (
           <Skeleton className="h-12 bg-gda-panel" />
