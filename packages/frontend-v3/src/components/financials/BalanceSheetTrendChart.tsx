@@ -1,24 +1,8 @@
 "use client";
 
-import ReactEChartsCore from "echarts-for-react/lib/core";
-import * as echarts from "echarts/core";
-import { LineChart } from "echarts/charts";
-import {
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-} from "echarts/components";
-import { CanvasRenderer } from "echarts/renderers";
+import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 import { useBalanceSheet } from "@/hooks/use-balance-sheet";
 import { formatMoney } from "@/lib/format-money";
-
-echarts.use([
-  LineChart,
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-  CanvasRenderer,
-]);
 
 const SERIES_CONFIG = [
   { key: "cash" as const, label: "Cash", color: "var(--color-fin-teal)" },

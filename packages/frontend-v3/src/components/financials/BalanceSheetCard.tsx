@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useBalanceSheet } from "@/hooks/use-balance-sheet";
+import { BalanceSheetTrendChart } from "@/components/financials/BalanceSheetTrendChart";
 import { formatMoney, formatMoneyFull } from "@/lib/format-money";
 import { Kpi } from "@/components/financials/primitives/Kpi";
 import { SortableHeader } from "@/components/shared/SortableHeader";
@@ -17,41 +18,6 @@ const BS_SORT_COLS: ColumnSortConfig[] = [
   { field: "accounts_receivable", type: "number" },
   { field: "accounts_payable", type: "number" },
 ];
-
-function SparkLine({
-  points,
-  max,
-  color,
-}: {
-  points: number[];
-  max: number;
-  color: string;
-}) {
-  if (points.length < 2 || max === 0) return null;
-  const w = 100;
-  const h = 40;
-  const coords = points.map((v, i) => {
-    const x = (i / (points.length - 1)) * w;
-    const y = h - (v / max) * h;
-    return `${x},${y}`;
-  });
-  return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="w-full h-10"
-      preserveAspectRatio="none"
-    >
-      <polyline
-        points={coords.join(" ")}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 export function BalanceSheetCard() {
   const { data, isLoading } = useBalanceSheet();
@@ -82,7 +48,6 @@ export function BalanceSheetCard() {
   }
 
   const { latest } = data;
-  const totalAssetsMax = Math.max(...sortedTrend.map((r) => r.total_assets), 1);
 
   const summaryCards = [
     { label: "Cash", value: latest.cash },
@@ -110,15 +75,11 @@ export function BalanceSheetCard() {
       </div>
 
       {sortedTrend.length >= 2 && (
-        <div className="rounded border border-border bg-gda-panel p-3 space-y-1">
+        <div className="space-y-1">
           <p className="text-[12px] text-muted-foreground">
-            Total Assets Trend
+            Balance Sheet Trend
           </p>
-          <SparkLine
-            points={sortedTrend.map((r) => r.total_assets).reverse()}
-            max={totalAssetsMax}
-            color="var(--color-gda-cyan)"
-          />
+          <BalanceSheetTrendChart />
         </div>
       )}
 

@@ -188,7 +188,12 @@ jobs:
           # 728→730: main now sits at the exact 728KB ceiling; the missing-vs-zero
           # + blocked-stage-move toast fix adds ~1KB (729KB). Same rationale —
           # small headroom so a ~1KB correctness fix + gzip jitter don't flap.
-          MAX_MAIN_KB=730
+          # 730→731: wiring the previously-dead BalanceSheetTrendChart +
+          # IndirectExpensePanel into the Financial Bible added the components, but
+          # switching them onto the shared SVG echarts-setup (dropping the only
+          # CanvasRenderer usage) offset it, so total lands back near ~728KB. Tiny
+          # bump purely for gzip cross-runner jitter headroom at the ceiling.
+          MAX_MAIN_KB=731
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
