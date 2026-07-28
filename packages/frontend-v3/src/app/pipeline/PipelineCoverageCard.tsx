@@ -156,7 +156,9 @@ function CoverageRow({
           {formatMoney(layer.actual)}
         </td>
         <td className="px-4 py-2 text-right font-mono text-xs text-foreground tabular-nums">
-          {layer.multiple.toFixed(1)}×
+          <span title={`Required = AOP target × ${layer.multiple}. Covered ${layer.coverage.toFixed(2)}× so far.`}>
+            {layer.multiple}×
+          </span>
         </td>
         <td className="px-4 py-2 text-center">
           <span

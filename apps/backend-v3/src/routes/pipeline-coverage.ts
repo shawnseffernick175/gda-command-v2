@@ -177,8 +177,13 @@ export async function pipelineCoverageRoutes(app: FastifyInstance): Promise<void
       const pursuits = allPursuits.filter((p) => stageSet.has(p.stage));
       const actual = pursuits.reduce((sum, p) => sum + p.capture_value, 0);
 
-      const multiple = aopTarget > 0 ? Math.round((actual / aopTarget) * 10) / 10 : 0;
+      // `multiple` is the layer's coverage multiplier of the AOP target
+      // (AOP ×10, Identification ×5, …) — Required = AOP target × multiple.
+      // `coverage` is how far actual has covered that Required (actual ÷
+      // Required), which drives the status dot: ≥1.0× on track, 0.8–1.0×
+      // warning, <0.8× under-covered.
       const ratio = requiredMin > 0 ? actual / requiredMin : 1;
+      const coverage = requiredMin > 0 ? Math.round(ratio * 100) / 100 : 0;
       const status = statusFromRatio(ratio);
 
       return {
@@ -187,7 +192,8 @@ export async function pipelineCoverageRoutes(app: FastifyInstance): Promise<void
         required_min: requiredMin,
         required_max: null,
         actual: Math.round(actual),
-        multiple,
+        multiple: cfg.multiple,
+        coverage,
         status,
         pursuits,
       };
