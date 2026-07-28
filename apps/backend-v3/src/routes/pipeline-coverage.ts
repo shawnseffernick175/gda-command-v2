@@ -18,8 +18,12 @@ import { pool } from '../lib/db.js';
 const LAYER_CONFIG = {
   aop: {
     label: 'AOP',
+    // 'qualify' is a pre-pipeline staging state that is not counted in metrics
+    // (excluded everywhere else — pipeline summary, opportunities list, capture
+    // stage sets), so it is excluded here too. 'qualified' is the first counted
+    // stage.
     multiple: 10,
-    stages: ['interest', 'qualify', 'qualified', 'pursue', 'solicitation', 'post_submittal'],
+    stages: ['interest', 'qualified', 'pursue', 'solicitation', 'post_submittal'],
   },
   identification: {
     label: 'Identification',
