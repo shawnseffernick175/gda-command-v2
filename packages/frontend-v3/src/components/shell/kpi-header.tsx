@@ -36,7 +36,7 @@ const KPI_TILES: KpiTile[] = [
   { label: "Gross Margin", labelLines: ["Gross", "Margin"], key: "gross_margin", scoreType: "gross_margin", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
   { label: "Return on Sales", labelLines: ["Return on", "Sales"], key: "ros", scoreType: "ros", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
   { label: "Funded Backlog", labelLines: ["Funded", "Backlog"], key: "funded_backlog", scoreType: "funded_backlog", colorCoded: false, format: formatMoney },
-  { label: "Backlog", key: "backlog", scoreType: "backlog", colorCoded: false, format: formatMoney },
+  { label: "Contract Backlog", labelLines: ["Contract", "Backlog"], key: "backlog", scoreType: "backlog", colorCoded: false, format: formatMoney },
 ];
 
 function Divider() {
