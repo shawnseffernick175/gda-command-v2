@@ -254,7 +254,7 @@ function PipelineContent() {
         </div>
       </div>
 
-      {/* ── Section 0: Shipley Pipeline Coverage Card ─────────── */}
+      {/* ── Section 0: Pipeline Coverage Card ─────────────────── */}
       <PipelineCoverageCard />
 
       {/* ── Section 1: Pipeline KPI Strip ─────────────────────────── */}
