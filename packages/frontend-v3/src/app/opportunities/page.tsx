@@ -41,6 +41,7 @@ import {
   CANONICAL_STAGE_KEYS,
   DB_KEY_TO_LABEL,
   isStagingStage,
+  stageMoveErrorMessage,
   type ActiveStage,
 } from "@/lib/stages";
 import type {
@@ -1043,6 +1044,7 @@ function OpportunityRow({
   onSelect?: (id: string) => void;
 }) {
   const updateStage = useUpdateStage();
+  const { toast } = useToast();
   const heat = getHeatColor(opp);
   const daysLeft = formatDaysLeft(opp);
   const pipelineStage = opp.pipeline_stage;
@@ -1155,7 +1157,11 @@ function OpportunityRow({
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => {
             const next = e.target.value;
-            if (next) updateStage.mutate({ id: String(opp.id), stage: next });
+            if (next)
+              updateStage.mutate(
+                { id: String(opp.id), stage: next },
+                { onError: (err) => toast(stageMoveErrorMessage(err), "error") },
+              );
           }}
           disabled={updateStage.isPending}
           className={cn(
@@ -1491,7 +1497,12 @@ function OpportunityDetail({ id }: { id: string }) {
                 )}
                 <button
                   type="button"
-                  onClick={() => updateStage.mutate({ id, stage })}
+                  onClick={() =>
+                    updateStage.mutate(
+                      { id, stage },
+                      { onError: (err) => detailToast(stageMoveErrorMessage(err), "error") },
+                    )
+                  }
                   className={cn(
                     "flex items-center gap-1 text-[12px] font-mono transition-colors",
                     isCurrent && "text-gda-green font-bold",
