@@ -1,50 +1,56 @@
 /**
- * Pipeline Coverage — Shipley Capture Management Lifecycle model (#887).
+ * Pipeline Coverage — capture-lifecycle funnel.
  *
  * Endpoint:
  *   GET /v3/pipeline/coverage?fy=2026  — layer-by-layer coverage snapshot
+ *
+ * Each layer's Required = the fiscal year's AOP revenue target × the layer
+ * multiple. Layers are a nested funnel: earlier phases carry a larger multiple
+ * because fewer of those pursuits convert.
  */
 
 import type { FastifyInstance } from 'fastify';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { pool } from '../lib/db.js';
 
-/* ── Shipley multiples (doctrine — hardcoded) ─────────────────── */
+/* ── Coverage multiples (doctrine — hardcoded) ────────────────── */
 
 const LAYER_CONFIG = {
-  total_qualified: {
-    label: 'Total Qualified',
-    multiple_min: 5,
-    multiple_max: null,
+  aop: {
+    label: 'AOP',
+    multiple: 10,
+    stages: ['interest', 'qualify', 'qualified', 'pursue', 'solicitation', 'post_submittal'],
+  },
+  identification: {
+    label: 'Identification',
+    multiple: 5,
     stages: ['qualified', 'pursue', 'solicitation', 'post_submittal'],
   },
-  active_capture: {
-    label: 'Active Capture',
-    multiple_min: 3,
-    multiple_max: null,
+  pursuit: {
+    label: 'Pursuit',
+    multiple: 2.5,
     stages: ['pursue', 'solicitation', 'post_submittal'],
   },
-  bid_proposal: {
-    label: 'Bid & Proposal',
-    multiple_min: 1.5,
-    multiple_max: 2,
+  capture: {
+    label: 'Capture',
+    multiple: 1.25,
     stages: ['solicitation', 'post_submittal'],
   },
-  pwin_weighted: {
-    label: 'Pwin-Weighted',
-    multiple_min: 1,
-    multiple_max: null,
-    stages: null, // all active stages — uses weighted calc
+  proposal: {
+    label: 'Proposal',
+    multiple: 0.65,
+    stages: ['post_submittal'],
   },
 } as const;
 
 type LayerKey = keyof typeof LAYER_CONFIG;
 
 const LAYER_ORDER: LayerKey[] = [
-  'total_qualified',
-  'active_capture',
-  'bid_proposal',
-  'pwin_weighted',
+  'aop',
+  'identification',
+  'pursuit',
+  'capture',
+  'proposal',
 ];
 
 const DEFAULT_STAGE_PWIN: Record<string, number> = {
@@ -160,21 +166,12 @@ export async function pipelineCoverageRoutes(app: FastifyInstance): Promise<void
     const layers = LAYER_ORDER.map((key) => {
       const cfg = LAYER_CONFIG[key];
 
-      const requiredMin = aopTarget * cfg.multiple_min;
-      const requiredMax = cfg.multiple_max != null ? aopTarget * cfg.multiple_max : null;
+      // Required = the fiscal year's AOP revenue target × the layer multiple.
+      const requiredMin = aopTarget * cfg.multiple;
 
-      let actual: number;
-      let pursuits: CoveragePursuit[];
-
-      if (key === 'pwin_weighted') {
-        // Pwin-weighted: sum(value * pwin) across all active pursuits
-        pursuits = allPursuits;
-        actual = allPursuits.reduce((sum, p) => sum + p.capture_value * p.pwin, 0);
-      } else {
-        const stageSet = new Set<string>(cfg.stages);
-        pursuits = allPursuits.filter((p) => stageSet.has(p.stage));
-        actual = pursuits.reduce((sum, p) => sum + p.capture_value, 0);
-      }
+      const stageSet = new Set<string>(cfg.stages);
+      const pursuits = allPursuits.filter((p) => stageSet.has(p.stage));
+      const actual = pursuits.reduce((sum, p) => sum + p.capture_value, 0);
 
       const multiple = aopTarget > 0 ? Math.round((actual / aopTarget) * 10) / 10 : 0;
       const ratio = requiredMin > 0 ? actual / requiredMin : 1;
@@ -184,7 +181,7 @@ export async function pipelineCoverageRoutes(app: FastifyInstance): Promise<void
         key,
         label: cfg.label,
         required_min: requiredMin,
-        required_max: requiredMax,
+        required_max: null,
         actual: Math.round(actual),
         multiple,
         status,

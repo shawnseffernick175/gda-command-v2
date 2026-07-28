@@ -51,7 +51,7 @@ export function PipelineCoverageCard() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <h2 className="font-mono text-xs font-bold uppercase text-muted-foreground tracking-wider">
-          Pipeline Coverage — Shipley Model
+          Pipeline Coverage
         </h2>
         <div className="flex gap-1">
           {FY_OPTIONS.map((year) => (
@@ -111,7 +111,7 @@ export function PipelineCoverageCard() {
           {/* Source line */}
           <div className="border-t border-border px-4 py-2">
             <p className="font-mono text-[12px] italic text-muted-foreground">
-              Source: Shipley Capture Management Lifecycle. Required = AOP revenue target × layer multiple.
+              Required = AOP revenue target × layer multiple. Change the AOP target and every layer recomputes.
             </p>
           </div>
         </>
@@ -147,11 +147,9 @@ function CoverageRow({
         </td>
         <td className="px-4 py-2 text-right font-mono text-xs text-muted-foreground tabular-nums">
           <span
-            title={`AOP × ${layer.key === "pwin_weighted" ? "≥1" : layer.required_max != null ? `${(layer.required_min / aopTarget).toFixed(1)}–${(layer.required_max / aopTarget).toFixed(0)}` : `${(layer.required_min / aopTarget).toFixed(0)}`}×`}
+            title={`AOP target × ${aopTarget > 0 ? +(layer.required_min / aopTarget).toFixed(2) : 0}×`}
           >
-            {layer.key === "pwin_weighted"
-              ? `≥${formatMoney(layer.required_min)}`
-              : formatRequiredRange(layer.required_min, layer.required_max)}
+            {formatRequiredRange(layer.required_min, layer.required_max)}
           </span>
         </td>
         <td className="px-4 py-2 text-right font-mono text-xs text-foreground tabular-nums">
