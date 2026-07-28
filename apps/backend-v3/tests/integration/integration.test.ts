@@ -155,8 +155,8 @@ describe('Integration: detail endpoint with fresh cache', () => {
   });
 });
 
-describe('Integration: detail endpoint pre-warm completes within timeout', () => {
-  it('returns 200 after analysis job completes', async () => {
+describe('Integration: detail endpoint does not block on analysis', () => {
+  it('returns 200 immediately while the analysis worker runs', async () => {
     const id = await insertTestOpportunity({
       title: 'Test PreWarm',
       agency: 'Department of the Army',
@@ -173,20 +173,23 @@ describe('Integration: detail endpoint pre-warm completes within timeout', () =>
         headers: authHeader(),
       });
 
-      if (res.statusCode === 200) {
-        const body = JSON.parse(res.body) as {
-          success: boolean;
-          data: { analysis: { pwin: number; version: string; generated_at: string } };
+      // The detail endpoint no longer waits for the analysis job, so it must
+      // answer 200 whether or not the worker has finished yet.
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body) as {
+        success: boolean;
+        data: {
+          analysis: { pwin: number; version: string; generated_at: string } | null;
+          analysis_pending?: boolean;
         };
-        expect(body.success).toBe(true);
-        expect(body.data.analysis).not.toBeNull();
+      };
+      expect(body.success).toBe(true);
+      if (body.data.analysis) {
         expect(typeof body.data.analysis.pwin).toBe('number');
         expect(body.data.analysis.version).toBe('v0.0.1-test');
         expect(body.data.analysis.generated_at).toBeTruthy();
       } else {
-        expect(res.statusCode).toBe(503);
-        const body = JSON.parse(res.body) as { success: boolean; error: { code: string } };
-        expect(body.error.code).toBe('ANALYSIS_TIMEOUT');
+        expect(body.data.analysis_pending).toBe(true);
       }
     } finally {
       await workerBoss.stop({ graceful: true, timeout: 5000 });
@@ -194,8 +197,8 @@ describe('Integration: detail endpoint pre-warm completes within timeout', () =>
   });
 });
 
-describe('Integration: detail endpoint ANALYSIS_TIMEOUT', () => {
-  it('returns 503 when no worker processes the job', async () => {
+describe('Integration: detail endpoint never 503s on missing analysis', () => {
+  it('returns 200 with analysis_pending when no worker processes the job', async () => {
     process.env['ANALYSIS_TIMEOUT_MS'] = '500';
     process.env['ANALYSIS_POLL_INTERVAL_MS'] = '50';
 
@@ -209,11 +212,16 @@ describe('Integration: detail endpoint ANALYSIS_TIMEOUT', () => {
       headers: authHeader(),
     });
 
-    expect(res.statusCode).toBe(503);
-    const body = JSON.parse(res.body) as { success: boolean; error: { code: string; detail: string | null } };
-    expect(body.success).toBe(false);
-    expect(body.error.code).toBe('ANALYSIS_TIMEOUT');
-    expect(body.error.detail).toContain('estimated_seconds');
+    // This previously blocked on waitForAnalysis and returned 503
+    // ANALYSIS_TIMEOUT, which stopped the detail page from opening at all.
+    // It must now open instantly and let analysis fill in asynchronously.
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      success: boolean;
+      data: { analysis_pending?: boolean };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.analysis_pending).toBe(true);
   });
 });
 

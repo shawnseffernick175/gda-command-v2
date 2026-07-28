@@ -615,7 +615,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     return attachPwin(res.rows[0]?.pwin ?? null);
   }
 
-  // GET /v3/opportunities/:id — detail with 10s synchronous block (Addendum A.3)
+  // GET /v3/opportunities/:id — detail, returns immediately (never blocks on analysis)
   app.get<{ Params: { id: string } }>('/v3/opportunities/:id', async (req, reply) => {
     const id = await resolveOpportunityId(pool, req.params.id);
     if (id === null) {
@@ -668,44 +668,21 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage, pwin }, req.requestId));
     }
 
-    // Enqueue user-detail-priority analysis (ANALYSIS_PRIORITY.USER_DETAIL = 100)
-    // and block up to the configured timeout. NOTE: this previously hardcoded
-    // pgboss priority: 1, which is BELOW backfill (10) and sweep (5) -- so an
-    // opened opportunity sat behind the entire backfill queue and always timed
-    // out with "Analysis not ready" whenever a backfill was in flight. Route
-    // through enqueueAnalysis so the user's open correctly jumps the queue.
+    // Non-blocking: real LLM analysis latency is 24-47s and the worker serves
+    // jobs serially, so blocking here made the detail page 503 whenever a
+    // backfill was in flight. Trigger analysis at USER_DETAIL priority (100)
+    // and return the current detail immediately; the UI polls
+    // GET /v3/opportunities/:id/analysis for the result.
     enqueueAnalysis(id, 'detail-endpoint');
 
-    const fresh = await waitForAnalysis(
-      id,
-      config.analysisTimeoutMs,
-      config.analysisPollIntervalMs,
-    );
+    // Fire-and-forget doctrine scoring so it still runs without gating the response.
+    runDoctrineCheck('opportunity', id, {}).catch((err) => {
+      logger.warn({ err, opportunityId: id }, 'Background doctrine check failed (non-critical)');
+    });
 
-    if (fresh) {
-      analysisCacheHits.inc();
-
-      // Fire-and-forget doctrine scoring after analysis
-      runDoctrineCheck('opportunity', id, {}).catch((err) => {
-        logger.warn({ err, opportunityId: id }, 'Background doctrine check failed (non-critical)');
-      });
-
-      const detail = await rowToDetail(fresh);
-      const [pipelineStage, pwin] = await Promise.all([getPipelineStage(id), getCachedPwin(id)]);
-      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage, pwin }, req.requestId));
-    }
-
-    analysisTimeoutCount.inc();
-    return reply
-      .status(503)
-      .send(
-        errorEnvelope(
-          'ANALYSIS_TIMEOUT',
-          'Analysis not ready, retry in a few seconds',
-          req.requestId,
-          'estimated_seconds=8',
-        ),
-      );
+    const detail = await rowToDetail(row);
+    const [pipelineStage, pwin] = await Promise.all([getPipelineStage(id), getCachedPwin(id)]);
+    return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage, pwin, analysis_pending: !isCacheFresh(row) }, req.requestId));
   });
 
   // POST /v3/opportunities — create (manual entry path)
