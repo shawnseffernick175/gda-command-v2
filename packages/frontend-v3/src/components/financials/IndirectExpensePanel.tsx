@@ -111,7 +111,7 @@ export function IndirectExpensePanel() {
       left: 60,
       right: 16,
       top: 8,
-      bottom: 40,
+      bottom: 64,
     },
     xAxis: {
       type: "category" as const,
@@ -137,7 +137,7 @@ export function IndirectExpensePanel() {
         <ReactEChartsCore
           echarts={echarts}
           option={option}
-          style={{ height: 280 }}
+          style={{ height: 304 }}
           notMerge
         />
       </div>
