@@ -74,7 +74,7 @@ export function BalanceSheetTrendChart() {
       left: 60,
       right: 16,
       top: 8,
-      bottom: 40,
+      bottom: 64,
     },
     xAxis: {
       type: "category" as const,
@@ -99,7 +99,7 @@ export function BalanceSheetTrendChart() {
       <ReactEChartsCore
         echarts={echarts}
         option={option}
-        style={{ height: 240 }}
+        style={{ height: 264 }}
         notMerge
       />
     </div>

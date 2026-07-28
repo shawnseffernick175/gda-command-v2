@@ -131,7 +131,7 @@ export function PipelineStageChart({
         itemHeight: 8,
         itemGap: 20,
       },
-      grid: { left: 60, right: 16, top: 24, bottom: 48 },
+      grid: { left: 60, right: 16, top: 24, bottom: 84 },
       xAxis: {
         type: "category",
         data: categories,
@@ -236,7 +236,7 @@ export function PipelineStageChart({
           echarts={echarts}
           option={option}
           onEvents={onEvents}
-          style={{ height: 300 }}
+          style={{ height: 340 }}
           notMerge
         />
       </div>

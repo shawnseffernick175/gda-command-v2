@@ -95,7 +95,7 @@ export function ArTab() {
       bottom: 0,
       textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
     },
-    grid: { left: 8, right: 8, top: 8, bottom: 32 },
+    grid: { left: 8, right: 8, top: 8, bottom: 48 },
     xAxis: {
       type: "value" as const,
       max: total,
@@ -179,7 +179,7 @@ export function ArTab() {
         <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
           Receivables Aging — composition
         </p>
-        <ReactEChartsCore echarts={echarts} option={agingBar} style={{ height: 120 }} notMerge />
+        <ReactEChartsCore echarts={echarts} option={agingBar} style={{ height: 140 }} notMerge />
       </div>
 
       {/* Customer concentration */}

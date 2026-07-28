@@ -133,7 +133,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
       left: 60,
       right: 16,
       top: 12,
-      bottom: 40,
+      bottom: 64,
     },
     xAxis: {
       type: "category",
@@ -173,7 +173,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
       <ReactEChartsCore
         echarts={echarts}
         option={option}
-        style={{ height: 300 }}
+        style={{ height: 324 }}
         notMerge
       />
     </div>

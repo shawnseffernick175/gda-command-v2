@@ -194,7 +194,7 @@ export function ApTab() {
       {
         type: "pie" as const,
         radius: ["45%", "70%"],
-        center: ["50%", "44%"],
+        center: ["50%", "42%"],
         data: statusEntries.map(([status, amt]) => ({
           name: status,
           value: amt,
@@ -229,7 +229,7 @@ export function ApTab() {
           <p className="mb-2 text-[12px] uppercase tracking-wider text-muted-foreground">
             Open Payables by Payment Status
           </p>
-          <ReactEChartsCore echarts={echarts} option={statusDonut} style={{ height: 260 }} notMerge />
+          <ReactEChartsCore echarts={echarts} option={statusDonut} style={{ height: 288 }} notMerge />
         </div>
       )}
 

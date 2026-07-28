@@ -68,7 +68,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
       left: 60,
       right: 16,
       top: 16,
-      bottom: 40,
+      bottom: 64,
     },
     xAxis: {
       type: "category",
@@ -148,7 +148,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
       <ReactEChartsCore
         echarts={echarts}
         option={option}
-        style={{ height: 280 }}
+        style={{ height: 304 }}
         notMerge
       />
     </div>

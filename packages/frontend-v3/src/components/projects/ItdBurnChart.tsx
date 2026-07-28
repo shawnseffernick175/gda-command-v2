@@ -67,7 +67,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
       left: 90,
       right: 24,
       top: 12,
-      bottom: 40,
+      bottom: 60,
     },
     yAxis: {
       type: "category",
@@ -162,7 +162,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
       <ReactEChartsCore
         echarts={echarts}
         option={option}
-        style={{ height: funded > 0 ? 160 : 120 }}
+        style={{ height: funded > 0 ? 184 : 144 }}
         notMerge
       />
       <div className="mt-3 grid grid-cols-3 gap-4 text-center text-xs">
