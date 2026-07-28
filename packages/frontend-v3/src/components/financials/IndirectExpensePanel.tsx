@@ -1,20 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import ReactEChartsCore from "echarts-for-react/lib/core";
-import * as echarts from "echarts/core";
-import { BarChart } from "echarts/charts";
-import {
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-} from "echarts/components";
-import { CanvasRenderer } from "echarts/renderers";
+import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 import { useIndirectExpensesTrend } from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
-import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+import { sortData, parsePeriod, type ColumnSortConfig } from "@/lib/sort-utils";
 
 const INDIRECT_SORT_COLS: ColumnSortConfig[] = [
   { field: "period", type: "period" },
@@ -22,14 +14,6 @@ const INDIRECT_SORT_COLS: ColumnSortConfig[] = [
   { field: "period_actual", type: "number" },
   { field: "period_budget", type: "number" },
 ];
-
-echarts.use([
-  BarChart,
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-  CanvasRenderer,
-]);
 
 const POOL_COLORS: Record<string, string> = {
   Fringe: "var(--color-fin-teal)",
@@ -64,7 +48,9 @@ export function IndirectExpensePanel() {
   }
 
   const pools = Array.from(new Set(items.map((i) => i.pool)));
-  const periods = Array.from(new Set(items.map((i) => i.period))).sort();
+  const periods = Array.from(new Set(items.map((i) => i.period))).sort(
+    (a, b) => parsePeriod(a) - parsePeriod(b),
+  );
 
   const series = pools.map((pool) => ({
     name: pool,
