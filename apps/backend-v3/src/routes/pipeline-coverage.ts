@@ -128,7 +128,8 @@ export async function pipelineCoverageRoutes(app: FastifyInstance): Promise<void
     const aopTarget = Number(configRes.rows[0]!.aop_target);
     const configPwin = configRes.rows[0]!.default_stage_pwin ?? DEFAULT_STAGE_PWIN;
 
-    // 2. Fetch all active pipeline pursuits (exclude terminal stages + $1 IDIQ)
+    // 2. Fetch all active pipeline pursuits (exclude terminal stages + $1 IDIQ).
+    // Archived items are not active pursuits, so they are excluded from coverage.
     const pursuitsSql = `
       SELECT
         pi.id::text        AS pipeline_item_id,
@@ -143,6 +144,7 @@ export async function pipelineCoverageRoutes(app: FastifyInstance): Promise<void
       INNER JOIN opportunities o
         ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
       WHERE pi.stage NOT IN ('won', 'lost', 'no_bid', 'gov_cancelled')
+        AND pi.archived_at IS NULL
         AND COALESCE(o.value_max, o.value_min, 0) > 1
       ORDER BY COALESCE(o.value_max, o.value_min, 0) DESC
     `;
