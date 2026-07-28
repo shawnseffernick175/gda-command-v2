@@ -9,6 +9,7 @@ import { AopExecutionTab } from "@/components/financials/tabs/AopExecutionTab";
 import { P2FinancialsTab } from "@/components/financials/tabs/P2FinancialsTab";
 import { DefinitionsTab } from "@/components/financials/tabs/DefinitionsTab";
 import { BalanceSheetCard } from "@/components/financials/BalanceSheetCard";
+import { IndirectExpensePanel } from "@/components/financials/IndirectExpensePanel";
 import { ApTab } from "@/components/financials/tabs/ApTab";
 import { ArTab } from "@/components/financials/tabs/ArTab";
 import { TrialBalanceTab } from "@/components/financials/tabs/TrialBalanceTab";
@@ -29,6 +30,7 @@ type Tab =
   | "ap"
   | "ar"
   | "trial-balance"
+  | "indirect-expenses"
   | "project-revenue"
   | "cost-service-centers"
   | "ingestion-coverage"
@@ -48,6 +50,7 @@ const TAB_GROUPS: TabGroup[] = [
       { id: "balance-sheet", label: "Balance Sheet" },
       { id: "trial-balance", label: "Trial Balance" },
       { id: "cost-service-centers", label: "Cost Service Centers" },
+      { id: "indirect-expenses", label: "Indirect Expenses" },
     ],
   },
   {
@@ -131,6 +134,8 @@ function tabTitle(tab: Tab): string {
       return "Project Revenue";
     case "cost-service-centers":
       return "Cost Service Centers";
+    case "indirect-expenses":
+      return "Indirect Expenses";
     case "ingestion-coverage":
       return "Ingestion Coverage";
     case "definitions":
@@ -284,6 +289,7 @@ export default function FinancialsPage() {
         {activeTab === "trial-balance" && <TrialBalanceTab />}
         {activeTab === "project-revenue" && <ProjectRevenueTab />}
         {activeTab === "cost-service-centers" && <ServiceCentersTab />}
+        {activeTab === "indirect-expenses" && <IndirectExpensePanel />}
         {activeTab === "ingestion-coverage" && <IngestionCoverageTab />}
         {activeTab === "definitions" && <DefinitionsTab />}
         {activeTab === "financial-bible" && <FinancialBibleTab />}
