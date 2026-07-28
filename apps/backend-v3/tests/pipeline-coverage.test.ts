@@ -16,7 +16,8 @@ const LAYER_CONFIG = {
   aop: {
     label: 'AOP',
     multiple: 10,
-    stages: ['interest', 'qualify', 'qualified', 'pursue', 'solicitation', 'post_submittal'] as string[],
+    // 'qualify' staging is excluded from metrics; 'qualified' is the first counted stage.
+    stages: ['interest', 'qualified', 'pursue', 'solicitation', 'post_submittal'] as string[],
   },
   identification: {
     label: 'Identification',
@@ -102,7 +103,7 @@ describe('Pipeline Coverage — layer math', () => {
 
     const layers = computeLayers(AOP, pursuits);
 
-    // AOP (×10) = all active stages = 290M
+    // AOP (×10) = all counted stages (interest + qualified..post) = 290M
     expect(layers[0]!.key).toBe('aop');
     expect(layers[0]!.actual).toBe(290_000_000);
     expect(layers[0]!.required_min).toBe(448_000_000); // 10 × 44.8M
@@ -138,6 +139,18 @@ describe('Pipeline Coverage — layer math', () => {
 
     expect(layers[0]!.actual).toBe(150_000_000); // AOP includes interest
     expect(layers[1]!.actual).toBe(50_000_000); // Identification excludes interest
+  });
+
+  it('qualify staging is excluded from every layer, including AOP', () => {
+    const pursuits: Pursuit[] = [
+      { stage: 'qualify', value: 100_000_000 }, // pre-pipeline staging — not counted
+      { stage: 'qualified', value: 50_000_000 },
+    ];
+
+    const layers = computeLayers(AOP, pursuits);
+
+    expect(layers[0]!.actual).toBe(50_000_000); // AOP excludes qualify staging
+    expect(layers[1]!.actual).toBe(50_000_000);
   });
 
   it('Required scales linearly with the AOP target', () => {
