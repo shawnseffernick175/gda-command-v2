@@ -57,6 +57,7 @@ interface LayerResult {
   required_max: number | null;
   actual: number;
   multiple: number;
+  coverage: number;
   status: 'green' | 'yellow' | 'red';
 }
 
@@ -79,11 +80,13 @@ function computeLayers(aopTarget: number, pursuits: Pursuit[]): LayerResult[] {
       .filter((p) => stageSet.has(p.stage))
       .reduce((sum, p) => sum + p.value, 0);
 
-    const multiple = aopTarget > 0 ? Math.round((actual / aopTarget) * 10) / 10 : 0;
+    // `multiple` is the layer's fixed multiplier of the AOP target (AOP ×10 …);
+    // `coverage` = actual ÷ Required, which drives the status dot.
     const ratio = requiredMin > 0 ? actual / requiredMin : 1;
+    const coverage = requiredMin > 0 ? Math.round(ratio * 100) / 100 : 0;
     const status = statusFromRatio(ratio);
 
-    return { key, label: cfg.label, required_min: requiredMin, required_max: null, actual: Math.round(actual), multiple, status };
+    return { key, label: cfg.label, required_min: requiredMin, required_max: null, actual: Math.round(actual), multiple: cfg.multiple, coverage, status };
   });
 }
 
@@ -165,6 +168,25 @@ describe('Pipeline Coverage — layer math', () => {
       expect(layer.actual).toBe(0);
       expect(layer.status).toBe('red');
     }
+  });
+
+  it('multiple is the fixed layer multiplier; coverage tracks actual ÷ required', () => {
+    const pursuits: Pursuit[] = [
+      { stage: 'pursue', value: 112_000_000 }, // exactly Pursuit Required (2.5 × 44.8M)
+    ];
+    const layers = computeLayers(AOP, pursuits);
+
+    // multiple always echoes the configured multiplier, regardless of actuals
+    expect(layers[0]!.multiple).toBe(10);
+    expect(layers[1]!.multiple).toBe(5);
+    expect(layers[2]!.multiple).toBe(2.5);
+    expect(layers[3]!.multiple).toBe(1.25);
+    expect(layers[4]!.multiple).toBe(0.65);
+
+    // Pursuit actual == its Required → coverage 1.0×
+    expect(layers[2]!.coverage).toBe(1);
+    // AOP Required is 448M; 112M covered → 0.25×
+    expect(layers[0]!.coverage).toBe(0.25);
   });
 
   it('status transitions: green ≥ 1.0, yellow 0.8-1.0, red < 0.8', () => {

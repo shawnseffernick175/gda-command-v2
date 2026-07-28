@@ -17,11 +17,11 @@ import {
   usePipelineSummary,
   usePipelineList,
   type PipelineListItem,
-  type PipelineStageStats,
 } from "@/hooks/use-pipeline";
 import { useUpdateStage } from "@/hooks/use-opportunities";
 import { useToast } from "@/components/ui/toast";
 import { PipelineCoverageCard } from "./PipelineCoverageCard";
+import { PipelineStageChart } from "./PipelineStageChart";
 
 const PAGE_SIZE = 50;
 
@@ -35,16 +35,6 @@ const PIPELINE_BUCKETS = [
   { label: "Submission", dbKey: "post_submittal" },
   { label: "Won", dbKey: "won" },
 ] as const;
-
-const STAGE_BAR_COLORS: Record<string, string> = {
-  Interest: "bg-muted-foreground/40",
-  Qualify: "bg-foreground/30",
-  Qualified: "bg-gda-blue/50",
-  Pursue: "bg-gda-cyan/60",
-  Solicitation: "bg-gda-cyan/60",
-  Submission: "bg-gda-cyan/80",
-  Won: "bg-gda-green",
-};
 
 const STAGE_BADGE_COLORS: Record<string, string> = {
   interest: "border-muted text-muted-foreground",
@@ -213,17 +203,6 @@ function PipelineContent() {
     [items, page],
   );
 
-  const maxStageCount = useMemo(() => {
-    if (!summary) return 1;
-    return Math.max(
-      ...PIPELINE_BUCKETS.map((b) => {
-        const stats = summary.by_stage[pipelineStageLabel(b.dbKey)] ?? summary.by_stage[stageKeyToLabel(b.dbKey)];
-        return stats?.count ?? 0;
-      }),
-      1,
-    );
-  }, [summary]);
-
   const handleBucketClick = useCallback(
     (label: string) => {
       setActiveBucket(activeBucket === label ? null : label);
@@ -257,85 +236,16 @@ function PipelineContent() {
       {/* ── Section 0: Pipeline Coverage Card ─────────────────── */}
       <PipelineCoverageCard />
 
-      {/* ── Section 1: Pipeline KPI Strip ─────────────────────────── */}
+      {/* ── Section 1: Pipeline Stage Chart ───────────────────────── */}
       {summaryLoading ? (
-        <div className="flex gap-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 flex-1 bg-gda-panel" />
-          ))}
-        </div>
+        <Skeleton className="h-[380px] bg-gda-panel" />
       ) : summary ? (
-        <div className="flex flex-wrap gap-2">
-          <IntelChip
-            label={formatMoney(summary.total_pipeline_value)}
-            sub="Total Pipeline"
-            onClick={() => setActiveBucket(null)}
-          />
-          <span className="inline-flex items-center gap-1">
-            <IntelChip
-              label={formatMoney(summary.weighted_pipeline_value)}
-              sub="Weighted Pipeline"
-            />
-            <ScoreExplain
-              score={formatMoney(summary.weighted_pipeline_value)}
-              label="Pipeline Value (Weighted)"
-              scoreType="pipeline_value"
-            />
-          </span>
-          <IntelChip
-            label={String(summary.active_pursuits)}
-            sub="Active Pursuits"
-            onClick={() => setActiveBucket(null)}
-          />
-          <IntelChip
-            label={String(summary.proposals_out)}
-            sub="Proposals Out"
-            onClick={() => handleBucketClick("Submission")}
-          />
-          <IntelChip
-            label={formatMoney(summary.won_ytd)}
-            sub="Won YTD"
-            onClick={() => handleBucketClick("Won")}
-          />
-        </div>
-      ) : null}
-
-      {/* ── Section 2: Stage Buckets (6) ──────────────────────────── */}
-      {summaryLoading ? (
-        <Skeleton className="h-24 bg-gda-panel" />
-      ) : summary ? (
-        <div className="grid grid-cols-5 gap-2">
-          {PIPELINE_BUCKETS.map((bucket) => {
-            const displayLabel = pipelineStageLabel(bucket.dbKey);
-            const stats: PipelineStageStats =
-              summary.by_stage[displayLabel] ??
-              summary.by_stage[stageKeyToLabel(bucket.dbKey)] ??
-              { count: 0, value: 0, weighted_value: 0 };
-            const barPct = maxStageCount > 0 ? (stats.count / maxStageCount) * 100 : 0;
-            const isActive = activeBucket === bucket.label;
-            return (
-              <button
-                key={bucket.dbKey}
-                type="button"
-                onClick={() => handleBucketClick(bucket.label)}
-                className={cn(
-                  "rounded border border-border bg-gda-panel p-3 text-left transition-colors hover:bg-gda-bg-base",
-                  isActive && "border-b-2 border-b-gda-green",
-                )}
-              >
-                <div className="font-mono text-xs uppercase text-muted-foreground">{bucket.label}</div>
-                <div className="font-mono text-sm font-bold text-foreground">{stats.count} opps</div>
-                <div className="font-mono text-xs text-gda-green">{formatMoney(stats.value)}</div>
-                <div className="mt-1.5 h-1.5 w-full rounded-full bg-gda-bg-base overflow-hidden">
-                  <div
-                    className={cn("h-full rounded-full transition-all", STAGE_BAR_COLORS[bucket.label])}
-                    style={{ width: `${barPct}%` }}
-                  />
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <PipelineStageChart
+          summary={summary}
+          activeBucket={activeBucket}
+          onBucketClick={handleBucketClick}
+          onClear={() => setActiveBucket(null)}
+        />
       ) : null}
 
       {/* ── Section 3: Stage Movers ───────────────────────────────── */}
@@ -565,30 +475,6 @@ function PipelineContent() {
         </div>
       )}
     </div>
-  );
-}
-
-/* ── IntelChip ─────────────────────────────────────────────────── */
-
-function IntelChip({
-  label,
-  sub,
-  onClick,
-}: {
-  label: string;
-  sub: string;
-  onClick?: () => void;
-}) {
-  const Tag = onClick ? "button" : "div";
-  return (
-    <Tag
-      type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className="bg-gda-panel border border-border rounded px-3 py-1.5 text-left"
-    >
-      <div className="font-mono text-sm font-bold text-foreground">{label}</div>
-      <div className="font-mono text-[12px] text-muted-foreground">{sub}</div>
-    </Tag>
   );
 }
 

@@ -21,6 +21,7 @@ export interface CoverageLayer {
   required_max: number | null;
   actual: number;
   multiple: number;
+  coverage: number;
   status: "green" | "yellow" | "red";
   pursuits: CoveragePursuit[];
 }
