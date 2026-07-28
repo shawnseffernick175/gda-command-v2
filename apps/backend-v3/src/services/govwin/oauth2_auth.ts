@@ -34,16 +34,18 @@ function getClientCredentials(): { clientId: string; clientSecret: string } {
   return { clientId, clientSecret };
 }
 
-async function persistTokenHash(accessToken: string): Promise<void> {
+async function persistTokenHash(accessToken: string, expiresAt: Date): Promise<void> {
   try {
     const tokenHash = createHash('sha256').update(accessToken).digest('hex').slice(0, 16);
     await pool.query(
-      `INSERT INTO govwin_auth_state (id, tgt_hash, last_refresh_at)
-       VALUES (1, $1, NOW())
+      `INSERT INTO govwin_auth_state (id, tgt_hash, expires_at, last_refresh_at, last_error)
+       VALUES (1, $1, $2, NOW(), NULL)
        ON CONFLICT (id) DO UPDATE SET
          tgt_hash = $1,
-         last_refresh_at = NOW()`,
-      [tokenHash],
+         expires_at = $2,
+         last_refresh_at = NOW(),
+         last_error = NULL`,
+      [tokenHash, expiresAt.toISOString()],
     );
   } catch (err) {
     logger.warn({ err }, 'govwin_oauth2_persist_token_hash_failed');
@@ -92,12 +94,16 @@ export async function getAccessToken(): Promise<string> {
   }
 
   const expiresInMs = (json.expires_in ?? 3600) * 1000;
+  const now = Date.now();
   cached = {
     accessToken: json.access_token,
-    expiresAt: Date.now() + expiresInMs - TOKEN_BUFFER_MS,
+    expiresAt: now + expiresInMs - TOKEN_BUFFER_MS,
   };
 
-  await persistTokenHash(json.access_token);
+  // Persist the token's true expiry (without the in-memory refresh buffer) so
+  // the health endpoint reports the real remaining lifetime instead of a stale
+  // value left over from the CAS path.
+  await persistTokenHash(json.access_token, new Date(now + expiresInMs));
   logger.info(
     { tokenType: json.token_type, expiresIn: json.expires_in },
     'govwin_oauth2_token_acquired',

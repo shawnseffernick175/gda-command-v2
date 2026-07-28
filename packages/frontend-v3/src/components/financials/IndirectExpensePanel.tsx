@@ -57,7 +57,9 @@ export function IndirectExpensePanel() {
     type: "bar" as const,
     data: periods.map((p) => {
       const item = items.find((i) => i.period === p && i.pool === pool);
-      return item?.period_actual ?? 0;
+      // Missing (no row for this period/pool) renders as a gap, not a $0 bar,
+      // so a genuine zero stays distinct from "not available".
+      return item?.period_actual ?? null;
     }),
     itemStyle: {
       color: POOL_COLORS[pool] ?? FALLBACK_COLOR,
@@ -69,7 +71,7 @@ export function IndirectExpensePanel() {
     type: "bar" as const,
     data: periods.map((p) => {
       const item = items.find((i) => i.period === p && i.pool === pool);
-      return item?.period_budget ?? 0;
+      return item?.period_budget ?? null;
     }),
     itemStyle: {
       color: POOL_COLORS[pool] ?? FALLBACK_COLOR,
@@ -81,10 +83,10 @@ export function IndirectExpensePanel() {
     tooltip: {
       trigger: "axis" as const,
       axisPointer: { type: "shadow" as const },
-      formatter: (params: Array<{ seriesName: string; value: number; marker: string }>) => {
+      formatter: (params: Array<{ seriesName: string; value: number | null; marker: string }>) => {
         const lines = params
-          .filter((p) => p.value !== 0)
-          .map((p) => `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}`);
+          .filter((p) => p.value != null)
+          .map((p) => `${p.marker} ${p.seriesName}: ${formatMoney(p.value as number)}`);
         return lines.join("<br/>");
       },
     },

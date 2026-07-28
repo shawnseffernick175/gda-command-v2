@@ -42,6 +42,21 @@ export function isStagingStage(key: string): boolean {
   return (STAGING_STAGE_KEYS as readonly string[]).includes(key);
 }
 
+/**
+ * Human-readable message for a failed stage move. A forward move on an
+ * opportunity that hasn't cleared assessment returns 409 (state conflict) with
+ * the specific reason; surface it verbatim behind a clear lead-in so the user
+ * knows the move was refused and why, instead of the change silently reverting.
+ */
+export function stageMoveErrorMessage(err: unknown): string {
+  const e = err as { status?: number; message?: string } | null;
+  const detail = e?.message ? `: ${e.message}` : "";
+  if (e?.status === 409) {
+    return `Can't move to that stage yet — qualify this opportunity first${detail}`;
+  }
+  return `Failed to move stage${detail}`;
+}
+
 /* ---- Display labels ----------------------------------------------------- */
 
 export const ACTIVE_STAGES = [
