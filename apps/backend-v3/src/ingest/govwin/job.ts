@@ -24,7 +24,32 @@ import {
   type GovWinApiOpportunity,
 } from '../../services/govwin/api_client.js';
 import { classifyGovWinStage } from './adapter.js';
+import { mirrorOpportunityToUnified } from '../../services/opportunities/unified-mirror.js';
 import type { IngestResult } from '../framework/registry.js';
+
+/** Payload passed to the unified mirror after a GovWin-native upsert commits. */
+interface MirrorInput {
+  id: number;
+  sam_notice_id: string;
+  title: string;
+  agency: string | null;
+  sub_agency: string | null;
+  naics: string | null;
+  set_aside: string | null;
+  value_min: number | null;
+  value_max: number | null;
+  posted_at: string | null;
+  response_due_at: string | null;
+  status: string | null;
+}
+
+interface UpsertOutcome {
+  outcome: 'inserted' | 'updated' | 'skipped';
+  // Non-null only for GovWin-native rows. The SAM-enrich path touches a
+  // SAM-authoritative row whose unified projection is owned by the SAM ingest,
+  // so we don't re-mirror it here.
+  mirror: MirrorInput | null;
+}
 
 const CACHE_RETENTION_DAYS = 30;
 
@@ -86,7 +111,7 @@ async function findExistingSAMOpp(db: PoolClient, opp: GovWinApiOpportunity): Pr
 
 async function upsertOpportunity(
   opp: GovWinApiOpportunity,
-): Promise<'inserted' | 'updated' | 'skipped'> {
+): Promise<UpsertOutcome> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -141,7 +166,7 @@ async function upsertOpportunity(
       );
 
       await client.query('COMMIT');
-      return 'updated';
+      return { outcome: 'updated', mirror: null };
     }
 
     const samNoticeId = `govwin-${opp.govwinId}`;
@@ -219,7 +244,23 @@ async function upsertOpportunity(
     );
 
     await client.query('COMMIT');
-    return wasInserted ? 'inserted' : 'updated';
+    return {
+      outcome: wasInserted ? 'inserted' : 'updated',
+      mirror: {
+        id: Number(oppId),
+        sam_notice_id: samNoticeId,
+        title: opp.title,
+        agency: opp.agency,
+        sub_agency: opp.subAgency,
+        naics: opp.naics,
+        set_aside: opp.setAside,
+        value_min: opp.valueMin,
+        value_max: opp.valueMax,
+        posted_at: opp.postedAt,
+        response_due_at: opp.responseDueAt,
+        status: opp.status,
+      },
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -282,10 +323,45 @@ export async function runGovWinIngest(): Promise<IngestResult> {
   for (const opp of opps) {
     try {
       await upsertGovWinCache(opp);
-      const outcome = await upsertOpportunity(opp);
+      const { outcome, mirror } = await upsertOpportunity(opp);
       if (outcome === 'inserted') inserted++;
       else if (outcome === 'updated') updated++;
       else skipped++;
+
+      // F-401: mirror GovWin-native rows into unified_opportunities after the
+      // upsert commits. Best-effort — a mirror failure must never fail ingest
+      // or double-count the row. (The generic source_writer does this for other
+      // feeds; the bespoke GovWin job previously skipped it, leaving
+      // unified_opportunities stale relative to the legacy table.)
+      if (mirror) {
+        try {
+          await mirrorOpportunityToUnified(pool, {
+            id: mirror.id,
+            data_source: 'govwin',
+            sam_notice_id: mirror.sam_notice_id,
+            external_id: null,
+            title: mirror.title,
+            agency: mirror.agency,
+            sub_agency: mirror.sub_agency,
+            naics: mirror.naics,
+            psc: null,
+            set_aside: mirror.set_aside,
+            value_min: mirror.value_min,
+            value_max: mirror.value_max,
+            posted_at: mirror.posted_at,
+            response_due_at: mirror.response_due_at,
+            status: mirror.status,
+          });
+        } catch (mirrorErr) {
+          logger.error(
+            {
+              govwinId: opp.govwinId,
+              error: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr),
+            },
+            'govwin_unified_mirror_error',
+          );
+        }
+      }
     } catch (err) {
       skipped++;
       logger.error(
