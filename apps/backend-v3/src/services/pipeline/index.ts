@@ -191,8 +191,11 @@ const BASE_SELECT = `
 export async function listPipelineItems(
   filters: PipelineListFilters,
 ): Promise<PaginatedResult<PipelineItem>> {
+  // Archived items are hidden from every Pipeline surface; the flag is
+  // reversible (set archived_at back to NULL) so nothing is lost.
   const conditions: string[] = [
     "pi.stage NOT IN ('no_bid', 'lost', 'gov_cancelled')",
+    'pi.archived_at IS NULL',
   ];
   const params: unknown[] = [];
   let paramIdx = 0;

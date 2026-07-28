@@ -74,7 +74,8 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v3/pipeline/summary — intelligence-bar aggregates + funnel + movers
   app.get('/v3/pipeline/summary', async (req, reply) => {
-    // Stage counts + values (exclude terminal stages and $1 IDIQ placeholders)
+    // Stage counts + values (exclude terminal stages and $1 IDIQ placeholders).
+    // Archived items are hidden from the board, so they must not be counted here.
     const stagesSql = `
       SELECT
         pi.stage,
@@ -100,6 +101,7 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
       FROM pipeline_items pi
       INNER JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
       WHERE pi.stage NOT IN ('lost', 'no_bid', 'gov_cancelled', 'qualify')
+        AND pi.archived_at IS NULL
       GROUP BY pi.stage
     `;
     const stagesRes = await pool.query<{
@@ -128,7 +130,8 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
       if (row.stage === 'post_submittal') proposalsOut += row.count;
     }
 
-    // Won YTD — awards in current fiscal year (Oct 1 → Sep 30)
+    // Won YTD — awards in current fiscal year (Oct 1 → Sep 30).
+    // Archived items are excluded so the intelligence bar matches the board.
     const wonYtdSql = `
       SELECT COALESCE(SUM(
         CASE WHEN COALESCE(o.value_max, o.value_min, 0) <= 1 THEN 0
@@ -138,6 +141,7 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
       FROM pipeline_items pi
       INNER JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
       WHERE pi.stage = 'won'
+        AND pi.archived_at IS NULL
         AND pi.updated_at >= CASE
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) >= 10
             THEN date_trunc('year', CURRENT_DATE) + INTERVAL '9 months'
@@ -194,7 +198,8 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
       }));
     } catch {
       // capture_stage_history may not exist yet if migration hasn't run;
-      // fall back to the old pipeline_items approach
+      // fall back to the old pipeline_items approach. Archived items are
+      // excluded so the fallback cannot surface rows the board hides.
       const fallbackSql = `
         SELECT DISTINCT ON (pi.opportunity_id)
           o.id::text AS internal_id,
@@ -207,6 +212,7 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
         INNER JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
         WHERE pi.updated_at > NOW() - INTERVAL '7 days'
           AND pi.stage IS NOT NULL
+          AND pi.archived_at IS NULL
         ORDER BY pi.opportunity_id, pi.updated_at DESC
       `;
       const fallbackRes = await pool.query<{
