@@ -11,17 +11,17 @@ import type { PipelineSummary, PipelineStageStats } from "@/hooks/use-pipeline";
 /* ── Stage config (matches the pipeline stage model) ───────────── */
 
 const STAGE_BUCKETS = [
-  { label: "Interest", dbKey: "interest", color: "#7a7974" },
-  { label: "Qualified", dbKey: "qualified", color: "#2563eb" },
-  { label: "Pursue", dbKey: "pursue", color: "#0284c7" },
-  { label: "Solicitation", dbKey: "solicitation", color: "#b45309" },
-  { label: "Submission", dbKey: "post_submittal", color: "#9333ea" },
-  { label: "Won", dbKey: "won", color: "#15803d" },
+  { label: "Interest", dbKey: "interest", color: "var(--color-fin-stone)" },
+  { label: "Qualified", dbKey: "qualified", color: "var(--color-fin-chart-navy)" },
+  { label: "Pursue", dbKey: "pursue", color: "var(--color-chart-3)" },
+  { label: "Solicitation", dbKey: "solicitation", color: "var(--color-chart-2)" },
+  { label: "Submission", dbKey: "post_submittal", color: "var(--color-chart-4)" },
+  { label: "Won", dbKey: "won", color: "var(--color-chart-1)" },
 ] as const;
 
-const INK = "#28251d";
-const MUTED = "#7a7974";
-const SAND = "#d8d4c8";
+const INK = "var(--color-fin-ink)";
+const MUTED = "var(--color-fin-stone)";
+const SAND = "var(--color-fin-sand)";
 
 function stageDisplayLabel(dbKey: string): string {
   if (dbKey === "post_submittal") return "Submission";
@@ -169,7 +169,7 @@ export function PipelineStageChart({
             formatter: (p: { value: number }) =>
               p.value > 0 ? formatMoney(p.value) : "",
             color: INK,
-            fontSize: 11,
+            fontSize: 12,
           },
         },
         {
