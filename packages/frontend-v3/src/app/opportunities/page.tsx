@@ -38,6 +38,8 @@ import {
   STAGE_BADGE_STYLES as CANONICAL_BADGE_STYLES,
   ACTIVE_STAGES as CANONICAL_ACTIVE_STAGES,
   stageKeyToLabel,
+  stageToDoctrinePhase,
+  stageColor,
   CANONICAL_STAGE_KEYS,
   DB_KEY_TO_LABEL,
   isStagingStage,
@@ -1012,7 +1014,7 @@ function VehicleOpportunityRow({
         )}
         {opp.pipeline_stage && (
           <span className="rounded border border-border px-1.5 py-0.5 text-[12px]">
-            {opp.pipeline_stage}
+            {stageToDoctrinePhase(opp.pipeline_stage)}
           </span>
         )}
         {opp.response_due_at ? (
@@ -1483,6 +1485,15 @@ function OpportunityDetail({ id }: { id: string }) {
         <h1 className="mt-1 font-mono text-lg font-bold text-foreground">
           {opp.title}
         </h1>
+
+        {/* Capture-doctrine phase (display-only level of capture) */}
+        <div className="mt-1 flex items-center gap-1.5 font-mono text-[12px] text-muted-foreground">
+          <span className="uppercase tracking-wider">Capture phase</span>
+          <span className="text-muted-foreground">•</span>
+          <span className={cn("font-semibold", stageColor(currentStage))}>
+            {stageToDoctrinePhase(opp.pipeline_stage ?? currentStage)}
+          </span>
+        </div>
 
         {/* Stage Stepper */}
         <div className="mt-3 flex items-center gap-1">
