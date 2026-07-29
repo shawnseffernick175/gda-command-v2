@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ALL_STAGES, stageColor, type Stage } from "@/lib/stages";
+import {
+  ALL_STAGES,
+  stageColor,
+  stageToDoctrinePhase,
+  type Stage,
+} from "@/lib/stages";
 import { cn } from "@/lib/utils";
 
 export function StageDropdown({
@@ -14,6 +19,24 @@ export function StageDropdown({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // Outward-facing capture-doctrine phase (display-only). DB keys / workflow
+  // are unchanged; this chip just reports the level of capture.
+  const phase = stageToDoctrinePhase(value);
+
+  // Read-only usage (no onChange): render a static phase chip.
+  if (!onChange) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded border border-border px-2 py-1 text-xs font-mono",
+          stageColor(phase),
+          className,
+        )}
+      >
+        {phase}
+      </span>
+    );
+  }
 
   return (
     <div className={cn("relative inline-block", className)}>
@@ -22,10 +45,10 @@ export function StageDropdown({
         onClick={() => setOpen(!open)}
         className={cn(
           "inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-mono transition-colors hover:bg-gda-panel",
-          stageColor(value),
+          stageColor(phase),
         )}
       >
-        {value}
+        {phase}
         <span className="text-muted-foreground">▾</span>
       </button>
       {open && (
@@ -40,7 +63,7 @@ export function StageDropdown({
                 stage === value && "bg-gda-panel",
               )}
               onClick={() => {
-                onChange?.(stage);
+                onChange(stage);
                 setOpen(false);
               }}
             >

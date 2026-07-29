@@ -109,6 +109,60 @@ export const LABEL_TO_DB_KEY: Record<Stage, CanonicalStageKey> = {
   "Government Cancelled": "gov_cancelled",
 };
 
+/* ---- Capture doctrine phases (display-only) ----------------------------- */
+
+/**
+ * Company capture doctrine (per the GROWTH deck): the outward-facing "level of
+ * capture" an opportunity is reported at. AOP and Evaluation bookend the
+ * continuum (annual plan / post-award) and are not per-opportunity stages, so
+ * the per-opportunity phases are Identification → Pursuit → Capture → Proposal.
+ *
+ * This is a DISPLAY layer only: DB stage keys, workflow controls (stepper,
+ * stage-change selects, forward actions), the operational pipeline board, and
+ * every metric calculation are unchanged. Several fine-grained operational
+ * stages roll up into one doctrine phase.
+ */
+export const DOCTRINE_PHASE_ORDER = [
+  "Identification",
+  "Pursuit",
+  "Capture",
+  "Proposal",
+] as const;
+
+export type DoctrinePhase = (typeof DOCTRINE_PHASE_ORDER)[number];
+
+/**
+ * Per-opportunity stage → doctrine phase. Terminal outcomes keep their outcome
+ * labels (Won / Lost / No Bid / Government Cancelled) — an outcome is not a
+ * capture phase.
+ */
+export const STAGE_KEY_TO_DOCTRINE_PHASE: Record<CanonicalStageKey, string> = {
+  interest: "Identification",
+  qualify: "Identification",
+  qualified: "Pursuit",
+  pursue: "Pursuit",
+  solicitation: "Capture",
+  post_submittal: "Proposal",
+  won: "Won",
+  lost: "Lost",
+  no_bid: "No Bid",
+  gov_cancelled: "Government Cancelled",
+};
+
+/**
+ * Outward-facing capture-doctrine phase label for a stage. Accepts either a DB
+ * key (e.g. `post_submittal`) or a display label (e.g. `Post-Submittal`);
+ * returns the input unchanged if it maps to neither.
+ */
+export function stageToDoctrinePhase(stage: string): string {
+  if (Object.prototype.hasOwnProperty.call(STAGE_KEY_TO_DOCTRINE_PHASE, stage)) {
+    return STAGE_KEY_TO_DOCTRINE_PHASE[stage as CanonicalStageKey];
+  }
+  const key = LABEL_TO_DB_KEY[stage as Stage];
+  if (key) return STAGE_KEY_TO_DOCTRINE_PHASE[key];
+  return stage;
+}
+
 /* ---- Tab config --------------------------------------------------------- */
 
 export const STAGE_TABS: ReadonlyArray<{ key: string; label: string }> = [
@@ -200,6 +254,15 @@ export function stageColor(stage: string): string {
     case "Solicitation":
       return "text-gda-amber";
     case "Post-Submittal":
+      return "text-gda-purple";
+    // Doctrine phases (display-only)
+    case "Identification":
+      return "text-gda-cyan";
+    case "Pursuit":
+      return "text-gda-blue";
+    case "Capture":
+      return "text-gda-amber";
+    case "Proposal":
       return "text-gda-purple";
     case "Won":
       return "text-gda-green";
