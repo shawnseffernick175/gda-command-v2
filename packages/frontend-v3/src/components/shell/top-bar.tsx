@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { CommandPalette } from "./command-palette";
@@ -64,13 +65,13 @@ export function TopBar() {
             </Button>
             {addOpen && (
               <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded border border-border bg-gda-bg-raised shadow-lg">
-                <a
+                <Link
                   href="/opportunities"
                   className="block px-3 py-2 text-xs text-foreground hover:bg-gda-panel"
                   onClick={() => setAddOpen(false)}
                 >
                   Opportunity
-                </a>
+                </Link>
                 <a
                   href="/risks"
                   className="block px-3 py-2 text-xs text-foreground hover:bg-gda-panel"

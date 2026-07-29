@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import { apiGet, apiPut, apiPost } from "@/lib/api";
 import { useOpportunities } from "@/hooks/use-opportunities";
 import { cn } from "@/lib/utils";
@@ -300,7 +301,7 @@ export function PwinWeightsPanel() {
                       </td>
                       <td className="py-1.5 pr-2 text-xs">
                         <Link
-                          href={`/opportunities?id=${opp.internal_id}`}
+                          href={opportunityHref(opp.internal_id)}
                           className="text-gda-cyan hover:underline truncate block max-w-[220px]"
                         >
                           {opp.title}

@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import {
   useVaultDocuments,
   useVaultCount,
@@ -937,7 +938,7 @@ function LinkedTo({ doc }: { doc: VaultDocument }) {
   if (doc.opp_title) {
     return (
       <Link
-        href={`/opportunities?id=${doc.linked_opportunity_id}`}
+        href={opportunityHref(doc.linked_opportunity_id)}
         className="text-gda-green hover:underline"
       >
         {doc.opp_title}
@@ -1126,7 +1127,7 @@ function DocumentReaderDrawer({
                     </span>
                     {doc.opp_title ? (
                       <Link
-                        href={`/opportunities?id=${doc.linked_opportunity_id}`}
+                        href={opportunityHref(doc.linked_opportunity_id)}
                         className="text-gda-green hover:underline"
                       >
                         {doc.opp_title}

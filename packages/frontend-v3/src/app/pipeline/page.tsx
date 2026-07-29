@@ -13,6 +13,7 @@ import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { stageKeyToLabel } from "@/lib/stages";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import {
   usePipelineSummary,
   usePipelineList,
@@ -266,7 +267,7 @@ function PipelineContent() {
               {summary.stage_movers.map((mover, idx) => (
                 <Link
                   key={`${mover.internal_id}-${idx}`}
-                  href={`/opportunities?id=${mover.internal_id}`}
+                  href={opportunityHref(mover.internal_id)}
                   className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-gda-bg-base transition-colors border-b border-border last:border-b-0"
                 >
                   <span
@@ -335,7 +336,7 @@ function PipelineContent() {
                 <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-gda-bg-base/50 transition-colors h-9">
                   <td className="px-3 py-1.5">
                     <Link
-                      href={`/opportunities?id=${item.opportunity_id}`}
+                      href={opportunityHref(item.opportunity_id)}
                       className="text-foreground hover:text-gda-green truncate block max-w-xs"
                     >
                       {item.opportunity_title}
@@ -492,7 +493,7 @@ function PipelineRow({ item }: { item: PipelineListItem }) {
       <td className="px-3 py-1.5">
         <div>
           <Link
-            href={`/opportunities?id=${item.opportunity_id}`}
+            href={opportunityHref(item.opportunity_id)}
             className="text-foreground hover:text-gda-green truncate block max-w-xs"
           >
             {item.opportunity_title}
@@ -552,7 +553,7 @@ function PipelineRow({ item }: { item: PipelineListItem }) {
       </td>
       <td className="px-3 py-1.5 text-left">
         <Link
-          href={`/opportunities?id=${item.opportunity_id}`}
+          href={opportunityHref(item.opportunity_id)}
           className="text-xs text-muted-foreground hover:text-gda-green"
         >
           →

@@ -11,6 +11,7 @@ import {
   type AwardsTab,
 } from "@/hooks/use-awards";
 import { Pagination } from "@/components/shared/Pagination";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SourceChip } from "@/components/shared/source-chip";
 import { PendingState } from "@/components/shared/pending-state";
@@ -399,7 +400,7 @@ function AwardCard({
       e.stopPropagation();
       pursue.mutate(award.id, {
         onSuccess: (data) => {
-          router.push(`/opportunities?id=${data.opportunity_id}`);
+          router.push(opportunityHref(data.opportunity_id));
         },
       });
     },
@@ -522,7 +523,7 @@ function AwardCard({
           </button>
         ) : (
           <button
-            onClick={() => router.push(`/opportunities?id=${award.linked_opportunity_id}`)}
+            onClick={() => router.push(opportunityHref(award.linked_opportunity_id))}
             className="text-[12px] font-mono text-gda-green hover:underline"
           >
             Pursuing

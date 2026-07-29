@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OpportunityLink } from "@/components/shared/OpportunityLink";
 import { Badge } from "@/components/ui/badge";
 import { BandBadge } from "@/components/band-badge";
 import { SourceChip } from "@/components/shared/source-chip";
@@ -73,12 +73,12 @@ export function OpportunityCard({ opp }: { opp: OpportunitySummary }) {
 
       {/* Top zone */}
       <div className="space-y-1 pr-16">
-        <Link
-          href={`/opportunities?id=${opp.id}`}
+        <OpportunityLink
+          id={opp.id}
           className="text-sm font-semibold text-foreground hover:text-gda-green leading-snug line-clamp-2"
         >
           {opp.title}
-        </Link>
+        </OpportunityLink>
         <div className="flex flex-wrap items-center gap-1.5">
           {opp.agency && (
             <Badge variant="outline" className="text-[12px]">
