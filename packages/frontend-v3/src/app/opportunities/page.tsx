@@ -1490,7 +1490,12 @@ function OpportunityDetail({ id }: { id: string }) {
         <div className="mt-1 flex items-center gap-1.5 font-mono text-[12px] text-muted-foreground">
           <span className="uppercase tracking-wider">Capture phase</span>
           <span className="text-muted-foreground">•</span>
-          <span className={cn("font-semibold", stageColor(currentStage))}>
+          <span
+            className={cn(
+              "font-semibold",
+              stageColor(stageToDoctrinePhase(opp.pipeline_stage ?? currentStage)),
+            )}
+          >
             {stageToDoctrinePhase(opp.pipeline_stage ?? currentStage)}
           </span>
         </div>
