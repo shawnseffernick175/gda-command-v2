@@ -62,8 +62,14 @@ export function AopPlanTab({ fy }: { fy: string }) {
   const [justSaved, setJustSaved] = useState(false);
 
   // Sync the form to the loaded plan during render (React's recommended pattern
-  // for resetting state on prop change), keyed on fy + which dataset is loaded.
-  const loadKey = `${fy}:${data ? (data.has_plan ? "plan" : "empty") : "loading"}`;
+  // for resetting state on prop change). Keyed on fy + a signature of the plan
+  // values so the annual inputs re-sync whenever the canonical plan changes
+  // server-side — e.g. after a per-month adjust or a Pipeline-originated AOP
+  // edit re-derives the annual total — not just when fy/has_plan flip.
+  const planSig = data?.plan
+    ? `${data.plan.plan_orders}|${data.plan.plan_sales}|${data.plan.plan_ebit}|${data.plan.plan_gross_margin}|${data.plan.plan_ros}`
+    : "none";
+  const loadKey = `${fy}:${data ? (data.has_plan ? planSig : "empty") : "loading"}`;
   const [seenKey, setSeenKey] = useState<string | null>(null);
   if (data && seenKey !== loadKey) {
     setSeenKey(loadKey);
