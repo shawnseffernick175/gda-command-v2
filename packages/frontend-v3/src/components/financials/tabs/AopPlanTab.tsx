@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useAopPlan, useSaveAopPlan } from "@/hooks/use-financial-bible";
-import type { AopPlanData } from "@/lib/types";
+import {
+  useAopPlan,
+  useSaveAopPlan,
+  useAdjustAopMonth,
+} from "@/hooks/use-financial-bible";
+import type { AopPlanData, AopPlanMonth } from "@/lib/types";
 
 type FieldKey =
   | "plan_orders"
@@ -117,7 +121,10 @@ export function AopPlanTab({ fy }: { fy: string }) {
           annual number per metric. On save, dollar targets (Orders, Sales,
           Operating Income) are split evenly across 12 months (annual {"÷"} 12);
           percentages (Gross Margin, ROS) apply the same value to every month.
-          These are your real numbers {"—"} not seeded benchmarks.
+          You can then fine-tune any individual month below {"—"} the annual AOP
+          is always the sum of the 12 months, and it updates the Pipeline
+          Coverage targets everywhere. These are your real numbers {"—"} not
+          seeded benchmarks.
         </p>
       </div>
 
@@ -245,7 +252,107 @@ export function AopPlanTab({ fy }: { fy: string }) {
               100.
             </p>
           )}
+
+          {data?.has_plan && data.months.length > 0 && (
+            <MonthlyAdjust fy={fy} months={data.months} />
+          )}
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Per-month AOP sales editor. Each month can be adjusted independently; the
+ * annual AOP shown is the live sum of the 12 months and is what Pipeline
+ * Coverage reads. Saving a month re-derives that canonical annual value.
+ */
+function MonthlyAdjust({ fy, months }: { fy: string; months: AopPlanMonth[] }) {
+  const adjust = useAdjustAopMonth();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [savedPeriod, setSavedPeriod] = useState<string | null>(null);
+
+  const valueFor = (m: AopPlanMonth): string =>
+    drafts[m.period] ?? (m.plan_sales != null ? String(m.plan_sales) : "");
+
+  const annualSum = months.reduce((sum, m) => {
+    const draft = drafts[m.period];
+    const n = draft != null ? toNum(draft) : m.plan_sales;
+    return sum + (n ?? 0);
+  }, 0);
+
+  const saveMonth = (m: AopPlanMonth) => {
+    const parsed = toNum(valueFor(m));
+    if (parsed === null || parsed < 0) return;
+    setSavedPeriod(null);
+    adjust.mutate(
+      { fy, period: m.period, plan_sales: parsed },
+      {
+        onSuccess: () => {
+          setSavedPeriod(m.period);
+          setDrafts((prev) => {
+            const next = { ...prev };
+            delete next[m.period];
+            return next;
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="space-y-3 border-t border-border pt-6">
+      <div className="flex items-baseline justify-between">
+        <h3 className="text-sm font-semibold text-foreground">
+          Adjust monthly AOP sales {"—"} {fy}
+        </h3>
+        <span className="text-[12px] text-muted-foreground">
+          Annual AOP (sum):{" "}
+          <span className="tabular-nums font-medium text-foreground">
+            {fmtMoney(annualSum)}
+          </span>
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {months.map((m) => (
+          <div key={m.period} className="flex items-center gap-2">
+            <span className="w-10 shrink-0 text-[12px] font-medium text-muted-foreground">
+              {m.month}
+            </span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              value={valueFor(m)}
+              onChange={(e) =>
+                setDrafts((prev) => ({ ...prev, [m.period]: e.target.value }))
+              }
+              className="w-full rounded border border-border bg-card px-2 py-1 text-[13px] text-foreground tabular-nums focus:border-gda-cyan focus:outline-none"
+            />
+            <button
+              type="button"
+              disabled={adjust.isPending}
+              onClick={() => saveMonth(m)}
+              className="shrink-0 rounded border border-border px-2 py-1 text-[12px] text-foreground transition-colors hover:bg-card disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save
+            </button>
+          </div>
+        ))}
+      </div>
+      {savedPeriod && !adjust.isPending && (
+        <span className="text-[13px] text-gda-green">
+          {savedPeriod} updated {"—"} annual AOP and Pipeline Coverage now reflect
+          the new total.
+        </span>
+      )}
+      {adjust.isError && (
+        <span className="text-[13px] text-gda-red">
+          {adjust.error instanceof Error
+            ? adjust.error.message
+            : "Failed to update month."}
+        </span>
       )}
     </div>
   );

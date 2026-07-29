@@ -4,6 +4,10 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { buildTabAnalysisInput } from '../services/financials/ai-analyze-tabs.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
+import {
+  syncAopTargetMirror,
+  isSupportedAopFy,
+} from '../services/financials/aop-target.js';
 import { parseCalendarMode, getMonthsForMode, fiscalMonthIndex, type CalendarMode } from '../lib/fiscal-calendar.js';
 import { classifyFinancialDoc } from '../services/financials/reingest-doc.js';
 import { CANONICAL_DIRECT_COST_LINES } from '../services/financials/deterministic-parsers.js';
@@ -1983,6 +1987,23 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const r = rows[0];
     const hasPlan = r && Number(r.month_count) > 0;
 
+    // Per-month sales rows so the Bible can adjust any single month (the annual
+    // AOP is their sum). Ordered by the FY calendar (Oct→Sep).
+    const { rows: monthRows } = await pool.query<{ period: string; plan_sales: string | null }>(
+      `SELECT period, plan_sales
+         FROM financial_plan
+        WHERE source = 'user_aop' AND is_seed = false
+          AND fiscal_year = $1 AND period NOT LIKE '%Q%'`,
+      [fiscalYear],
+    );
+    const salesByPeriod = new Map(monthRows.map((m) => [m.period, m.plan_sales]));
+    const fyShort = `FY${fiscalYear % 100}`;
+    const months = getMonthsForMode('FY').map(({ mon }) => {
+      const period = `${fyShort} ${mon}`;
+      const raw = salesByPeriod.get(period);
+      return { period, month: mon, plan_sales: raw != null ? Number(raw) : null };
+    });
+
     return reply.send(successEnvelope({
       fiscal_year: fiscalYear,
       fy: `FY${fiscalYear % 100}`,
@@ -1996,6 +2017,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
             plan_ros: Number(r.plan_ros),
           }
         : null,
+      months,
     }, req.requestId));
   });
 
@@ -2070,6 +2092,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         );
       }
 
+      // Canonical AOP: re-derive the wheelhouse mirror so Pipeline Coverage
+      // reads the exact same annual revenue target the Bible just saved.
+      await syncAopTargetMirror(client, fiscalYear);
+
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
@@ -2107,6 +2133,91 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         plan_gross_margin: planGm,
         plan_ros: planRos,
       },
+    }, req.requestId));
+  });
+
+  // PATCH /v3/financials/aop-plan/month
+  // Body: { fy: 'FY26', period: 'FY26 Jan', plan_sales: number }
+  // Adjust a SINGLE month's AOP sales. The annual AOP is the sum of the 12
+  // months, so after the edit the canonical wheelhouse mirror is re-derived in
+  // the same transaction — Pipeline Coverage instantly reflects the new sum.
+  app.patch('/v3/financials/aop-plan/month', async (req, reply) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+
+    const fyRaw = typeof body.fy === 'string' ? body.fy : '';
+    const fiscalYear = normalizeFiscalYear(fyRaw, 0);
+    if (!fiscalYear || !isSupportedAopFy(fiscalYear)) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'A supported fiscal year (FY26–FY28) is required', req.requestId));
+    }
+
+    const period = typeof body.period === 'string' ? body.period.trim() : '';
+    if (!period) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'period is required (e.g. "FY26 Jan")', req.requestId));
+    }
+
+    const planSales =
+      typeof body.plan_sales === 'number' && Number.isFinite(body.plan_sales)
+        ? body.plan_sales
+        : typeof body.plan_sales === 'string' && body.plan_sales.trim() !== '' && Number.isFinite(Number(body.plan_sales))
+          ? Number(body.plan_sales)
+          : null;
+    if (planSales === null || planSales < 0) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'plan_sales must be a non-negative number', req.requestId));
+    }
+
+    const client = await pool.connect();
+    let newAnnual: number | null = null;
+    let oldSales: number | null = null;
+    try {
+      await client.query('BEGIN');
+
+      const cur = await client.query<{ plan_sales: string | null }>(
+        `SELECT plan_sales FROM financial_plan
+          WHERE source = 'user_aop' AND is_seed = false
+            AND fiscal_year = $1 AND period = $2
+          FOR UPDATE`,
+        [fiscalYear, period],
+      );
+      if (cur.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', `No AOP plan month "${period}" for FY${fiscalYear % 100}. Save the annual plan first.`, req.requestId));
+      }
+      oldSales = cur.rows[0]!.plan_sales != null ? Number(cur.rows[0]!.plan_sales) : null;
+
+      await client.query(
+        `UPDATE financial_plan SET plan_sales = $1
+          WHERE source = 'user_aop' AND is_seed = false
+            AND fiscal_year = $2 AND period = $3`,
+        [planSales, fiscalYear, period],
+      );
+
+      newAnnual = await syncAopTargetMirror(client, fiscalYear);
+
+      await recordAuditLog(client, {
+        action: 'financial_plan_month_update',
+        table_name: 'financial_plan',
+        record_ref: `fy:${fiscalYear}:${period}`,
+        old_values: { plan_sales: oldSales },
+        new_values: { plan_sales: planSales, annual_aop: newAnnual },
+        actor: 'user',
+        source: 'user',
+      });
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      req.log.error({ err }, 'aop-plan month update failed');
+      return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'Failed to update AOP plan month', req.requestId));
+    } finally {
+      client.release();
+    }
+
+    return reply.send(successEnvelope({
+      fiscal_year: fiscalYear,
+      fy: `FY${fiscalYear % 100}`,
+      period,
+      plan_sales: planSales,
+      annual_aop: newAnnual,
     }, req.requestId));
   });
 

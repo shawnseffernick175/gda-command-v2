@@ -1399,11 +1399,26 @@ export interface AopPlanValues {
   plan_ros: number;
 }
 
+export interface AopPlanMonth {
+  period: string;
+  month: string;
+  plan_sales: number | null;
+}
+
 export interface AopPlanData {
   fiscal_year: number;
   fy: string;
   has_plan: boolean;
   plan: AopPlanValues | null;
+  months: AopPlanMonth[];
+}
+
+export interface AopPlanMonthResponse {
+  fiscal_year: number;
+  fy: string;
+  period: string;
+  plan_sales: number;
+  annual_aop: number | null;
 }
 
 export interface AopPlanSaveResponse {
