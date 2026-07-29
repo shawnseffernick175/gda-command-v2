@@ -193,7 +193,11 @@ jobs:
           # switching them onto the shared SVG echarts-setup (dropping the only
           # CanvasRenderer usage) offset it, so total lands back near ~728KB. Tiny
           # bump purely for gzip cross-runner jitter headroom at the ceiling.
-          MAX_MAIN_KB=731
+          # 731→733: AOP single-source-of-truth adds two small inline editors
+          # (Pipeline AOP target + per-month Bible adjustment) so the canonical
+          # AOP can be written/reconciled from both surfaces (~1KB, 732KB). Small
+          # headroom so this feature + gzip jitter don't flap at the ceiling.
+          MAX_MAIN_KB=733
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 

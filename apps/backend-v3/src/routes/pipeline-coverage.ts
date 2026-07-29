@@ -12,6 +12,12 @@
 import type { FastifyInstance } from 'fastify';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { pool } from '../lib/db.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
+import {
+  distributeAnnualSales,
+  syncAopTargetMirror,
+  isSupportedAopFy,
+} from '../services/financials/aop-target.js';
 
 /* ── Coverage multiples (doctrine — hardcoded) ────────────────── */
 
@@ -205,6 +211,88 @@ export async function pipelineCoverageRoutes(app: FastifyInstance): Promise<void
       fy,
       aop_target: aopTarget,
       layers,
+    }, req.requestId));
+  });
+
+  // PATCH /v3/pipeline/coverage/aop-target
+  // Body: { fy: 2026, aop_revenue_target: number }
+  // Set the fiscal year's AOP revenue target FROM the Pipeline. This is the
+  // reverse write path: it distributes the annual figure evenly (÷12) into the
+  // Financial Bible's monthly plan rows, then re-derives the canonical
+  // wheelhouse mirror from that sum — so the Bible and every consumer instantly
+  // reflect the number entered here. Individual months can still be adjusted
+  // afterwards in the Bible (annual = sum of months).
+  app.patch('/v3/pipeline/coverage/aop-target', async (req, reply) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+
+    const fyRaw = body.fy;
+    const fy = typeof fyRaw === 'number' ? fyRaw : typeof fyRaw === 'string' ? parseInt(fyRaw, 10) : NaN;
+    if (!Number.isFinite(fy) || !isSupportedAopFy(fy)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', `fy must be one of ${VALID_FY.join(', ')}`, req.requestId),
+      );
+    }
+
+    const targetRaw = body.aop_revenue_target;
+    const target =
+      typeof targetRaw === 'number' && Number.isFinite(targetRaw)
+        ? targetRaw
+        : typeof targetRaw === 'string' && targetRaw.trim() !== '' && Number.isFinite(Number(targetRaw))
+          ? Number(targetRaw)
+          : null;
+    if (target === null || target < 0) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'aop_revenue_target must be a non-negative number', req.requestId),
+      );
+    }
+
+    const col = AOP_COLUMN[fy]!;
+    const client = await pool.connect();
+    let newAnnual: number | null = null;
+    let oldTarget: number | null = null;
+    try {
+      await client.query('BEGIN');
+
+      const prev = await client.query<{ aop_target: string | null }>(
+        `SELECT ${col} AS aop_target FROM wheelhouse_config WHERE id = 1 FOR UPDATE`,
+      );
+      if (prev.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return reply.status(500).send(
+          errorEnvelope('INTERNAL_ERROR', 'wheelhouse_config not initialized', req.requestId),
+        );
+      }
+      oldTarget = prev.rows[0]!.aop_target != null ? Number(prev.rows[0]!.aop_target) : null;
+
+      // Push the annual figure into the Bible's monthly plan, then re-derive the
+      // canonical mirror from that sum (keeps annual === sum(months) exactly).
+      await distributeAnnualSales(client, fy, target);
+      newAnnual = await syncAopTargetMirror(client, fy);
+
+      await recordAuditLog(client, {
+        action: 'aop_target_update',
+        table_name: 'wheelhouse_config',
+        record_ref: `fy:${fy}`,
+        old_values: { aop_revenue_target: oldTarget },
+        new_values: { aop_revenue_target: newAnnual, origin: 'pipeline' },
+        actor: 'user',
+        source: 'user',
+      });
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      req.log.error({ err }, 'pipeline aop-target update failed');
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', 'Failed to update AOP target', req.requestId),
+      );
+    } finally {
+      client.release();
+    }
+
+    return reply.send(successEnvelope({
+      fy,
+      aop_target: newAnnual,
     }, req.requestId));
   });
 }

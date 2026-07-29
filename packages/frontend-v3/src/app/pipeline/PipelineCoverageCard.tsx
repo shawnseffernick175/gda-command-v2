@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { stageKeyToLabel } from "@/lib/stages";
 import {
   usePipelineCoverage,
+  useSetPipelineAopTarget,
   type CoverageLayer,
   type CoveragePursuit,
 } from "@/hooks/use-pipeline-coverage";
@@ -108,14 +109,94 @@ export function PipelineCoverageCard() {
             </tbody>
           </table>
 
-          {/* Source line */}
-          <div className="border-t border-border px-4 py-2">
+          {/* Source line + AOP target editor */}
+          <div className="border-t border-border px-4 py-2 space-y-2">
+            <AopTargetEditor fy={fy} aopTarget={data.aop_target} />
             <p className="font-mono text-[12px] italic text-muted-foreground">
               Required = AOP revenue target × layer multiple. Change the AOP target and every layer recomputes.
             </p>
           </div>
         </>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Inline editor for the fiscal year's AOP revenue target. Writing here updates
+ * the single canonical value — the Financial Bible's monthly plan is re-derived
+ * (annual ÷ 12) and every consumer reflects it immediately.
+ */
+function AopTargetEditor({ fy, aopTarget }: { fy: number; aopTarget: number }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const setTarget = useSetPipelineAopTarget();
+
+  const start = () => {
+    setDraft(String(aopTarget));
+    setEditing(true);
+  };
+
+  const save = () => {
+    const n = Number(draft);
+    if (!Number.isFinite(n) || n < 0) return;
+    setTarget.mutate(
+      { fy, aop_revenue_target: n },
+      { onSuccess: () => setEditing(false) },
+    );
+  };
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2 font-mono text-[12px]">
+        <span className="text-muted-foreground">FY{String(fy).slice(2)} AOP revenue target:</span>
+        <span className="tabular-nums font-medium text-foreground">
+          {formatMoney(aopTarget)}
+        </span>
+        <button
+          type="button"
+          onClick={start}
+          className="rounded border border-border px-1.5 py-0.5 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Edit
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 font-mono text-[12px]">
+      <span className="text-muted-foreground">FY{String(fy).slice(2)} AOP:</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        min="0"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        className="w-40 rounded border border-border bg-card px-2 py-1 text-foreground tabular-nums focus:border-gda-cyan focus:outline-none"
+      />
+      <button
+        type="button"
+        disabled={setTarget.isPending}
+        onClick={save}
+        className="rounded bg-gda-cyan px-2 py-1 text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {setTarget.isPending ? "Saving…" : "Save"}
+      </button>
+      <button
+        type="button"
+        onClick={() => setEditing(false)}
+        className="rounded border border-border px-2 py-1 text-muted-foreground transition-colors hover:text-foreground"
+      >
+        Cancel
+      </button>
+      {setTarget.isError && (
+        <span className="text-gda-red">
+          {setTarget.error instanceof Error ? setTarget.error.message : "Failed"}
+        </span>
+      )}
     </div>
   );
 }

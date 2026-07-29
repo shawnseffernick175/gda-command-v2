@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiDelete, getToken } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, getToken } from "@/lib/api";
 import type {
   IngestionStatus,
   ContractWaterfallData,
@@ -10,6 +10,7 @@ import type {
   AopPlanData,
   AopPlanValues,
   AopPlanSaveResponse,
+  AopPlanMonthResponse,
   P2FinancialsData,
   DefinitionsData,
   AiAnalyzeResponse,
@@ -99,16 +100,32 @@ export function useAopPlan(fy: string) {
   });
 }
 
+// Any AOP write re-derives the canonical annual target, which Pipeline Coverage
+// also reads — so its cache must be refreshed alongside the Bible's views.
+function invalidateAopEverywhere(qc: ReturnType<typeof useQueryClient>): void {
+  void qc.invalidateQueries({ queryKey: ["financials", "aop-plan"] });
+  void qc.invalidateQueries({ queryKey: ["financials", "aop-execution"] });
+  void qc.invalidateQueries({ queryKey: ["pipeline-coverage"] });
+}
+
 export function useSaveAopPlan() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: { fy: string } & AopPlanValues) =>
       apiPost<AopPlanSaveResponse>("/v3/financials/aop-plan", payload),
-    onSuccess: () => {
-      // The saved plan now drives AOP Execution — refresh both views.
-      void qc.invalidateQueries({ queryKey: ["financials", "aop-plan"] });
-      void qc.invalidateQueries({ queryKey: ["financials", "aop-execution"] });
-    },
+    onSuccess: () => invalidateAopEverywhere(qc),
+  });
+}
+
+// Adjust a single month's AOP sales. The annual AOP is the sum of the 12
+// months and the canonical target re-derives from it, so this refreshes the
+// Bible AND Pipeline Coverage.
+export function useAdjustAopMonth() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { fy: string; period: string; plan_sales: number }) =>
+      apiPatch<AopPlanMonthResponse>("/v3/financials/aop-plan/month", payload),
+    onSuccess: () => invalidateAopEverywhere(qc),
   });
 }
 
