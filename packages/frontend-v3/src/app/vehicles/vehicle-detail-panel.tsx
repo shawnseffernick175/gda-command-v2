@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import Link from "next/link";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import { useVehicleDetail, useVehicleOpportunities } from "@/hooks/use-vehicles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreTooltip } from "@/components/shared/score-tooltip";
@@ -170,7 +171,7 @@ export default function VehicleDetailPanel({
             {opportunities.map((opp) => (
               <Link
                 key={opp.id}
-                href={`/opportunities?id=${opp.id}`}
+                href={opportunityHref(opp.id)}
                 className="block rounded border border-border p-2 text-xs hover:bg-gda-bg-base transition-colors"
                 title={opp.match_evidence ?? undefined}
               >

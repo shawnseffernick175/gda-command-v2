@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SourceChip } from "@/components/shared/source-chip";
@@ -58,7 +59,7 @@ export function AwardDetailPanel({
   const handlePursue = useCallback(() => {
     pursue.mutate(awardId, {
       onSuccess: (data) => {
-        router.push(`/opportunities?id=${data.opportunity_id}`);
+        router.push(opportunityHref(data.opportunity_id));
       },
     });
   }, [awardId, pursue, router]);
@@ -284,7 +285,7 @@ export function AwardDetailPanel({
                 </button>
               ) : (
                 <button
-                  onClick={() => router.push(`/opportunities?id=${award.linked_opportunity_id}`)}
+                  onClick={() => router.push(opportunityHref(award.linked_opportunity_id))}
                   className="rounded border border-gda-green/40 bg-gda-green/10 px-3 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
                 >
                   View Pursuit

@@ -13,6 +13,7 @@ import {
 import { usePipelineList, type PipelineListItem } from "@/hooks/use-pipeline";
 import { useToast } from "@/components/ui/toast";
 import { Pagination } from "@/components/shared/Pagination";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
 import { SourceChip } from "@/components/shared/source-chip";
@@ -689,7 +690,7 @@ function OpportunityList() {
           <div className="flex-1 min-h-0 overflow-y-auto mt-4">
             <VehicleGroupedView
               vehicles={vehiclesData ?? []}
-              onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
+              onNavigate={(id) => router.push(opportunityHref(id))}
               onAgencyFilter={applyAgencyFilter}
             />
           </div>
@@ -738,7 +739,7 @@ function OpportunityList() {
                       <OpportunityRow
                         key={String(opp.internal_id ?? opp.id)}
                         opp={opp}
-                        onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
+                        onNavigate={(id) => router.push(opportunityHref(id))}
                         onAgencyFilter={applyAgencyFilter}
                         selected={selectedOppId === String(opp.id)}
                         onSelect={(id) => setSelectedOppId((prev) => prev === id ? null : id)}
@@ -1082,7 +1083,7 @@ function OpportunityRow({
         <div>
           <div className="flex items-center gap-2">
             <Link
-              href={`/opportunities?id=${opp.id}`}
+              href={opportunityHref(opp.id)}
               className="text-foreground hover:text-gda-green truncate block max-w-xs text-sm"
             >
               {opp.title}
@@ -1295,7 +1296,7 @@ function QualifyStagingQueue() {
                   },
                 );
               }}
-              onNavigate={(oppId) => router.push(`/opportunities?id=${oppId}`)}
+              onNavigate={(oppId) => router.push(opportunityHref(oppId))}
               isPending={updateStage.isPending}
             />
           ))}

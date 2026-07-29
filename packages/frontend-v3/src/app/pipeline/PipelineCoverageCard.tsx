@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
@@ -302,7 +303,7 @@ function DrilldownTable({ pursuits }: { pursuits: CoveragePursuit[] }) {
           >
             <td className="px-4 py-1.5 text-left">
               <Link
-                href={`/opportunities?id=${p.opportunity_id}`}
+                href={opportunityHref(p.opportunity_id)}
                 className="text-foreground hover:text-gda-green truncate block max-w-[280px]"
               >
                 {p.title}

@@ -9,8 +9,10 @@ import type {
   RegulatoryEntry,
   UpcomingSolicitation,
 } from "@/hooks/use-digest";
+import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { opportunityHref } from "@/components/shared/OpportunityLink";
 import {
   RefreshCw,
   ExternalLink,
@@ -327,7 +329,7 @@ function LeadStoryContent({ lead }: { lead: DigestLeadStory }) {
           <a
             href={
               lead.related_opportunity_ids.length === 1
-                ? `/opportunities?id=${lead.related_opportunity_ids[0]}`
+                ? opportunityHref(lead.related_opportunity_ids[0])
                 : `/opportunities`
             }
             className="font-mono text-[12px] text-gda-cyan hover:underline"
@@ -475,7 +477,7 @@ function UpcomingSolicitationsContent({ items }: { items: UpcomingSolicitation[]
             <div key={item.id} className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <a
-                  href={`/opportunities?id=${item.id}`}
+                  href={opportunityHref(item.id)}
                   className="font-mono text-[12px] text-foreground hover:text-gda-cyan hover:underline truncate block"
                 >
                   {item.title}
@@ -491,12 +493,12 @@ function UpcomingSolicitationsContent({ items }: { items: UpcomingSolicitation[]
               </span>
             </div>
           ))}
-          <a
+          <Link
             href="/opportunities"
             className="block font-mono text-[12px] text-gda-cyan hover:underline pt-1"
           >
             View all {"\u2192"}
-          </a>
+          </Link>
         </>
       )}
     </div>
