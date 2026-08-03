@@ -705,6 +705,58 @@ export interface ProjectRevenueData {
   };
 }
 
+/* ── Project Income Statement (Financial Bible) ───────────────── */
+
+/**
+ * A project-scoped income statement, built from the per-project cost-pool
+ * book. Every dollar line is null when the book did not populate it (missing ≠
+ * zero, R1); percentages are revenue-derived from the summed dollars.
+ */
+export interface ProjectIncomeStatement {
+  revenue: number | null;
+  direct_cost: number | null;
+  indirect_cost: number | null;
+  profit: number | null;
+  gross_profit: number | null;
+  dc_dl_onsite: number | null;
+  dc_dl_offsite: number | null;
+  dc_subk_labor: number | null;
+  dc_subk_travel: number | null;
+  dc_subk_material: number | null;
+  dc_consultant_labor: number | null;
+  dc_consultant_travel: number | null;
+  dc_direct_travel: number | null;
+  dc_direct_material: number | null;
+  dc_direct_odc: number | null;
+  ind_oh_onsite: number | null;
+  ind_oh_offsite: number | null;
+  ind_mhx: number | null;
+  ind_gna: number | null;
+  margin_pct: number | null;
+  gross_profit_pct: number | null;
+  source_doc_ids: number[];
+}
+
+export interface ProjectIncomeStatementColumn extends ProjectIncomeStatement {
+  project_id: string | null;
+  project_name: string;
+  contract_number: string | null;
+}
+
+export interface ProjectIncomeStatementData {
+  columns: ProjectIncomeStatementColumn[];
+  total: ProjectIncomeStatement;
+  available_periods: string[];
+  available_months?: string[];
+  available_quarters?: string[];
+  selected_period: string;
+  meta: {
+    table: string;
+    project_count: number;
+    source: string;
+  };
+}
+
 /* ── Cost Service Centers (Financial Bible) ───────────────────── */
 
 export interface ServiceCenterRow {

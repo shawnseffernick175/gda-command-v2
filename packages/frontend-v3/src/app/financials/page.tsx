@@ -300,7 +300,9 @@ export default function FinancialsPage() {
         )}
         {activeTab === "plan" && <AopPlanTab fy={fy} />}
         {activeTab === "execution" && <AopExecutionTab fy={fy} />}
-        {activeTab === "p2" && <P2FinancialsTab />}
+        {activeTab === "p2" && (
+          <P2FinancialsTab projectFilter={projectSel["p2"] ?? []} />
+        )}
         {activeTab === "balance-sheet" && <BalanceSheetCard />}
         {activeTab === "ap" && <ApTab />}
         {activeTab === "ar" && <ArTab projectFilter={projectSel["ar"] ?? []} />}

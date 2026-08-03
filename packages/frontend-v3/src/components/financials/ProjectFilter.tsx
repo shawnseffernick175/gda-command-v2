@@ -17,6 +17,7 @@ import type { CalendarMode } from "@/lib/types";
  * so the control is shown disabled with an explanatory note instead.
  */
 export const PROJECT_FILTERABLE_TABS = [
+  "p2",
   "project-revenue",
   "waterfall",
   "ar",
@@ -242,6 +243,39 @@ function ProjectRevenueFilter({
   );
 }
 
+function IncomeStatementFilter({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  // Options are the full YTD project set from the same book the project income
+  // statement reads (`project_revenue_actuals`), keyed by project name.
+  const { data, isLoading } = useProjectRevenue("YTD");
+  const options = useMemo(
+    () =>
+      dedupeOptions(
+        (data?.items ?? []).map((r) => ({
+          value: r.project_name,
+          label: r.contract_number
+            ? `${r.project_name} (${r.contract_number})`
+            : r.project_name,
+        })),
+      ),
+    [data],
+  );
+  return (
+    <ProjectMultiSelect
+      options={options}
+      selected={selected}
+      onChange={onChange}
+      isLoading={isLoading}
+      note="Selecting projects shows a project-level income statement from the cost-pool book."
+    />
+  );
+}
+
 function WaterfallFilter({
   selected,
   onChange,
@@ -318,6 +352,9 @@ export function ProjectFilter({
   selected: string[];
   onChange: (next: string[]) => void;
 }) {
+  if (tab === "p2") {
+    return <IncomeStatementFilter selected={selected} onChange={onChange} />;
+  }
   if (tab === "project-revenue") {
     return <ProjectRevenueFilter selected={selected} onChange={onChange} />;
   }

@@ -18,6 +18,11 @@ import {
   inferDocPeriod,
   type CoverageDocInput,
 } from '../services/financials/coverage.js';
+import {
+  buildProjectColumns,
+  aggregateProjectIncomeStatement,
+  type ProjectCostPoolRow,
+} from '../lib/project-income-statement.js';
 
 // Live, user-specific financials read from the DB on every request. They must
 // never be served from an HTTP cache (browser/proxy) or a 304 revalidation,
@@ -1035,6 +1040,149 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         row_count: items.length,
         effective_period: effectivePeriod,
         period_total: Math.round(periodTotal * 100) / 100,
+      },
+    }, req.requestId));
+  });
+
+  // GET /v3/financials/project-income-statement?period=YTD|Q1..Q4|<month>&projects=a|b
+  //
+  // Project-scoped income statement built from the per-project cost-pool book
+  // (`project_revenue_actuals`, F-628 / #1203): direct-cost lines, indirect
+  // pool lines (Overhead on/off-site, MHX, G&A), and stored roll-ups. Every
+  // figure comes straight from the book — no allocation/modeling. Lines the
+  // book did not populate stay null (rendered "—"), so missing ≠ zero (R1).
+  //
+  // `projects` is a pipe-separated list of project identities (project_name,
+  // project_id, or contract_number, matching the header Project selector).
+  // Omitted/empty → every project. Dollar lines sum across the period's months
+  // and the selected projects; percentages re-derive from the summed dollars.
+  app.get('/v3/financials/project-income-statement', async (req, reply) => {
+    noStore(reply);
+    const qp = req.query as Record<string, string>;
+
+    const MONTH_ORDER: Record<string, number> = {
+      Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
+      Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+    };
+    const calQuarter = (mon: string): number => Math.ceil((MONTH_ORDER[mon] ?? 0) / 3);
+
+    // Month periods that actually carry project cost-pool actuals.
+    const { rows: periodRows } = await pool.query(
+      `SELECT DISTINCT period FROM project_revenue_actuals
+         WHERE (revenue <> 0 OR cost <> 0) AND period NOT LIKE '%Q%'`,
+    );
+    const rawPeriods = periodRows
+      .map((r) => r.period as string)
+      .sort((a, b) => (MONTH_ORDER[a.slice(-3)] ?? 99) - (MONTH_ORDER[b.slice(-3)] ?? 99));
+
+    const availableQuarters = [
+      ...new Set(rawPeriods.map((p) => calQuarter(p.slice(-3))).filter((q) => q >= 1)),
+    ]
+      .sort((a, b) => a - b)
+      .map((q) => `Q${q}`);
+    const availablePeriods = ['YTD', ...availableQuarters, ...rawPeriods];
+
+    // Resolve the requested period to the set of month periods it spans.
+    const requested = (qp.period || '').trim();
+    const qMatch = /^Q([1-4])$/i.exec(requested);
+    let effectivePeriod: string;
+    let monthPeriods: string[];
+    if (!requested || requested.toUpperCase() === 'YTD') {
+      effectivePeriod = 'YTD';
+      monthPeriods = rawPeriods;
+    } else if (qMatch) {
+      const qn = Number(qMatch[1]);
+      const months = rawPeriods.filter((p) => calQuarter(p.slice(-3)) === qn);
+      if (months.length > 0) {
+        effectivePeriod = `Q${qn}`;
+        monthPeriods = months;
+      } else {
+        effectivePeriod = 'YTD';
+        monthPeriods = rawPeriods;
+      }
+    } else if (rawPeriods.some((p) => p.toUpperCase() === requested.toUpperCase())) {
+      effectivePeriod = rawPeriods.find((p) => p.toUpperCase() === requested.toUpperCase()) as string;
+      monthPeriods = [effectivePeriod];
+    } else {
+      effectivePeriod = 'YTD';
+      monthPeriods = rawPeriods;
+    }
+
+    // Selected project identities (pipe-separated to allow names with commas).
+    const projects = (qp.projects || '')
+      .split('|')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const params: unknown[] = [monthPeriods];
+    let projectClause = '';
+    if (projects.length > 0) {
+      params.push(projects);
+      projectClause = `AND (
+        project_name = ANY($2)
+        OR COALESCE(project_id, '') = ANY($2)
+        OR COALESCE(contract_number, '') = ANY($2)
+      )`;
+    }
+
+    const { rows } = monthPeriods.length === 0
+      ? { rows: [] as Record<string, unknown>[] }
+      : await pool.query(
+          `SELECT project_id, project_name, contract_number,
+                  revenue, direct_cost, indirect_cost, profit, gross_profit,
+                  dc_dl_onsite, dc_dl_offsite, dc_subk_labor, dc_subk_travel,
+                  dc_subk_material, dc_consultant_labor, dc_consultant_travel,
+                  dc_direct_travel, dc_direct_material, dc_direct_odc,
+                  ind_oh_onsite, ind_oh_offsite, ind_mhx, ind_gna,
+                  source_doc_id
+           FROM project_revenue_actuals
+           WHERE period = ANY($1) ${projectClause}`,
+          params,
+        );
+
+    const num = (v: unknown): number | null =>
+      v === null || v === undefined ? null : Number(v);
+
+    const costPoolRows: ProjectCostPoolRow[] = rows.map((r) => ({
+      project_id: (r.project_id as string) ?? null,
+      project_name: r.project_name as string,
+      contract_number: (r.contract_number as string) ?? null,
+      revenue: num(r.revenue),
+      direct_cost: num(r.direct_cost),
+      indirect_cost: num(r.indirect_cost),
+      profit: num(r.profit),
+      gross_profit: num(r.gross_profit),
+      dc_dl_onsite: num(r.dc_dl_onsite),
+      dc_dl_offsite: num(r.dc_dl_offsite),
+      dc_subk_labor: num(r.dc_subk_labor),
+      dc_subk_travel: num(r.dc_subk_travel),
+      dc_subk_material: num(r.dc_subk_material),
+      dc_consultant_labor: num(r.dc_consultant_labor),
+      dc_consultant_travel: num(r.dc_consultant_travel),
+      dc_direct_travel: num(r.dc_direct_travel),
+      dc_direct_material: num(r.dc_direct_material),
+      dc_direct_odc: num(r.dc_direct_odc),
+      ind_oh_onsite: num(r.ind_oh_onsite),
+      ind_oh_offsite: num(r.ind_oh_offsite),
+      ind_mhx: num(r.ind_mhx),
+      ind_gna: num(r.ind_gna),
+      source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+    }));
+
+    const columns = buildProjectColumns(costPoolRows);
+    const total = aggregateProjectIncomeStatement(costPoolRows);
+
+    return reply.send(successEnvelope({
+      columns,
+      total,
+      available_periods: availablePeriods,
+      available_months: rawPeriods,
+      available_quarters: availableQuarters,
+      selected_period: effectivePeriod,
+      meta: {
+        table: 'project_revenue_actuals',
+        project_count: columns.length,
+        source: 'project cost-pool book (Full Proj Revenue Summary)',
       },
     }, req.requestId));
   });
