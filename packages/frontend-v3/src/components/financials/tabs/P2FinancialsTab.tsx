@@ -1,6 +1,7 @@
 "use client";
 
 import { useP2Financials } from "@/hooks/use-financial-bible";
+import { ProjectIncomeStatement } from "@/components/financials/ProjectIncomeStatement";
 import { Kpi } from "@/components/financials/primitives/Kpi";
 import { NumberCell } from "@/components/financials/primitives/NumberCell";
 import { SourceFooter } from "@/components/financials/SourceFooter";
@@ -226,9 +227,21 @@ function resolveTotalValue(
   return hasAny ? sum : null;
 }
 
-export function P2FinancialsTab() {
+export function P2FinancialsTab({
+  projectFilter = [],
+}: {
+  projectFilter?: string[];
+}) {
   const { data, isLoading, error } = useP2Financials();
   const { sortBy, sortDir, handleSort } = useTableSort("p2pool");
+
+  // When one or more projects are selected in the header, the Income Statement
+  // becomes project-scoped: a real per-project statement from the cost-pool
+  // book instead of the company-wide statement. Nothing else on the page is
+  // company-vs-project ambiguous, so we swap the whole view.
+  if (projectFilter.length > 0) {
+    return <ProjectIncomeStatement projectFilter={projectFilter} />;
+  }
 
   if (isLoading) {
     return (

@@ -19,6 +19,7 @@ import type {
   ArByContractData,
   TrialBalanceData,
   ProjectRevenueData,
+  ProjectIncomeStatementData,
   ServiceCentersData,
   IngestionCoverageData,
 } from "@/lib/types";
@@ -266,6 +267,32 @@ export function useProjectRevenue(period?: string) {
     queryKey: ["financials", "project-revenue", period ?? "default"],
     queryFn: () =>
       apiGet<ProjectRevenueData>(`/v3/financials/project-revenue${qs}`),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+// Project-scoped income statement. `projects` are project identities from the
+// header Project selector (pipe-joined for the query so names with commas are
+// safe); empty → every project. `enabled` gates the fetch so the tab only
+// calls it when a project selection is active.
+export function useProjectIncomeStatement(
+  period: string,
+  projects: string[],
+  enabled: boolean,
+) {
+  const params = new URLSearchParams();
+  if (period) params.set("period", period);
+  if (projects.length > 0) params.set("projects", projects.join("|"));
+  const qs = params.toString();
+  return useQuery({
+    queryKey: ["financials", "project-income-statement", period, projects],
+    queryFn: () =>
+      apiGet<ProjectIncomeStatementData>(
+        `/v3/financials/project-income-statement${qs ? `?${qs}` : ""}`,
+      ),
+    enabled,
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",
