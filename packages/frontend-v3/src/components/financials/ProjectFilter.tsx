@@ -77,12 +77,22 @@ function ProjectMultiSelect({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open]);
 
-  // Selections that no longer exist in the current option set are ignored for
-  // the summary so we never claim "3 selected" while showing fewer rows.
+  // Reconcile the selection with the current option set: when the options
+  // change (e.g. AR's FY/CY toggle rewrites contract labels), prune any
+  // selected value that no longer exists so the label and the actually-filtered
+  // data can never disagree — and the user is never left with a hidden,
+  // unclearable filter.
   const validSelected = useMemo(() => {
     const valid = new Set(options.map((o) => o.value));
     return selected.filter((s) => valid.has(s));
   }, [options, selected]);
+
+  useEffect(() => {
+    if (isLoading || options.length === 0) return;
+    if (validSelected.length !== selected.length) {
+      onChange(validSelected);
+    }
+  }, [isLoading, options.length, validSelected, selected, onChange]);
 
   const summary = (() => {
     if (validSelected.length === 0) return "All projects";

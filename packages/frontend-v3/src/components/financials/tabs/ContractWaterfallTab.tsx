@@ -540,13 +540,18 @@ function ForecastSummaryStrip({ data }: { data: ContractWaterfallData }) {
   const totalFunded = data.contracts.reduce((s, c) => s + c.funded_to_date, 0);
   const totalForecastRevenue = data.forecast.reduce((s, f) => s + f.total_revenue, 0);
   const totalForecastProfit = data.forecast.reduce((s, f) => s + f.total_profit, 0);
+  // Margin derived from the profit/revenue actually shown here (so it stays
+  // consistent when a project filter narrows the forecast), not the
+  // whole-portfolio average.
+  const forecastMargin =
+    totalForecastRevenue > 0 ? (totalForecastProfit / totalForecastRevenue) * 100 : 0;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <MetricCard label="Total Ceiling" value={formatMoney(totalCeiling)} />
       <MetricCard label="Funded to Date" value={formatMoney(totalFunded)} accent />
       <MetricCard label="Forecast Revenue" value={formatMoney(totalForecastRevenue)} sub={`${data.forecast.length} months`} />
-      <MetricCard label="Forecast Profit" value={formatMoney(totalForecastProfit)} sub={`${data.portfolio_avg_margin.toFixed(1)}% avg margin`} />
+      <MetricCard label="Forecast Profit" value={formatMoney(totalForecastProfit)} sub={`${forecastMargin.toFixed(1)}% margin`} />
     </div>
   );
 }

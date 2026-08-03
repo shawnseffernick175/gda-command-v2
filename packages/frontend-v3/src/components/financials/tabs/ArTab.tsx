@@ -27,9 +27,15 @@ export function ArTab({ projectFilter = [] }: { projectFilter?: string[] }) {
   const { sortBy, sortDir, handleSort } = useTableSort("ar");
   const filterActive = projectFilter.length > 0;
   const [matrixOpen, setMatrixOpen] = useState(false);
-  // When a project (contract) filter is active, the contract matrix is the only
-  // AR view that carries a contract dimension — surface it automatically.
-  const matrixExpanded = matrixOpen || filterActive;
+  // The contract matrix is the only AR view with a contract dimension, so
+  // auto-open it once when a project filter becomes active — but leave the
+  // header toggle fully functional so the user can still collapse it. This is
+  // React's sanctioned "adjust state when a prop changes" render-phase pattern.
+  const [wasFilterActive, setWasFilterActive] = useState(filterActive);
+  if (filterActive !== wasFilterActive) {
+    setWasFilterActive(filterActive);
+    if (filterActive) setMatrixOpen(true);
+  }
 
   const items = useMemo(() => data?.items ?? [], [data]);
 
@@ -213,10 +219,10 @@ export function ArTab({ projectFilter = [] }: { projectFilter?: string[] }) {
           className="flex w-full items-center gap-2 px-4 py-3 text-left text-[13px] font-medium text-foreground hover:bg-gda-panel/40"
           onClick={() => setMatrixOpen((v) => !v)}
         >
-          <span className="inline-block w-3 text-muted-foreground">{matrixExpanded ? "▾" : "▸"}</span>
+          <span className="inline-block w-3 text-muted-foreground">{matrixOpen ? "▾" : "▸"}</span>
           Receivables by Contract (month-by-month matrix)
         </button>
-        {matrixExpanded && (
+        {matrixOpen && (
           <div className="px-4 pb-4">
             <ArContractMatrix projectFilter={projectFilter} />
           </div>
