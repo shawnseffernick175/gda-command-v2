@@ -159,14 +159,17 @@ function ProjectMultiSelect({
                     className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-foreground hover:bg-gda-panel/60"
                   >
                     <span
+                      aria-hidden
                       className={cn(
                         "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border",
                         checked
-                          ? "border-gda-cyan bg-gda-cyan text-gda-bg-deep"
+                          ? "border-gda-cyan bg-gda-cyan"
                           : "border-border",
                       )}
                     >
-                      {checked ? "✓" : ""}
+                      {checked && (
+                        <span className="h-1.5 w-1.5 rounded-[1px] bg-gda-bg-deep" />
+                      )}
                     </span>
                     <span className="truncate">{o.label}</span>
                   </button>
