@@ -12,6 +12,7 @@ function row(overrides: Partial<ProjectCostPoolRow>): ProjectCostPoolRow {
     project_name: 'X',
     contract_number: null,
     revenue: null,
+    cost: null,
     direct_cost: null,
     indirect_cost: null,
     profit: null,
@@ -80,6 +81,38 @@ describe('aggregateProjectIncomeStatement', () => {
     ]);
     expect(s.margin_pct).toBeNull();
     expect(s.gross_profit_pct).toBeNull();
+  });
+
+  it('sums the burdened summary cost line (present on every project row)', () => {
+    const s = aggregateProjectIncomeStatement([
+      row({ revenue: 100, cost: 80, profit: 20 }),
+      row({ revenue: 50, cost: 45, profit: 5 }),
+    ]);
+    expect(s.cost).toBe(125);
+    expect(s.profit).toBe(25);
+  });
+
+  it('flags has_cost_pool_detail=false for a summary-only project', () => {
+    // revenue/cost/profit only — no direct/indirect breakdown lines
+    const s = aggregateProjectIncomeStatement([
+      row({ revenue: 100, cost: 80, profit: 20 }),
+    ]);
+    expect(s.has_cost_pool_detail).toBe(false);
+  });
+
+  it('flags has_cost_pool_detail=true when any breakdown line is present', () => {
+    const s = aggregateProjectIncomeStatement([
+      row({ revenue: 100, cost: 80, profit: 20, dc_dl_onsite: 30 }),
+    ]);
+    expect(s.has_cost_pool_detail).toBe(true);
+  });
+
+  it('does not treat revenue/cost/profit alone as cost-pool detail', () => {
+    // a genuine zero on a summary field must not flip the detail flag
+    const s = aggregateProjectIncomeStatement([
+      row({ revenue: 0, cost: 0, profit: 0 }),
+    ]);
+    expect(s.has_cost_pool_detail).toBe(false);
   });
 
   it('collects distinct, sorted source_doc_ids for R1 traceability', () => {
