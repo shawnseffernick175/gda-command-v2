@@ -65,12 +65,12 @@ async def _perplexity_search(inp: WebSearchInput) -> WebSearchOutput:
 
     content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
     citations = data.get("citations", [])
+    # Only surface results that carry a real citation URL. If Perplexity
+    # returns prose without citations, we return nothing rather than pinning
+    # the AI-generated content to a generic "https://perplexity.ai" URL — that
+    # would be an unsourced/AI-only claim (R1).
     results = [
         WebResult(title=f"Result {i + 1}", url=url, snippet=content[:500])
         for i, url in enumerate(citations[: inp.top_k])
     ]
-    if not results:
-        results = [
-            WebResult(title="Perplexity result", url="https://perplexity.ai", snippet=content[:500])
-        ]
     return WebSearchOutput(results=results)

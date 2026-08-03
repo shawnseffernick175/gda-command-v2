@@ -143,10 +143,19 @@ class DoctrineCheckInput(BaseModel):
 
 
 class DoctrineEvaluation(BaseModel):
-    alignment_score_by_principle: dict[str, int] = Field(
-        description="1-5 score per doctrine principle"
+    status: str = Field(
+        default="evaluated",
+        description="'evaluated' when scored; 'not_evaluated' when the rules engine is unavailable",
     )
-    exclusion_triggers: list[str]
+    alignment_score_by_principle: dict[str, int] = Field(
+        default_factory=dict,
+        description="1-5 score per doctrine principle; empty when status='not_evaluated'",
+    )
+    principles: list[str] = Field(
+        default_factory=list,
+        description="Doctrine principles that would be scored once the rules engine is live",
+    )
+    exclusion_triggers: list[str] = Field(default_factory=list)
     margin_check: str | None = None
     rationale: str
     source_url: str | None = None
