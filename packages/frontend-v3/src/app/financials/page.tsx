@@ -17,6 +17,7 @@ import { ProjectRevenueTab } from "@/components/financials/tabs/ProjectRevenueTa
 import { ServiceCentersTab } from "@/components/financials/tabs/ServiceCentersTab";
 import { IngestionCoverageTab } from "@/components/financials/tabs/IngestionCoverageTab";
 import { FinancialBibleTab } from "@/components/financials/tabs/FinancialBibleTab";
+import { ProjectFilter } from "@/components/financials/ProjectFilter";
 import { useAiAnalyze } from "@/hooks/use-financial-bible";
 import { cn } from "@/lib/utils";
 import type { CalendarMode } from "@/lib/types";
@@ -161,6 +162,16 @@ export default function FinancialsPage() {
   }, []);
   const [selectedYear, setSelectedYear] = useState<string>("26");
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  // Project (contract / task-order) selection is scoped per tab because the
+  // three project-backed tabs key on different identities (project name, task
+  // order number, AR contract label) and cannot share a single selection.
+  const [projectSel, setProjectSel] = useState<Record<string, string[]>>({});
+  const setProjectForTab = useCallback(
+    (next: string[]) =>
+      setProjectSel((prev) => ({ ...prev, [activeTab]: next })),
+    [activeTab],
+  );
+  const activeProjectSel = projectSel[activeTab] ?? [];
 
   const aiAnalyze = useAiAnalyze();
 
@@ -190,8 +201,13 @@ export default function FinancialsPage() {
             </p>
           </div>
 
-          {/* Right: AI Analyze + FY/CY toggle + year buttons */}
+          {/* Right: Project filter + AI Analyze + FY/CY toggle + year buttons */}
           <div className="flex items-center gap-3 shrink-0">
+            <ProjectFilter
+              tab={activeTab}
+              selected={activeProjectSel}
+              onChange={setProjectForTab}
+            />
             <button
               type="button"
               className="rounded px-3 py-1.5 text-[13px] font-medium text-white transition-colors bg-fin-navy hover:bg-fin-navy-hover"
@@ -279,15 +295,19 @@ export default function FinancialsPage() {
 
       {/* Tab content */}
       <div className="min-h-[300px]">
-        {activeTab === "waterfall" && <ContractWaterfallTab />}
+        {activeTab === "waterfall" && (
+          <ContractWaterfallTab projectFilter={projectSel["waterfall"] ?? []} />
+        )}
         {activeTab === "plan" && <AopPlanTab fy={fy} />}
         {activeTab === "execution" && <AopExecutionTab fy={fy} />}
         {activeTab === "p2" && <P2FinancialsTab />}
         {activeTab === "balance-sheet" && <BalanceSheetCard />}
         {activeTab === "ap" && <ApTab />}
-        {activeTab === "ar" && <ArTab />}
+        {activeTab === "ar" && <ArTab projectFilter={projectSel["ar"] ?? []} />}
         {activeTab === "trial-balance" && <TrialBalanceTab />}
-        {activeTab === "project-revenue" && <ProjectRevenueTab />}
+        {activeTab === "project-revenue" && (
+          <ProjectRevenueTab projectFilter={projectSel["project-revenue"] ?? []} />
+        )}
         {activeTab === "cost-service-centers" && <ServiceCentersTab />}
         {activeTab === "indirect-expenses" && <IndirectExpensePanel />}
         {activeTab === "ingestion-coverage" && <IngestionCoverageTab />}

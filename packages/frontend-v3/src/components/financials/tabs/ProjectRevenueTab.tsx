@@ -40,7 +40,11 @@ function periodLabel(p: string): string {
 type ViewMode = "Month" | "Quarter" | "YTD";
 const VIEW_MODES: ViewMode[] = ["Month", "Quarter", "YTD"];
 
-export function ProjectRevenueTab() {
+export function ProjectRevenueTab({
+  projectFilter = [],
+}: {
+  projectFilter?: string[];
+}) {
   // View selector: Month = a chosen month, Quarter = that calendar quarter's
   // roll-up, YTD = cumulative through the year. The backend derives quarter/YTD
   // by summing the official monthly rows — never fabricating absent months.
@@ -58,7 +62,12 @@ export function ProjectRevenueTab() {
   const { data, isLoading } = useProjectRevenue(selectedPeriod);
   const { sortBy, sortDir, handleSort } = useTableSort("projrev");
 
-  const items = useMemo(() => data?.items ?? [], [data]);
+  const items = useMemo(() => {
+    const raw = data?.items ?? [];
+    if (projectFilter.length === 0) return raw;
+    const set = new Set(projectFilter);
+    return raw.filter((r) => set.has(r.project_name));
+  }, [data, projectFilter]);
   const monthOptions = useMemo(() => data?.available_months ?? [], [data]);
   const quarterOptions = useMemo(() => data?.available_quarters ?? [], [data]);
 
@@ -89,7 +98,12 @@ export function ProjectRevenueTab() {
   const totalCost = items.reduce((s, r) => s + r.cost, 0);
   const totalProfit = items.reduce((s, r) => s + r.profit, 0);
   const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-  const headerTotal = data?.meta?.period_total ?? totalRevenue;
+  // When a project filter is active the meta.period_total (whole-portfolio)
+  // no longer matches the visible rows, so show the filtered revenue instead.
+  const headerTotal =
+    projectFilter.length > 0
+      ? totalRevenue
+      : data?.meta?.period_total ?? totalRevenue;
 
   // All projects by revenue (retain every project — no top-N truncation)
   const ranked = [...items].sort((a, b) => b.revenue - a.revenue);

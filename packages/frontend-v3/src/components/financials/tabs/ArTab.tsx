@@ -22,10 +22,20 @@ const AR_SORT_COLS: ColumnSortConfig[] = [
   { field: "due_date", type: "date" },
 ];
 
-export function ArTab() {
+export function ArTab({ projectFilter = [] }: { projectFilter?: string[] }) {
   const { data, isLoading } = useArData();
   const { sortBy, sortDir, handleSort } = useTableSort("ar");
+  const filterActive = projectFilter.length > 0;
   const [matrixOpen, setMatrixOpen] = useState(false);
+  // The contract matrix is the only AR view with a contract dimension, so
+  // auto-open it once when a project filter becomes active — but leave the
+  // header toggle fully functional so the user can still collapse it. This is
+  // React's sanctioned "adjust state when a prop changes" render-phase pattern.
+  const [wasFilterActive, setWasFilterActive] = useState(filterActive);
+  if (filterActive !== wasFilterActive) {
+    setWasFilterActive(filterActive);
+    if (filterActive) setMatrixOpen(true);
+  }
 
   const items = useMemo(() => data?.items ?? [], [data]);
 
@@ -162,6 +172,13 @@ export function ArTab() {
 
   return (
     <div className="space-y-6">
+      {filterActive && (
+        <p className="rounded border border-gda-cyan/30 bg-gda-cyan/5 px-3 py-2 text-[12px] text-muted-foreground">
+          Project filter applies to the Receivables-by-Contract matrix below.
+          The aging composition, customer concentration and detail table are
+          portfolio-level (AR is booked by customer/invoice, not by project).
+        </p>
+      )}
       {/* Health summary — laptop-first, no horizontal scroll */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Total Receivables" value={formatMoney(total)} subtitle={`${items.length} open items`} />
@@ -207,7 +224,7 @@ export function ArTab() {
         </button>
         {matrixOpen && (
           <div className="px-4 pb-4">
-            <ArContractMatrix />
+            <ArContractMatrix projectFilter={projectFilter} />
           </div>
         )}
       </div>
