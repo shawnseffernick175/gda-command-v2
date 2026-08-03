@@ -120,7 +120,6 @@ export interface PipelineRow {
   teaming_partners: string[] | null;
   stage: string;
   pwin_score: string | null;
-  pwin_band: string | null;
   solicitation_number: string | null;
   estimated_value: string | null;
   pwin_override: string | null;

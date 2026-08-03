@@ -1,5 +1,6 @@
 import { pool } from '../../lib/db.js';
 import { normalizePipelineStage } from '../../lib/pipeline-stage.js';
+import { pwinFractionToPct, pwinBandFromPct } from '../../lib/pwin-scale.js';
 import type {
   PipelineItem,
   PipelineRow,
@@ -56,10 +57,12 @@ function rowToItem(row: PipelineRow): PipelineItem {
   const valMin = row.opportunity_value_min != null ? Number(row.opportunity_value_min) : null;
   const resolvedValue = estVal ?? valMax ?? valMin ?? 0;
 
-  // pwin_override is stored 0–1; win_probability / pwin_score are 0–100
-  const pwinOverride = row.pwin_override != null ? Number(row.pwin_override) * 100 : null;
+  // pwin_override and the analysis-cache pwin (pwin_score) are stored 0–1
+  // fractions; win_probability is already 0–100. Convert the fractions through
+  // the shared accessor so they land on the 0–100 scale the API/UI expect.
+  const pwinOverride = pwinFractionToPct(row.pwin_override);
   const winProb = row.win_probability != null ? Number(row.win_probability) : null;
-  const analysisPwin = row.pwin_score != null ? Number(row.pwin_score) : null;
+  const analysisPwin = pwinFractionToPct(row.pwin_score);
   const resolvedPwin = pwinOverride ?? winProb ?? analysisPwin ?? null;
 
   const resolvedWeighted = resolvedPwin != null
@@ -108,7 +111,7 @@ function rowToItem(row: PipelineRow): PipelineItem {
     milestones: parseMilestones(row.milestone_90day),
     teaming_partners: row.teaming_partners ?? [],
     pwin_score: analysisPwin,
-    pwin_band: row.pwin_band,
+    pwin_band: pwinBandFromPct(analysisPwin),
     solicitation_number: row.solicitation_number,
     resolved_value: resolvedValue,
     resolved_pwin: resolvedPwin,
@@ -148,20 +151,11 @@ const BASE_SELECT = `
 
     pi.stage,
 
+    -- Canonical pwin is a 0–1 fraction; the band is derived on the 0–100
+    -- scale in rowToItem (pwinBandFromPct) so a single accessor owns it.
     (SELECT ac.pwin FROM opportunity_analysis_cache ac
      WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1
     ) AS pwin_score,
-
-    (SELECT
-       CASE
-         WHEN ac.pwin >= 70 THEN 'high'
-         WHEN ac.pwin >= 40 THEN 'medium'
-         WHEN ac.pwin > 0  THEN 'low'
-         ELSE NULL
-       END
-     FROM opportunity_analysis_cache ac
-     WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1
-    ) AS pwin_band,
 
     ${SOURCE_SUBQUERY('opportunity_title_sources', 'opportunity_id')}         AS opportunity_title_sources,
     ${SOURCE_SUBQUERY('opportunity_agency_sources', 'opportunity_id')}        AS opportunity_agency_sources,
