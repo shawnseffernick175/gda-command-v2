@@ -20,13 +20,14 @@ interface StatementRow {
 }
 
 /**
- * Line structure of the per-project income statement. Every keyed line maps
- * directly to a column populated by the project cost-pool book — there is no
- * modeling or allocation. The indirect pools are the book's own project-level
- * pools (Overhead on/off-site, Material Handling, G&A); the book carries no
- * separate project Fringe line, so none is shown (missing ≠ fabricated).
+ * Full line structure of the per-project income statement, used when the
+ * cost-pool book carries the direct/indirect itemization for the scope. Every
+ * keyed line maps directly to a book column — no modeling or allocation. The
+ * indirect pools are the book's own project-level pools (Overhead on/off-site,
+ * Material Handling, G&A); the book carries no separate project Fringe line, so
+ * none is shown (missing ≠ fabricated).
  */
-const ROWS: StatementRow[] = [
+const ROWS_DETAILED: StatementRow[] = [
   { kind: "section", label: "Revenue" },
   { kind: "summary", label: "Total Revenue", key: "revenue", format: "money" },
 
@@ -59,6 +60,26 @@ const ROWS: StatementRow[] = [
 
   { kind: "separator", label: "" },
 
+  { kind: "summary", label: "Total Cost (burdened)", key: "cost", format: "money" },
+  { kind: "summary", label: "Operating Profit", key: "profit", format: "money" },
+  { kind: "detail", label: "Operating Margin %", key: "margin_pct", format: "percent", indent: 1 },
+];
+
+/**
+ * Burdened-summary layout, used when the cost-pool book carries only the
+ * summary columns (revenue / cost / profit) for the scope — i.e. the project
+ * was not ingested from the "Full Proj Revenue Summary by Cost Pool" workbook.
+ * Every project row has these, so a complete, sourced statement still renders;
+ * the direct/indirect itemization is simply omitted rather than shown as a wall
+ * of "—".
+ */
+const ROWS_SUMMARY: StatementRow[] = [
+  { kind: "section", label: "Revenue" },
+  { kind: "summary", label: "Total Revenue", key: "revenue", format: "money" },
+
+  { kind: "separator", label: "" },
+
+  { kind: "summary", label: "Total Cost (burdened)", key: "cost", format: "money" },
   { kind: "summary", label: "Operating Profit", key: "profit", format: "money" },
   { kind: "detail", label: "Operating Margin %", key: "margin_pct", format: "percent", indent: 1 },
 ];
@@ -128,6 +149,12 @@ export function ProjectIncomeStatement({
     });
   }
 
+  // Show the itemized direct/indirect breakdown only when at least one shown
+  // scope actually carries it in the cost-pool book; otherwise render the
+  // burdened summary (which every project has) rather than a wall of "—".
+  const anyDetail = displayColumns.some((c) => c.values.has_cost_pool_detail);
+  const ROWS = anyDetail ? ROWS_DETAILED : ROWS_SUMMARY;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-4">
@@ -136,7 +163,10 @@ export function ProjectIncomeStatement({
             Project Income Statement
           </h3>
           <p className="text-[12px] text-muted-foreground">
-            Sourced from the per-project cost-pool book — no modeled allocation.
+            Sourced from the per-project book — no modeled allocation.{" "}
+            {anyDetail
+              ? "Direct/indirect line detail comes from the cost-pool workbook; lines the book didn't populate show \u201C\u2014\u201D."
+              : "The selected project(s) carry only burdened summary figures in the book (revenue, cost, profit); the direct/indirect line detail isn't itemized for them."}{" "}
             The sum of project statements need not equal the company statement
             (company-level unallocated items exist).
           </p>

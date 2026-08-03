@@ -714,6 +714,8 @@ export interface ProjectRevenueData {
  */
 export interface ProjectIncomeStatement {
   revenue: number | null;
+  /** burdened total cost — the summary column every project row carries */
+  cost: number | null;
   direct_cost: number | null;
   indirect_cost: number | null;
   profit: number | null;
@@ -734,6 +736,12 @@ export interface ProjectIncomeStatement {
   ind_gna: number | null;
   margin_pct: number | null;
   gross_profit_pct: number | null;
+  /**
+   * True when the cost-pool book carried the direct/indirect line detail for
+   * this scope. When false, only the burdened summary (revenue / cost / profit)
+   * is available and the itemized breakdown is omitted.
+   */
+  has_cost_pool_detail: boolean;
   source_doc_ids: number[];
 }
 

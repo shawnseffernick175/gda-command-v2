@@ -25,6 +25,8 @@ export interface ProjectCostPoolRow {
   project_name: string;
   contract_number: string | null;
   revenue: number | null;
+  /** burdened total cost — the summary column every project row carries */
+  cost: number | null;
   direct_cost: number | null;
   indirect_cost: number | null;
   profit: number | null;
@@ -51,6 +53,7 @@ export interface ProjectCostPoolRow {
 /** The dollar fields that SUM across rows. */
 const DOLLAR_FIELDS = [
   'revenue',
+  'cost',
   'direct_cost',
   'indirect_cost',
   'profit',
@@ -73,6 +76,15 @@ const DOLLAR_FIELDS = [
 
 type DollarField = (typeof DOLLAR_FIELDS)[number];
 
+/**
+ * Breakdown lines that only the per-project cost-pool book carries. Their
+ * presence distinguishes a full line-item statement from a burdened-summary
+ * one (revenue / cost / profit, which every project row has).
+ */
+const DETAIL_FIELDS = DOLLAR_FIELDS.filter(
+  (f) => f !== 'revenue' && f !== 'cost' && f !== 'profit',
+) as Exclude<DollarField, 'revenue' | 'cost' | 'profit'>[];
+
 export type ProjectIncomeStatement = {
   [K in DollarField]: number | null;
 } & {
@@ -80,6 +92,12 @@ export type ProjectIncomeStatement = {
   margin_pct: number | null;
   /** revenue-derived: gross_profit / revenue × 100 */
   gross_profit_pct: number | null;
+  /**
+   * True when the cost-pool book carried the direct/indirect line detail for
+   * this scope. When false, only the burdened summary (revenue / cost / profit)
+   * is available — the detail lines render "—", not fabricated zeros.
+   */
+  has_cost_pool_detail: boolean;
   /** distinct source document ids backing the figures (R1) */
   source_doc_ids: number[];
 };
@@ -142,10 +160,15 @@ export function aggregateProjectIncomeStatement(
     rounded[field] = sums[field] != null ? round2(sums[field] as number) : null;
   }
 
+  // Detail is present only when the cost-pool book populated a breakdown line;
+  // the burdened summary (revenue / cost / profit) exists for every project.
+  const hasCostPoolDetail = DETAIL_FIELDS.some((f) => sums[f] != null);
+
   return {
     ...rounded,
     margin_pct: marginPct,
     gross_profit_pct: grossProfitPct,
+    has_cost_pool_detail: hasCostPoolDetail,
     source_doc_ids: Array.from(docIds).sort((a, b) => a - b),
   };
 }

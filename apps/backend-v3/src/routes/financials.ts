@@ -1129,7 +1129,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       ? { rows: [] as Record<string, unknown>[] }
       : await pool.query(
           `SELECT project_id, project_name, contract_number,
-                  revenue, direct_cost, indirect_cost, profit, gross_profit,
+                  revenue, cost, direct_cost, indirect_cost, profit, gross_profit,
                   dc_dl_onsite, dc_dl_offsite, dc_subk_labor, dc_subk_travel,
                   dc_subk_material, dc_consultant_labor, dc_consultant_travel,
                   dc_direct_travel, dc_direct_material, dc_direct_odc,
@@ -1148,6 +1148,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       project_name: r.project_name as string,
       contract_number: (r.contract_number as string) ?? null,
       revenue: num(r.revenue),
+      cost: num(r.cost),
       direct_cost: num(r.direct_cost),
       indirect_cost: num(r.indirect_cost),
       profit: num(r.profit),
