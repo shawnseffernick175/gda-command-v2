@@ -53,6 +53,23 @@ class AgentState(BaseModel):
     step_count: int = 0
 
 
+def _coerce_tool_input(raw: Any) -> dict[str, Any]:
+    """Normalize a LangChain tool-end input payload into a JSON-serializable dict.
+
+    LangChain reports tool input as ``{"input": {...}}`` in most cases, but it
+    can also be a bare value. We always return a dict so the audit row records
+    the real arguments a tool was called with.
+    """
+    if isinstance(raw, dict):
+        inner = raw.get("input")
+        if isinstance(inner, dict):
+            return inner
+        return raw
+    if raw is None:
+        return {}
+    return {"input": raw}
+
+
 def _parse_model_spec(spec: str) -> tuple[str, str]:
     """Parse 'provider:model_name' into (provider, model_name)."""
     if ":" in spec:
@@ -192,6 +209,8 @@ async def run_agent(
     final_output = ""
     status = "ok"
     error_msg = None
+    # Track when each tool run started so on_tool_end can record real latency.
+    tool_started_at: dict[str, float] = {}
 
     try:
         context_str = json.dumps(context) if context else ""
@@ -267,9 +286,23 @@ async def run_agent(
                             else str(output.content)
                         )
 
+            elif kind == "on_tool_start":
+                tool_run_id = event.get("run_id", "")
+                if tool_run_id:
+                    tool_started_at[tool_run_id] = time.monotonic()
+
             elif kind == "on_tool_end":
                 tool_output = event.get("data", {}).get("output")
                 tool_name = event.get("name", "")
+                tool_run_id = event.get("run_id", "")
+
+                # Recover the real tool input and measured latency instead of
+                # logging an empty payload — the trace endpoint surfaces these.
+                tool_input = _coerce_tool_input(event.get("data", {}).get("input"))
+                started = tool_started_at.pop(tool_run_id, None)
+                latency_ms = (
+                    int((time.monotonic() - started) * 1000) if started is not None else None
+                )
 
                 output_data = str(tool_output) if tool_output else ""
                 yield {
@@ -288,9 +321,9 @@ async def run_agent(
                     run_id=run_id,
                     step_index=step_count,
                     tool_name=tool_name,
-                    tool_input={},
+                    tool_input=tool_input,
                     tool_output={"result": output_data[:2000]},
-                    latency_ms=0,
+                    latency_ms=latency_ms,
                 )
 
     except Exception as exc:

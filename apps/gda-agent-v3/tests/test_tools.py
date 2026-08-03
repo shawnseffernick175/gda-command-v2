@@ -10,7 +10,7 @@ import pytest
 import respx
 from langchain_core.tools import StructuredTool
 
-from src.agent import _build_langchain_tools
+from src.agent import _build_langchain_tools, _coerce_tool_input
 from src.tools.decision_memory import decision_memory_lookup
 from src.tools.doctrine_check import doctrine_check
 from src.tools.federal_register_search import federal_register_search
@@ -292,6 +292,40 @@ class TestWebSearch:
         assert len(result.results) == 1
         assert result.results[0].url == "https://example.com"
 
+    @respx.mock
+    async def test_web_search_perplexity_with_citations(self, monkeypatch):
+        import src.tools.web_search as ws
+
+        monkeypatch.setattr(ws, "TAVILY_API_KEY", "")
+        monkeypatch.setattr(ws, "PERPLEXITY_API_KEY", "test-key")
+        respx.post("https://api.perplexity.ai/chat/completions").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": "answer"}}],
+                    "citations": ["https://real-source.gov/a"],
+                },
+            )
+        )
+        result = await web_search(WebSearchInput(query="test"))
+        assert [r.url for r in result.results] == ["https://real-source.gov/a"]
+
+    @respx.mock
+    async def test_web_search_perplexity_no_citations_is_empty(self, monkeypatch):
+        import src.tools.web_search as ws
+
+        monkeypatch.setattr(ws, "TAVILY_API_KEY", "")
+        monkeypatch.setattr(ws, "PERPLEXITY_API_KEY", "test-key")
+        respx.post("https://api.perplexity.ai/chat/completions").mock(
+            return_value=httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "prose with no sources"}}]},
+            )
+        )
+        result = await web_search(WebSearchInput(query="test"))
+        # No citations → no results; never pin AI prose to a fabricated URL (R1).
+        assert result.results == []
+
 
 @pytest.mark.anyio
 class TestDoctrineCheck:
@@ -299,9 +333,26 @@ class TestDoctrineCheck:
         result = await doctrine_check(
             DoctrineCheckInput(claim_text="We should pursue this Army contract")
         )
-        assert len(result.evaluation.alignment_score_by_principle) == 7
-        # Honest stub: no fabricated source URL (R1).
+        # Honest stub: no fabricated numeric scores, flagged not_evaluated.
+        assert result.evaluation.status == "not_evaluated"
+        assert result.evaluation.alignment_score_by_principle == {}
+        assert len(result.evaluation.principles) == 7
+        # No fabricated source URL (R1).
         assert result.evaluation.source_url is None
+
+
+class TestCoerceToolInput:
+    def test_unwraps_langchain_input_envelope(self):
+        assert _coerce_tool_input({"input": {"query": "army"}}) == {"query": "army"}
+
+    def test_passes_through_plain_dict(self):
+        assert _coerce_tool_input({"query": "army"}) == {"query": "army"}
+
+    def test_none_becomes_empty_dict(self):
+        assert _coerce_tool_input(None) == {}
+
+    def test_bare_value_is_wrapped(self):
+        assert _coerce_tool_input("army") == {"input": "army"}
 
 
 @pytest.mark.anyio
