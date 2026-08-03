@@ -56,7 +56,11 @@ function getContractColor(c: WaterfallContract, idx: number): string {
 
 /* ── Main component ───────────────────────────────── */
 
-export function ContractWaterfallTab() {
+export function ContractWaterfallTab({
+  projectFilter = [],
+}: {
+  projectFilter?: string[];
+}) {
   const [viewMode, setViewMode] = useState<ViewMode>("both");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("");
@@ -77,6 +81,32 @@ export function ContractWaterfallTab() {
   );
 
   const { data, isLoading, error } = useContractWaterfall(params);
+
+  // Narrow the waterfall to the selected task orders. Every displayed figure is
+  // re-summed from the same authoritative per-contract components the backend
+  // returned (funded / unfunded / profit per contract-month) — nothing is
+  // invented; we only aggregate the selected subset.
+  const viewData = useMemo(() => {
+    if (!data || projectFilter.length === 0) return data;
+    const set = new Set(projectFilter);
+    const contracts = data.contracts.filter((c) => set.has(c.to_number));
+    const ids = new Set(contracts.map((c) => c.id));
+    const forecast = data.forecast.map((f) => {
+      const by_contract = f.by_contract.filter((e) => ids.has(e.contract_id));
+      const total_funded = by_contract.reduce((s, e) => s + e.funded_revenue, 0);
+      const total_unfunded = by_contract.reduce((s, e) => s + e.unfunded_revenue, 0);
+      const total_profit = by_contract.reduce((s, e) => s + e.profit, 0);
+      return {
+        ...f,
+        by_contract,
+        total_funded,
+        total_unfunded,
+        total_revenue: total_funded + total_unfunded,
+        total_profit,
+      };
+    });
+    return { ...data, contracts, forecast };
+  }, [data, projectFilter]);
 
   if (isLoading) {
     return (
@@ -104,6 +134,9 @@ export function ContractWaterfallTab() {
     );
   }
 
+  const view = viewData ?? data;
+  const filteredEmpty = projectFilter.length > 0 && view.contracts.length === 0;
+
   return (
     <div className="space-y-4">
       <WaterfallFilterBar
@@ -123,13 +156,21 @@ export function ContractWaterfallTab() {
         onAddTaskOrder={() => setAddFormOpen(true)}
       />
 
-      <ForecastSummaryStrip data={data} />
+      {filteredEmpty ? (
+        <p className="rounded border border-dashed border-border bg-card py-8 text-center text-xs text-muted-foreground">
+          No task orders match the selected project(s).
+        </p>
+      ) : (
+        <>
+          <ForecastSummaryStrip data={view} />
 
-      <WaterfallChart data={data} viewMode={viewMode} />
+          <WaterfallChart data={view} viewMode={viewMode} />
 
-      <ContractTable contracts={data.contracts} portfolioMargin={data.portfolio_avg_margin} />
+          <ContractTable contracts={view.contracts} portfolioMargin={view.portfolio_avg_margin} />
 
-      {data.pipeline.length === 0 && <PipelineScaffold />}
+          {view.pipeline.length === 0 && <PipelineScaffold />}
+        </>
+      )}
 
       {addFormOpen && (
         <AddTaskOrderDrawer onClose={() => setAddFormOpen(false)} />

@@ -4,7 +4,7 @@ import { useState, useMemo, useSyncExternalStore } from "react";
 import { useArByContract } from "@/hooks/use-financial-bible";
 import { formatMoneyFull } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
-import type { CalendarMode } from "@/lib/types";
+import type { ArByContractData, CalendarMode } from "@/lib/types";
 
 const CALENDAR_MODE_KEY = "gda-financial-bible-calendar-mode";
 
@@ -20,7 +20,11 @@ function getServerSnapshot(): CalendarMode {
   return "FY";
 }
 
-export function ArContractMatrix() {
+export function ArContractMatrix({
+  projectFilter = [],
+}: {
+  projectFilter?: string[];
+}) {
   const calendarMode = useSyncExternalStore(
     subscribeToStorage,
     getSnapshot,
@@ -31,8 +35,35 @@ export function ArContractMatrix() {
     window.dispatchEvent(new StorageEvent("storage", { key: CALENDAR_MODE_KEY }));
   };
 
-  const { data, isLoading } = useArByContract(calendarMode);
+  const { data: raw, isLoading } = useArByContract(calendarMode);
   const [rs3Expanded, setRs3Expanded] = useState(true);
+
+  // Narrow the matrix to the selected contracts. Every subtotal / grand total
+  // is re-summed from the same per-contract month values the backend returned
+  // — nothing is invented; we only aggregate the selected subset.
+  const data = useMemo<ArByContractData | undefined>(() => {
+    if (!raw || projectFilter.length === 0) return raw;
+    const set = new Set(projectFilter);
+    const contracts = raw.contracts.filter((c) => set.has(c.contract));
+    const sumMonths = (rows: typeof contracts) => {
+      const months: Record<string, number> = {};
+      let total = 0;
+      for (const m of raw.month_columns) {
+        months[m] = rows.reduce((s, r) => s + (r.months[m] ?? 0), 0);
+      }
+      total = rows.reduce((s, r) => s + r.total, 0);
+      return { months, total };
+    };
+    const rs3Rows = contracts.filter((c) => c.is_rs3);
+    const rs3Sum = sumMonths(rs3Rows);
+    const grand = sumMonths(contracts);
+    return {
+      ...raw,
+      contracts,
+      rs3_subtotal: { ...raw.rs3_subtotal, ...rs3Sum },
+      grand_total: grand,
+    };
+  }, [raw, projectFilter]);
 
   const activeMonths = useMemo(() => {
     if (!data) return [];
@@ -48,7 +79,9 @@ export function ArContractMatrix() {
   if (!data || data.contracts.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
-        No AR contract data available.
+        {projectFilter.length > 0
+          ? "No AR contract data for the selected project(s)."
+          : "No AR contract data available."}
       </p>
     );
   }

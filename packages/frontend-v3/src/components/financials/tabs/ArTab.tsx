@@ -22,10 +22,14 @@ const AR_SORT_COLS: ColumnSortConfig[] = [
   { field: "due_date", type: "date" },
 ];
 
-export function ArTab() {
+export function ArTab({ projectFilter = [] }: { projectFilter?: string[] }) {
   const { data, isLoading } = useArData();
   const { sortBy, sortDir, handleSort } = useTableSort("ar");
+  const filterActive = projectFilter.length > 0;
   const [matrixOpen, setMatrixOpen] = useState(false);
+  // When a project (contract) filter is active, the contract matrix is the only
+  // AR view that carries a contract dimension — surface it automatically.
+  const matrixExpanded = matrixOpen || filterActive;
 
   const items = useMemo(() => data?.items ?? [], [data]);
 
@@ -162,6 +166,13 @@ export function ArTab() {
 
   return (
     <div className="space-y-6">
+      {filterActive && (
+        <p className="rounded border border-gda-cyan/30 bg-gda-cyan/5 px-3 py-2 text-[12px] text-muted-foreground">
+          Project filter applies to the Receivables-by-Contract matrix below.
+          The aging composition, customer concentration and detail table are
+          portfolio-level (AR is booked by customer/invoice, not by project).
+        </p>
+      )}
       {/* Health summary — laptop-first, no horizontal scroll */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Total Receivables" value={formatMoney(total)} subtitle={`${items.length} open items`} />
@@ -202,12 +213,12 @@ export function ArTab() {
           className="flex w-full items-center gap-2 px-4 py-3 text-left text-[13px] font-medium text-foreground hover:bg-gda-panel/40"
           onClick={() => setMatrixOpen((v) => !v)}
         >
-          <span className="inline-block w-3 text-muted-foreground">{matrixOpen ? "▾" : "▸"}</span>
+          <span className="inline-block w-3 text-muted-foreground">{matrixExpanded ? "▾" : "▸"}</span>
           Receivables by Contract (month-by-month matrix)
         </button>
-        {matrixOpen && (
+        {matrixExpanded && (
           <div className="px-4 pb-4">
-            <ArContractMatrix />
+            <ArContractMatrix projectFilter={projectFilter} />
           </div>
         )}
       </div>

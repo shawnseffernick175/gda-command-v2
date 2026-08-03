@@ -197,7 +197,12 @@ jobs:
           # (Pipeline AOP target + per-month Bible adjustment) so the canonical
           # AOP can be written/reconciled from both surfaces (~1KB, 732KB). Small
           # headroom so this feature + gzip jitter don't flap at the ceiling.
-          MAX_MAIN_KB=733
+          # 733→735: Financial Bible per-project filter adds the header
+          # multi-select control + per-tab client-side aggregation (Project
+          # Revenue / Contract Waterfall / AR matrix); total lands at ~734KB
+          # (751,333 bytes). Small headroom so this feature + gzip cross-runner
+          # jitter don't flap right at the ceiling.
+          MAX_MAIN_KB=735
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
