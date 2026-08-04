@@ -199,6 +199,14 @@ export interface OpportunityUpdateInput {
   relevance_status?: string | null;
   /** Owner attribution used when a stage change must create a pipeline card. */
   capture_owner?: string;
+  /**
+   * F: audited override. When true, a forward-progression stage move promotes
+   * the opportunity into the pipeline even if it has not cleared the
+   * qualify-first gate (relevance/assessment). Requires `override_reason`.
+   */
+  override?: boolean;
+  /** Owner rationale recorded in the audit log when `override` is used. */
+  override_reason?: string | null;
 }
 
 export interface ListFilters {

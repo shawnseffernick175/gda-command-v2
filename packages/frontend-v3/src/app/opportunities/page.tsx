@@ -45,6 +45,7 @@ import {
   DB_KEY_TO_LABEL,
   isStagingStage,
   stageMoveErrorMessage,
+  isQualifyRequiredError,
   type ActiveStage,
 } from "@/lib/stages";
 import type {
@@ -56,6 +57,7 @@ import type {
 // import { DoctrineAlignmentPanel } from "@/components/shared/DoctrineAlignmentPanel";
 import { MarginFloorBanner } from "@/components/shared/MarginFloorBanner";
 import { DoctrineOverrideModal } from "@/components/shared/DoctrineOverrideModal";
+import { QualifyPromoteModal } from "@/components/shared/QualifyPromoteModal";
 import { useDoctrineEvaluations } from "@/hooks/use-doctrine-evaluation";
 import { useOpportunityAnalysis } from "@/hooks/use-opportunity-analysis";
 import { DecisionBriefStream } from "@/components/opportunity-analysis/DecisionBriefStream";
@@ -1418,6 +1420,25 @@ function OpportunityDetail({ id }: { id: string }) {
   const { toast: detailToast } = useToast();
   const { data: doctrineEvals } = useDoctrineEvaluations("opportunity", id);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
+  // F: when a forward move is refused by the qualify-first gate, prompt the
+  // owner to Qualify & promote or record an audited override.
+  const [qualifyGate, setQualifyGate] = useState<{ stage: string; label: string } | null>(null);
+
+  function moveStage(stage: string, label: string) {
+    updateStage.mutate(
+      { id, stage },
+      {
+        onSuccess: () => detailToast(`Moved to ${label}`, "success"),
+        onError: (err) => {
+          if (isQualifyRequiredError(err)) {
+            setQualifyGate({ stage, label });
+          } else {
+            detailToast(stageMoveErrorMessage(err), "error");
+          }
+        },
+      },
+    );
+  }
 
   // F-305: Auto-trigger SSE analysis stream on mount (R2 compliance — no click-to-analyze)
   const analysisStream = useOpportunityAnalysis(id);
@@ -1514,12 +1535,7 @@ function OpportunityDetail({ id }: { id: string }) {
                 )}
                 <button
                   type="button"
-                  onClick={() =>
-                    updateStage.mutate(
-                      { id, stage },
-                      { onError: (err) => detailToast(stageMoveErrorMessage(err), "error") },
-                    )
-                  }
+                  onClick={() => moveStage(stage, stage)}
                   className={cn(
                     "flex items-center gap-1 text-[12px] font-mono transition-colors",
                     isCurrent && "text-gda-green font-bold",
@@ -1830,21 +1846,11 @@ function OpportunityDetail({ id }: { id: string }) {
                     <button
                       key={action.label}
                       type="button"
-                      onClick={() =>
-                        !blocked && action.stage &&
-                        updateStage.mutate(
-                          { id, stage: action.stage },
-                          {
-                            onSuccess: () =>
-                              detailToast(`Moved to ${action.label}`, "success"),
-                            onError: (err) =>
-                              detailToast(
-                                `Stage change failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-                                "error",
-                              ),
-                          },
-                        )
-                      }
+                      onClick={() => {
+                        if (!blocked && action.stage) {
+                          moveStage(action.stage, action.label);
+                        }
+                      }}
                       disabled={updateStage.isPending || blocked}
                       title={blocked ? "Blocked by doctrine exclusion or margin floor — override required" : undefined}
                       className={cn(
@@ -1870,6 +1876,17 @@ function OpportunityDetail({ id }: { id: string }) {
               exclusionIds={triggeredExclusions.map((e) => e.id)}
               onClose={() => setShowOverrideModal(false)}
               onSuccess={() => setShowOverrideModal(false)}
+            />
+          )}
+
+          {/* Qualify-first gate prompt (F) */}
+          {qualifyGate && (
+            <QualifyPromoteModal
+              opportunityId={id}
+              targetStage={qualifyGate.stage}
+              targetLabel={qualifyGate.label}
+              onClose={() => setQualifyGate(null)}
+              onSuccess={(msg) => detailToast(msg, "success")}
             />
           )}
 
