@@ -64,8 +64,8 @@ export function QualifyPromoteModal({
             Qualify required to move to {targetLabel}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            This opportunity hasn&apos;t been qualified yet. Per capture doctrine, the
-            owner qualifies an opportunity before it enters the pipeline. Qualify &amp;
+            This opportunity has not been qualified yet. Per capture doctrine, the
+            owner qualifies an opportunity before it enters the pipeline. Qualify &
             promote it now, or record an audited override for an exception.
           </p>
         </div>
@@ -78,7 +78,7 @@ export function QualifyPromoteModal({
               disabled={updateStage.isPending}
               className="block w-full rounded border border-gda-green bg-gda-green/10 px-3 py-2 text-left text-xs text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
             >
-              <span className="font-semibold">Qualify &amp; promote</span>
+              <span className="font-semibold">Qualify & promote</span>
               <span className="block text-[12px] text-gda-green/80">
                 Mark relevant and move to {targetLabel} (recommended)
               </span>
