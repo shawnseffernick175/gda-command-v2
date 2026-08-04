@@ -775,6 +775,23 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     const patchUser = (req as typeof req & { user?: { sub: string } }).user;
     input.capture_owner = (body.capture_owner as string) ?? patchUser?.sub ?? 'system';
 
+    // F: audited override of the qualify-first gate. Reason is mandatory so the
+    // audit trail captures who/when/why.
+    if (body.override === true) {
+      const reason = typeof body.override_reason === 'string' ? body.override_reason.trim() : '';
+      if (!reason) {
+        return reply.status(400).send(
+          errorEnvelope(
+            'VALIDATION_ERROR',
+            'override_reason is required when override is true',
+            req.requestId,
+          ),
+        );
+      }
+      input.override = true;
+      input.override_reason = reason;
+    }
+
     // Validate stage early so we return 400 instead of a DB constraint violation
     if (input.stage && !normalizePipelineStage(input.stage)) {
       return reply
@@ -794,11 +811,14 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       ({ row, analysisAffected } = await updateOpportunity(id, input));
     } catch (err) {
       const e = err as Error & { statusCode?: number };
-      // Pipeline-entry guard: stage set on an opportunity with no pipeline card.
+      // Pipeline-entry guard: forward stage move on an opportunity that has not
+      // cleared the qualify-first gate. Surface a dedicated code + can_override
+      // flag so the UI can offer "Qualify & promote" or an audited override,
+      // instead of a dead-end error toast (F).
       if (e.statusCode === 409) {
         return reply
           .status(409)
-          .send(errorEnvelope('CONFLICT', e.message, req.requestId));
+          .send(errorEnvelope('QUALIFY_REQUIRED', e.message, req.requestId, 'can_override'));
       }
       throw err;
     }

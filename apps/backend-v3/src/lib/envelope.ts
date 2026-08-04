@@ -7,6 +7,7 @@ export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'NOT_FOUND'
   | 'CONFLICT'
+  | 'QUALIFY_REQUIRED'
   | 'ANALYSIS_TIMEOUT'
   | 'DRAFT_NOT_READY'
   | 'INTERNAL_ERROR'

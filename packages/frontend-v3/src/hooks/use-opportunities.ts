@@ -307,11 +307,25 @@ export function useAnalyzeOpportunity() {
   };
 }
 
+export interface UpdateStageVars {
+  id: string;
+  stage: string;
+  /** Qualify-first path: mark the opportunity relevant as part of the promotion. */
+  relevance_status?: string;
+  /** Audited override of the qualify-first gate (requires override_reason). */
+  override?: boolean;
+  override_reason?: string;
+}
+
 export function useUpdateStage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, stage }: { id: string; stage: string }) =>
-      apiPatch<Record<string, unknown>>(`/v3/opportunities/${id}`, { stage }),
+    mutationFn: ({ id, stage, relevance_status, override, override_reason }: UpdateStageVars) =>
+      apiPatch<Record<string, unknown>>(`/v3/opportunities/${id}`, {
+        stage,
+        ...(relevance_status ? { relevance_status } : {}),
+        ...(override ? { override: true, override_reason } : {}),
+      }),
 
     onMutate: async (vars) => {
       // Optimistic update: immediately reflect the new stage in caches

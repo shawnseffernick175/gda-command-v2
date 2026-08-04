@@ -57,6 +57,16 @@ export function stageMoveErrorMessage(err: unknown): string {
   return `Failed to move stage${detail}`;
 }
 
+/**
+ * True when a stage move was refused by the qualify-first gate (backend code
+ * `QUALIFY_REQUIRED`). Such moves can be completed via "Qualify & promote" or an
+ * audited override rather than surfaced as a dead-end error.
+ */
+export function isQualifyRequiredError(err: unknown): boolean {
+  const e = err as { status?: number; code?: string } | null;
+  return e?.code === "QUALIFY_REQUIRED" || e?.status === 409;
+}
+
 /* ---- Display labels ----------------------------------------------------- */
 
 export const ACTIVE_STAGES = [

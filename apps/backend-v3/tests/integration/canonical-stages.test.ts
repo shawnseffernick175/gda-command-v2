@@ -77,7 +77,9 @@ describe('Canonical pipeline stages: PATCH + filter', () => {
     });
     expect(patchRes.statusCode).toBe(409);
     const patchBody = JSON.parse(patchRes.body) as { error: { code: string } };
-    expect(patchBody.error.code).toBe('CONFLICT');
+    // F: the qualify-first gate returns a dedicated code so the UI can offer
+    // "Qualify & promote" / an audited override rather than a dead-end error.
+    expect(patchBody.error.code).toBe('QUALIFY_REQUIRED');
 
     // No pipeline card should have been created.
     const piRes = await pool.query<{ stage: string }>(

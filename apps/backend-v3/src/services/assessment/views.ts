@@ -191,16 +191,26 @@ export class PromoteError extends Error {
  * @param captureOwner   the requesting user's display identity (NEVER 'system')
  * @param createdByUserId numeric user id for created_by, or null
  * @param targetStage    canonical pipeline stage to create the item at (default 'qualified')
+ * @param opts.override  when true, bypass the qualify-first gate (relevance/assessment)
+ *                       and record an audited override. `opts.reason` is required.
+ * @param opts.reason    owner rationale recorded in the audit log when overriding.
  */
 export async function promoteToPipeline(
   opportunityId: string,
   captureOwner: string,
   createdByUserId: string | null,
   targetStage: string = 'qualified',
+  opts: { override?: boolean; reason?: string | null } = {},
 ): Promise<PromoteResult> {
   const owner = captureOwner?.trim();
   if (!owner || owner.toLowerCase() === 'system') {
     throw new PromoteError('capture_owner must be the requesting user, not "system"', 400);
+  }
+
+  const override = opts.override === true;
+  const overrideReason = (opts.reason ?? '').trim();
+  if (override && !overrideReason) {
+    throw new PromoteError('override_reason is required when overriding the qualify-first gate', 400);
   }
 
   const client = await pool.connect();
@@ -221,12 +231,15 @@ export async function promoteToPipeline(
     // F-614: accept items that are either in ops_tracker OR in the owner's
     // bucket (relevance_status='relevant'). The Opportunities page shows all
     // relevant items; the owner must be able to promote any of them.
-    if (opp.assessment_status !== 'ops_tracker' && opp.relevance_status !== 'relevant') {
+    // F: the owner may bypass this qualify-first gate with an audited override.
+    const passesGate = opp.assessment_status === 'ops_tracker' || opp.relevance_status === 'relevant';
+    if (!passesGate && !override) {
       throw new PromoteError(
         `Only relevant or Ops Tracker opportunities can be promoted (current: assessment_status=${opp.assessment_status}, relevance_status=${opp.relevance_status})`,
         400,
       );
     }
+    const gateOverridden = !passesGate && override;
 
     // If a pipeline item already exists, do not create a second one.
     const existing = await client.query<{ id: string; capture_owner: string }>(
@@ -278,12 +291,25 @@ export async function promoteToPipeline(
       [opportunityId, owner, normalizedStage, sourceId, numericUserId],
     );
 
-    // F-614: audit trail for pipeline promotion (user-initiated)
+    // F-614/F: audit trail for pipeline promotion (user-initiated). When the
+    // qualify-first gate was bypassed, record who/when (actor + auto timestamp)
+    // and why (override_reason) so the exception is traceable.
     await recordAuditLog(client, {
-      action: 'promote_to_pipeline',
+      action: gateOverridden ? 'promote_to_pipeline_override' : 'promote_to_pipeline',
       table_name: 'pipeline_items',
       record_id: Number(insertRes.rows[0]!.id),
-      new_values: { stage: normalizedStage, opportunity_id: opportunityId, capture_owner: owner },
+      new_values: {
+        stage: normalizedStage,
+        opportunity_id: opportunityId,
+        capture_owner: owner,
+        ...(gateOverridden
+          ? {
+              override_reason: overrideReason,
+              bypassed_assessment_status: opp.assessment_status,
+              bypassed_relevance_status: opp.relevance_status,
+            }
+          : {}),
+      },
       actor: owner,
       source: 'user',
     });

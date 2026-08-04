@@ -926,9 +926,14 @@ export async function updateOpportunity(
   // capture_owner is attribution metadata, not a column on opportunities.
   const stageValue = input.stage;
   const captureOwner = input.capture_owner ?? 'system';
+  const overrideGate = input.override === true;
+  const overrideReason = input.override_reason ?? null;
 
+  // stage, capture_owner, override* are handled separately — they are not
+  // columns on the opportunities table.
+  const NON_COLUMN_KEYS = new Set(['stage', 'capture_owner', 'override', 'override_reason']);
   const fields = Object.entries(input).filter(
-    ([k, v]) => v !== undefined && k !== 'stage' && k !== 'capture_owner',
+    ([k, v]) => v !== undefined && !NON_COLUMN_KEYS.has(k),
   );
   let agencyValue: string | undefined;
   for (const [key, value] of fields) {
@@ -1079,8 +1084,12 @@ export async function updateOpportunity(
       // canonical promoteToPipeline path so the item enters the pipeline
       // with capture_owner = user. PromoteError → 409 when the prerequisite
       // assessment hasn't happened yet (state conflict, not a validation error).
+      // F: an owner may bypass the qualify-first gate with an audited override.
       try {
-        await promoteToPipeline(id, captureOwner, null, dbStage);
+        await promoteToPipeline(id, captureOwner, null, dbStage, {
+          override: overrideGate,
+          reason: overrideReason,
+        });
       } catch (err) {
         if (err instanceof PromoteError) {
           const code = err.statusCode === 400 ? 409 : err.statusCode;
