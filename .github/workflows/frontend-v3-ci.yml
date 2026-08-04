@@ -202,7 +202,11 @@ jobs:
           # Revenue / Contract Waterfall / AR matrix); total lands at ~734KB
           # (751,333 bytes). Small headroom so this feature + gzip cross-runner
           # jitter don't flap right at the ceiling.
-          MAX_MAIN_KB=735
+          # 735→740: capture-phase entry gate adds the QualifyPromoteModal
+          # (Qualify & promote + audited override w/ rationale) on the
+          # Opportunities detail page; total lands at ~739KB. Small headroom so
+          # this feature + gzip jitter don't flap at the ceiling.
+          MAX_MAIN_KB=740
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
