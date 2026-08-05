@@ -14,6 +14,7 @@ import {
   type CoveragePursuit,
 } from "@/hooks/use-pipeline-coverage";
 import { SortableHeader } from "@/components/shared/SortableHeader";
+import { StageAxisInfo } from "@/components/shared/StageAxisInfo";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 
@@ -52,9 +53,12 @@ export function PipelineCoverageCard() {
     <div className="rounded border border-border bg-gda-panel overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="font-mono text-xs font-bold uppercase text-muted-foreground tracking-wider">
-          Pipeline Coverage
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-mono text-xs font-bold uppercase text-muted-foreground tracking-wider">
+            Pipeline Coverage
+          </h2>
+          <StageAxisInfo axis="coverage" />
+        </div>
         <div className="flex gap-1">
           {FY_OPTIONS.map((year) => (
             <button

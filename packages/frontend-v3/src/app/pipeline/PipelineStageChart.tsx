@@ -6,6 +6,7 @@ import { echarts } from "@/lib/echarts-setup";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { stageKeyToLabel } from "@/lib/stages";
+import { StageAxisInfo } from "@/components/shared/StageAxisInfo";
 import type { PipelineSummary, PipelineStageStats } from "@/hooks/use-pipeline";
 
 /* ── Stage config (matches the pipeline stage model) ───────────── */
@@ -199,9 +200,12 @@ export function PipelineStageChart({
     <div className="rounded border border-border bg-gda-panel overflow-hidden">
       {/* Header + KPI figures */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-        <h2 className="font-mono text-xs font-bold uppercase text-muted-foreground tracking-wider">
-          Pipeline by Stage
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-mono text-xs font-bold uppercase text-muted-foreground tracking-wider">
+            Pipeline by Stage
+          </h2>
+          <StageAxisInfo axis="capture" />
+        </div>
         <div className="flex flex-wrap gap-2">
           <StatTile
             label={formatMoney(summary.total_pipeline_value)}
