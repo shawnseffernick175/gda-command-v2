@@ -1412,7 +1412,7 @@ const SUGGESTION_CHIPS = [
   "Draft an executive summary",
 ];
 
-function OpportunityDetail({ id }: { id: string }) {
+export function OpportunityDetail({ id }: { id: string }) {
   const router = useRouter();
   const { data: opp, isLoading, error } = useOpportunity(id);
   const analyzeOpp = useAnalyzeOpportunity();

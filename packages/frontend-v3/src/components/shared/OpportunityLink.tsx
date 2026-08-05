@@ -6,14 +6,15 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
  * affordance should route through this so a click opens the same deep-linkable,
  * shareable detail page from anywhere in the tool.
  *
- * The app is a static export (`output: "export"`), so the detail view is served
- * by the `/opportunities` page which resolves `?id=<id>` on the client — this is
- * the one canonical, shareable form. Centralizing it here means there is a single
- * place that defines how an opportunity is opened.
+ * Canonical form is the REST-style path `/opportunities/<id>`, served by the
+ * `app/opportunities/[id]` route. The legacy `/opportunities?id=<id>` query form
+ * still resolves to the same detail view (handled on the `/opportunities` page),
+ * so older links/bookmarks keep working. Centralizing the shape here means there
+ * is a single place that defines how an opportunity is opened.
  */
 export function opportunityHref(id: string | number | null | undefined): string {
   if (id == null || id === "") return "/opportunities";
-  return `/opportunities?id=${encodeURIComponent(String(id))}`;
+  return `/opportunities/${encodeURIComponent(String(id))}`;
 }
 
 type OpportunityLinkProps = {

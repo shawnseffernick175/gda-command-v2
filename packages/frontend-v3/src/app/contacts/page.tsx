@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { Pagination } from "@/components/shared/Pagination";
 import { SortableHeader } from "@/components/shared/SortableHeader";
+import { OpportunityLink } from "@/components/shared/OpportunityLink";
 import { useTableSort } from "@/hooks/use-table-sort";
 import type {
   GovTriContact,
@@ -398,13 +399,13 @@ function ContactExpandRow({
             </h4>
             <div className="mt-1 space-y-1">
               {(contact.linked_opportunities ?? []).map((o) => (
-                <a
+                <OpportunityLink
                   key={`opp-${o.id}`}
-                  href={`/opportunities/${o.id}`}
+                  id={o.id}
                   className="block text-xs text-gda-cyan hover:underline"
                 >
                   &#8594; {o.title} &#8212; {o.stage ?? "Opportunity"}
-                </a>
+                </OpportunityLink>
               ))}
               {(contact.linked_captures ?? []).map((c) => (
                 <a
@@ -590,14 +591,14 @@ function LinkedChips({ contact }: { contact: GovTriContact }) {
   return (
     <div className="flex flex-wrap gap-1">
       {opps.map((o) => (
-        <a
+        <OpportunityLink
           key={`opp-${o.id}`}
-          href={`/opportunities/${o.id}`}
+          id={o.id}
           onClick={(e) => e.stopPropagation()}
           className="inline-flex items-center rounded bg-gda-cyan/10 px-1.5 py-0.5 text-[12px] text-gda-cyan hover:bg-gda-cyan/20"
         >
           {o.title.length > 20 ? o.title.slice(0, 20) + "\u2026" : o.title} &#8599;
-        </a>
+        </OpportunityLink>
       ))}
       {caps.map((c) => (
         <a

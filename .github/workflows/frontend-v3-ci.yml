@@ -206,7 +206,12 @@ jobs:
           # (Qualify & promote + audited override w/ rationale) on the
           # Opportunities detail page; total lands at ~739KB. Small headroom so
           # this feature + gzip jitter don't flap at the ceiling.
-          MAX_MAIN_KB=740
+          # 740→755: canonical /opportunities/[id] REST route adds a new dynamic
+          # app-router route (its own entry/route chunks; the shared detail code
+          # is NOT duplicated) so single-opportunity views are shareable/
+          # bookmarkable; total lands at ~752KB. Small headroom so this route +
+          # gzip cross-runner jitter don't flap at the ceiling.
+          MAX_MAIN_KB=755
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
