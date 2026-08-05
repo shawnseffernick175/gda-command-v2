@@ -999,108 +999,146 @@ export async function updateOpportunity(
   const sql = `UPDATE opportunities SET ${setClauses.join(', ')} WHERE id = $${paramIdx} AND deleted_at IS NULL RETURNING *`;
   params.push(id);
 
-  const res = await pool.query<OpportunityRow>(sql, params);
-  const row = res.rows[0]!;
+  // Atomicity (Devin Review, #1228): the column UPDATE (notably the
+  // "Qualify & promote" relevance_status='relevant' write) and the pipeline
+  // promotion must commit or roll back together. Previously the UPDATE
+  // auto-committed on the pool before promoteToPipeline ran in its own
+  // transaction, so a failed promotion left the opportunity permanently marked
+  // relevant/qualified while the caller only saw an error. Run both on one
+  // transactional client. Best-effort audit writes are deferred until after
+  // COMMIT so we never record a change that rolled back.
+  const deferredAudits: Array<() => void> = [];
+  const client = await pool.connect();
+  let row!: OpportunityRow;
+  try {
+    await client.query('BEGIN');
 
-  // F-600: audit trail for relevance_status change (user-initiated via PATCH)
-  if (input.relevance_status !== undefined) {
-    const newRelevanceStatus = (row as { relevance_status?: string | null }).relevance_status ?? null;
-    if (newRelevanceStatus !== oldRelevanceStatus) {
-      recordAuditLog(pool, {
-        action: 'UPDATE',
-        table_name: 'opportunities',
-        record_id: Number(id),
-        old_values: { relevance_status: oldRelevanceStatus },
-        new_values: { relevance_status: newRelevanceStatus },
-        actor: captureOwner,
-        source: 'user',
-      }).catch((err) => {
-        logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
-      });
+    const res = await client.query<OpportunityRow>(sql, params);
+    row = res.rows[0]!;
+
+    // F-600: audit trail for relevance_status change (user-initiated via PATCH)
+    if (input.relevance_status !== undefined) {
+      const newRelevanceStatus = (row as { relevance_status?: string | null }).relevance_status ?? null;
+      if (newRelevanceStatus !== oldRelevanceStatus) {
+        deferredAudits.push(() => {
+          recordAuditLog(pool, {
+            action: 'UPDATE',
+            table_name: 'opportunities',
+            record_id: Number(id),
+            old_values: { relevance_status: oldRelevanceStatus },
+            new_values: { relevance_status: newRelevanceStatus },
+            actor: captureOwner,
+            source: 'user',
+          }).catch((err) => {
+            logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
+          });
+        });
+      }
     }
+
+    // Write stage to pipeline_items (stages live there, not on opportunities).
+    // GUARD (F-600): an opportunity enters the pipeline ONLY when the owner
+    // qualifies it. Pipeline items are NEVER deleted by automation — all 12 are
+    // owner-promoted; terminal stages are explicit owner decisions.
+    // A stage update may MOVE an existing card between stages, but it must NEVER
+    // create a card for an opportunity that was never qualified. If no card exists,
+    // refuse -- the owner must qualify first.
+    if (stageValue) {
+      const dbStage = normalizePipelineStage(stageValue);
+      if (!dbStage) {
+        throw new Error(`Unknown pipeline stage: ${stageValue}`);
+      }
+      const existing = await client.query<{ id: number; stage: string }>(
+        `SELECT id, stage FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
+        [id],
+      );
+      const oldStage = existing.rows[0]?.stage ?? null;
+      if (existing.rows.length > 0) {
+        const pipelineItemId = existing.rows[0].id;
+        await client.query(
+          `UPDATE pipeline_items SET stage = $1, updated_at = NOW() WHERE id = $2`,
+          [dbStage, pipelineItemId],
+        );
+
+        // F-600: audit trail for pipeline stage change (user-initiated)
+        deferredAudits.push(() => {
+          recordAuditLog(pool, {
+            action: 'UPDATE',
+            table_name: 'pipeline_items',
+            record_id: pipelineItemId,
+            old_values: { stage: oldStage },
+            new_values: { stage: dbStage },
+            actor: captureOwner,
+            source: 'user',
+          }).catch((err) => {
+            logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
+          });
+        });
+      } else if (isTerminalStage(dbStage)) {
+        // Terminal decisions (No Bid, Lost, Won, Government Cancelled) are explicit
+        // owner verdicts that may be recorded directly from the Interest list, even
+        // when the opportunity was never formally qualified. Create the card so the
+        // decision persists into its terminal tab.
+        const insertRes = await client.query<{ id: number }>(
+          `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
+           VALUES ($1, $2, $3, $4) RETURNING id`,
+          [id, captureOwner, dbStage, row.source_id],
+        );
+
+        // F-600: audit trail for new pipeline item (terminal decision)
+        const insertedId = insertRes.rows[0]?.id;
+        if (insertedId !== undefined) {
+          deferredAudits.push(() => {
+            recordAuditLog(pool, {
+              action: 'INSERT',
+              table_name: 'pipeline_items',
+              record_id: insertedId,
+              new_values: { stage: dbStage, opportunity_id: id },
+              actor: captureOwner,
+              source: 'user',
+            }).catch((err) => {
+              logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
+            });
+          });
+        }
+      } else {
+        // F-614: Forward-progression stage from Interest — promote via the
+        // canonical promoteToPipeline path so the item enters the pipeline
+        // with capture_owner = user. PromoteError → 409 when the prerequisite
+        // assessment hasn't happened yet (state conflict, not a validation error).
+        // F: an owner may bypass the qualify-first gate with an audited override.
+        // Runs on THIS transaction so the qualify/relevance write above and the
+        // promotion are atomic — a failed promote rolls the relevance change back.
+        try {
+          await promoteToPipeline(id, captureOwner, null, dbStage, {
+            override: overrideGate,
+            reason: overrideReason,
+            client,
+          });
+        } catch (err) {
+          if (err instanceof PromoteError) {
+            const code = err.statusCode === 400 ? 409 : err.statusCode;
+            throw Object.assign(new Error(err.message), { statusCode: code });
+          }
+          throw err;
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 
-  // Write stage to pipeline_items (stages live there, not on opportunities).
-  // GUARD (F-600): an opportunity enters the pipeline ONLY when the owner
-  // qualifies it. Pipeline items are NEVER deleted by automation — all 12 are
-  // owner-promoted; terminal stages are explicit owner decisions.
-  // A stage update may MOVE an existing card between stages, but it must NEVER
-  // create a card for an opportunity that was never qualified. If no card exists,
-  // refuse -- the owner must qualify first.
+  // Fire best-effort audit writes only after the mutation actually committed.
+  for (const fire of deferredAudits) fire();
+
+  // Re-query the row after pipeline changes so the response reflects
+  // any updates made by promoteToPipeline (e.g. status = 'qualified').
   if (stageValue) {
-    const dbStage = normalizePipelineStage(stageValue);
-    if (!dbStage) {
-      throw new Error(`Unknown pipeline stage: ${stageValue}`);
-    }
-    const existing = await pool.query<{ id: number; stage: string }>(
-      `SELECT id, stage FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
-      [id],
-    );
-    const oldStage = existing.rows[0]?.stage ?? null;
-    if (existing.rows.length > 0) {
-      await pool.query(
-        `UPDATE pipeline_items SET stage = $1, updated_at = NOW() WHERE id = $2`,
-        [dbStage, existing.rows[0].id],
-      );
-
-      // F-600: audit trail for pipeline stage change (user-initiated)
-      recordAuditLog(pool, {
-        action: 'UPDATE',
-        table_name: 'pipeline_items',
-        record_id: existing.rows[0].id,
-        old_values: { stage: oldStage },
-        new_values: { stage: dbStage },
-        actor: captureOwner,
-        source: 'user',
-      }).catch((err) => {
-        logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
-      });
-    } else if (isTerminalStage(dbStage)) {
-      // Terminal decisions (No Bid, Lost, Won, Government Cancelled) are explicit
-      // owner verdicts that may be recorded directly from the Interest list, even
-      // when the opportunity was never formally qualified. Create the card so the
-      // decision persists into its terminal tab.
-      const insertRes = await pool.query<{ id: number }>(
-        `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [id, captureOwner, dbStage, row.source_id],
-      );
-
-      // F-600: audit trail for new pipeline item (terminal decision)
-      if (insertRes.rows[0]) {
-        recordAuditLog(pool, {
-          action: 'INSERT',
-          table_name: 'pipeline_items',
-          record_id: insertRes.rows[0].id,
-          new_values: { stage: dbStage, opportunity_id: id },
-          actor: captureOwner,
-          source: 'user',
-        }).catch((err) => {
-          logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
-        });
-      }
-    } else {
-      // F-614: Forward-progression stage from Interest — promote via the
-      // canonical promoteToPipeline path so the item enters the pipeline
-      // with capture_owner = user. PromoteError → 409 when the prerequisite
-      // assessment hasn't happened yet (state conflict, not a validation error).
-      // F: an owner may bypass the qualify-first gate with an audited override.
-      try {
-        await promoteToPipeline(id, captureOwner, null, dbStage, {
-          override: overrideGate,
-          reason: overrideReason,
-        });
-      } catch (err) {
-        if (err instanceof PromoteError) {
-          const code = err.statusCode === 400 ? 409 : err.statusCode;
-          throw Object.assign(new Error(err.message), { statusCode: code });
-        }
-        throw err;
-      }
-    }
-
-    // Re-query the row after pipeline changes so the response reflects
-    // any updates made by promoteToPipeline (e.g. status = 'qualified').
     const freshRes = await pool.query<OpportunityRow>(
       `SELECT * FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
       [id],

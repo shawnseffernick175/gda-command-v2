@@ -132,6 +132,43 @@ describe('promoteToPipeline — audited override', () => {
   });
 });
 
+describe('promoteToPipeline — caller-owned transaction (atomic Qualify & promote)', () => {
+  it('joins a supplied client without BEGIN/COMMIT/connect/release', async () => {
+    scriptFor({ id: '1', assessment_status: 'passed', relevance_status: 'relevant', source_id: '5' });
+    const caller = makeClient();
+    const res = await promoteToPipeline('1', 'shawn', null, 'pursue', {
+      client: caller as unknown as import('pg').PoolClient,
+    });
+    expect(res.created).toBe(true);
+    // The caller owns the transaction: promote must not open/commit its own.
+    expect(mockPool.connect).not.toHaveBeenCalled();
+    expect(caller.query).toHaveBeenCalled();
+    expect(caller.release).not.toHaveBeenCalled();
+    const callerSql = caller.query.mock.calls.map((c) => String(c[0]));
+    expect(callerSql.some((s) => /^\s*BEGIN/i.test(s))).toBe(false);
+    expect(callerSql.some((s) => /^\s*COMMIT/i.test(s))).toBe(false);
+    expect(callerSql.some((s) => /INSERT INTO pipeline_items/i.test(s))).toBe(true);
+  });
+
+  it('does not ROLLBACK or release a supplied client when it throws (caller unwinds)', async () => {
+    // Ineligible opp, no override → promote throws; the caller's transaction
+    // (holding the relevance write) must be left for the caller to roll back.
+    steps = [
+      { match: /FROM opportunities\s+WHERE id = \$1/i, rows: [{ id: '1', assessment_status: 'passed', relevance_status: 'off_profile', source_id: '5' }] },
+    ];
+    const caller = makeClient();
+    await expect(
+      promoteToPipeline('1', 'shawn', null, 'pursue', {
+        client: caller as unknown as import('pg').PoolClient,
+      }),
+    ).rejects.toBeInstanceOf(PromoteError);
+    const callerSql = caller.query.mock.calls.map((c) => String(c[0]));
+    expect(callerSql.some((s) => /^\s*ROLLBACK/i.test(s))).toBe(false);
+    expect(caller.release).not.toHaveBeenCalled();
+    expect(recordAuditSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe('promoteToPipeline — existing card', () => {
   it('returns the existing card without creating a duplicate or auditing', async () => {
     scriptFor(
