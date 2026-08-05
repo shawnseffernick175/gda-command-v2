@@ -70,7 +70,7 @@ export function AskAiPanel({
       </div>
       {agentDown && (
         <p className="rounded border border-gda-amber/40 bg-gda-amber/10 px-2 py-1 text-xs text-gda-amber">
-          Analysis service unavailable — questions can&apos;t be answered right now.
+          Analysis service unavailable — questions can’t be answered right now.
         </p>
       )}
       <div className="flex gap-2">
