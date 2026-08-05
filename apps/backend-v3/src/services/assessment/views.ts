@@ -9,6 +9,7 @@
  * pipeline. capture_owner is ALWAYS the requesting user — never 'system'.
  */
 
+import type pg from 'pg';
 import { pool } from '../../lib/db.js';
 import { recordAuditLog } from '../audit/audit-log.js';
 import { normalizePipelineStage, isTerminalStage } from '../../lib/pipeline-stage.js';
@@ -194,13 +195,18 @@ export class PromoteError extends Error {
  * @param opts.override  when true, bypass the qualify-first gate (relevance/assessment)
  *                       and record an audited override. `opts.reason` is required.
  * @param opts.reason    owner rationale recorded in the audit log when overriding.
+ * @param opts.client    when provided, run inside the caller's open transaction
+ *                       (no BEGIN/COMMIT/ROLLBACK here) so the promotion is atomic
+ *                       with the caller's other writes — e.g. the "Qualify &
+ *                       promote" relevance_status change. The caller owns commit
+ *                       and rollback; a throw leaves its transaction to unwind.
  */
 export async function promoteToPipeline(
   opportunityId: string,
   captureOwner: string,
   createdByUserId: string | null,
   targetStage: string = 'qualified',
-  opts: { override?: boolean; reason?: string | null } = {},
+  opts: { override?: boolean; reason?: string | null; client?: pg.PoolClient } = {},
 ): Promise<PromoteResult> {
   const owner = captureOwner?.trim();
   if (!owner || owner.toLowerCase() === 'system') {
@@ -213,9 +219,14 @@ export async function promoteToPipeline(
     throw new PromoteError('override_reason is required when overriding the qualify-first gate', 400);
   }
 
-  const client = await pool.connect();
+  // When the caller supplies a client we join its transaction and must not
+  // manage the transaction lifecycle or release the connection.
+  const ownsTransaction = !opts.client;
+  const client = opts.client ?? (await pool.connect());
   try {
-    await client.query('BEGIN');
+    if (ownsTransaction) {
+      await client.query('BEGIN');
+    }
 
     const oppRes = await client.query<{ id: string; assessment_status: string; relevance_status: string | null; source_id: string | null }>(
       `SELECT id::text, assessment_status, relevance_status, source_id::text
@@ -247,7 +258,9 @@ export async function promoteToPipeline(
       [opportunityId],
     );
     if (existing.rows.length > 0) {
-      await client.query('COMMIT');
+      if (ownsTransaction) {
+        await client.query('COMMIT');
+      }
       return {
         pipeline_item_id: existing.rows[0]!.id,
         opportunity_id: opportunityId,
@@ -314,7 +327,9 @@ export async function promoteToPipeline(
       source: 'user',
     });
 
-    await client.query('COMMIT');
+    if (ownsTransaction) {
+      await client.query('COMMIT');
+    }
 
     return {
       pipeline_item_id: insertRes.rows[0]!.id,
@@ -323,9 +338,15 @@ export async function promoteToPipeline(
       created: true,
     };
   } catch (err) {
-    await client.query('ROLLBACK');
+    // Only unwind/return the connection we own; a caller-supplied client is
+    // rolled back and released by the caller.
+    if (ownsTransaction) {
+      await client.query('ROLLBACK');
+    }
     throw err;
   } finally {
-    client.release();
+    if (ownsTransaction) {
+      client.release();
+    }
   }
 }
