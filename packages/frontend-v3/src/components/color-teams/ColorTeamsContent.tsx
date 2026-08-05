@@ -13,6 +13,7 @@ import { RunModal } from "./RunModal";
 import { StatusPills } from "./StatusPills";
 import { FindingCard } from "./FindingCard";
 import { DoctrineScorecardPanel } from "./DoctrineScorecardPanel";
+import { StageAxisInfo } from "@/components/shared/StageAxisInfo";
 import type {
   ColorTeamFinding,
   ColorTeamRun,
@@ -119,9 +120,12 @@ export function ColorTeamsContent() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-mono text-xl font-bold text-foreground">
-            Color Team Reviews
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-xl font-bold text-foreground">
+              Color Team Reviews
+            </h1>
+            <StageAxisInfo axis="color_team" />
+          </div>
           <p className="text-sm text-muted-foreground">
             Upload a document, run a multi-color Shipley review, and track findings
           </p>
