@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import type { LlmResponse } from "@/lib/types";
 
 interface LlmRequest {
@@ -42,6 +42,20 @@ export function useOodaAnalysis(params: {
   });
 }
 
+export interface AgentSource {
+  url: string;
+  tool?: string;
+}
+
+export interface AskAiResponse {
+  answer: string;
+  /** Sources the agent actually retrieved (R1-verified citations). */
+  sources?: AgentSource[];
+  /** Citation URLs in the answer NOT backed by a retrieved source (R1 flag). */
+  unverified_citations?: string[];
+  trace_id: string;
+}
+
 export function useAskAi() {
   return useMutation({
     mutationFn: (params: {
@@ -50,10 +64,39 @@ export function useAskAi() {
       object_id: string;
       context?: Record<string, unknown>;
     }) =>
-      apiPost<{ answer: string; trace_id: string }>("/v3/agent/ask", {
+      apiPost<AskAiResponse>("/v3/agent/ask", {
         task: "ask_ai",
         input: params,
       }),
+  });
+}
+
+interface AgentHealth {
+  backend_v3: string;
+  agent_v3: string;
+  trace_id?: string;
+}
+
+/**
+ * Reachability of the agent runtime so the UI can show an explicit
+ * "unavailable" state instead of an indefinite spinner when the analysis
+ * service is down. `/v3/agent/healthz` returns a success envelope with
+ * `agent_v3: "ok" | "unreachable"` (HTTP 503 when unreachable, which the API
+ * layer still parses); a thrown request is treated as unreachable.
+ */
+export function useAgentHealth() {
+  return useQuery({
+    queryKey: ["agent-health"],
+    queryFn: async (): Promise<AgentHealth> => {
+      try {
+        return await apiGet<AgentHealth>("/v3/agent/healthz");
+      } catch {
+        return { backend_v3: "unknown", agent_v3: "unreachable" };
+      }
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 
