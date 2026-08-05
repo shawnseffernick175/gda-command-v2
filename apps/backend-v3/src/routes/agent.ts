@@ -17,6 +17,77 @@ import { getOpportunityById } from '../services/opportunities/index.js';
 
 const AGENT_BASE = config.agentV3Url;
 
+type AgentSource = { url: string; tool?: string };
+
+/** Matches http(s) URLs embedded in prose. */
+const URL_RE = /\bhttps?:\/\/[^\s<>()[\]"'`]+/gi;
+
+/** Trailing punctuation that commonly clings to a URL inside a sentence. */
+function trimUrl(url: string): string {
+  return url.replace(/[.,;:!?)\]}>'"`]+$/, '');
+}
+
+/** Normalize for set-membership: drop trailing slashes, lowercase. */
+function normalizeUrl(url: string): string {
+  return trimUrl(url).replace(/\/+$/, '').toLowerCase();
+}
+
+function extractUrls(text: string): string[] {
+  const matches = text.match(URL_RE) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of matches) {
+    const url = trimUrl(raw);
+    const key = normalizeUrl(url);
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(url);
+    }
+  }
+  return out;
+}
+
+/**
+ * R1 boundary guard: any URL the model puts in its prose answer must be backed
+ * by a source the agent actually retrieved (the `sources` the agent emits on
+ * its `final` event). URLs with no backing source are returned as
+ * `unverified_citations` so the client can flag them rather than presenting a
+ * possibly-fabricated citation as authoritative. We flag (not strip) so the
+ * answer text is never silently rewritten.
+ */
+function findUnverifiedCitations(answer: string, sources: AgentSource[]): string[] {
+  const verified = new Set(sources.map((s) => normalizeUrl(s.url)));
+  return extractUrls(answer).filter((url) => !verified.has(normalizeUrl(url)));
+}
+
+/** Pull the answer text + retrieved sources out of a parsed SSE payload. */
+function readAnswerAndSources(parsed: Record<string, unknown>): {
+  answer: string;
+  sources: AgentSource[];
+} {
+  // The agent's `final` event is not envelope-wrapped, but the buffered wrapper
+  // also tolerates an enveloped payload ({ success, data }).
+  const holder =
+    parsed.success === true && parsed.data
+      ? (parsed.data as Record<string, unknown>)
+      : parsed;
+  const answer = String(holder.answer ?? holder.output ?? JSON.stringify(holder));
+  const rawSources = Array.isArray(holder.sources) ? holder.sources : [];
+  const sources: AgentSource[] = rawSources
+    .map((s): AgentSource | null => {
+      if (s && typeof s === 'object') {
+        const url = (s as Record<string, unknown>).url;
+        const tool = (s as Record<string, unknown>).tool;
+        if (typeof url === 'string' && url.trim()) {
+          return { url: url.trim(), tool: typeof tool === 'string' ? tool : undefined };
+        }
+      }
+      return null;
+    })
+    .filter((s): s is AgentSource => s !== null);
+  return { answer, sources };
+}
+
 function agentHeaders(traceId: string): Record<string, string> {
   const headers: Record<string, string> = {
     'X-GDA-Trace-Id': traceId,
@@ -265,16 +336,11 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       }
 
       let answer: string;
+      let sources: AgentSource[] = [];
       if (lastData) {
         try {
           const parsed = JSON.parse(lastData) as Record<string, unknown>;
-          // Unwrap envelope if present
-          if (parsed.success === true && parsed.data) {
-            const inner = parsed.data as Record<string, unknown>;
-            answer = String(inner.answer ?? inner.output ?? JSON.stringify(inner));
-          } else {
-            answer = String(parsed.answer ?? parsed.output ?? JSON.stringify(parsed));
-          }
+          ({ answer, sources } = readAnswerAndSources(parsed));
         } catch {
           // Not JSON — use raw SSE payload as plain-text answer
           answer = lastData;
@@ -283,12 +349,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
         // No SSE framing — try parsing the entire response as JSON
         try {
           const parsed = JSON.parse(raw) as Record<string, unknown>;
-          if (parsed.success === true && parsed.data) {
-            const inner = parsed.data as Record<string, unknown>;
-            answer = String(inner.answer ?? inner.output ?? JSON.stringify(inner));
-          } else {
-            answer = String(parsed.answer ?? parsed.output ?? JSON.stringify(parsed));
-          }
+          ({ answer, sources } = readAnswerAndSources(parsed));
         } catch {
           answer = raw.trim();
         }
@@ -296,8 +357,27 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
         answer = 'No response from analysis service.';
       }
 
+      // R1 boundary guard: flag any citation URL in the answer that the agent
+      // did not actually retrieve, so the client never presents a possibly
+      // fabricated source as authoritative.
+      const unverifiedCitations = findUnverifiedCitations(answer, sources);
+      if (unverifiedCitations.length > 0) {
+        logger.warn(
+          { traceId, unverifiedCitations },
+          'agent /ask: answer contains citations not backed by a retrieved source',
+        );
+      }
+
       return reply.status(200).send(
-        successEnvelope({ answer, trace_id: traceId }, traceId),
+        successEnvelope(
+          {
+            answer,
+            sources,
+            unverified_citations: unverifiedCitations,
+            trace_id: traceId,
+          },
+          traceId,
+        ),
       );
     } catch (err) {
       logger.error({ err }, 'agent-v3 /agent/ask proxy failed');

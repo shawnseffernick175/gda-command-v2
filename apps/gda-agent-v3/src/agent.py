@@ -53,6 +53,37 @@ class AgentState(BaseModel):
     step_count: int = 0
 
 
+def _extract_source_urls(output_json: str) -> list[str]:
+    """Pull every non-empty ``source_url`` out of a tool result's JSON output.
+
+    Tools return ``result.model_dump_json()`` (see ``_make_tool_coroutine``), so
+    every retrieved record carries its R1 ``source_url`` somewhere in the JSON
+    tree. We walk the whole structure so nested result lists are covered. This is
+    the authoritative set of sources the agent actually retrieved — the ``final``
+    event surfaces it so the proxy can flag any answer citation not backed by one.
+    """
+    try:
+        parsed = json.loads(output_json)
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+    urls: list[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "source_url" and isinstance(value, str) and value.strip():
+                    urls.append(value.strip())
+                else:
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(parsed)
+    return urls
+
+
 def _coerce_tool_input(raw: Any) -> dict[str, Any]:
     """Normalize a LangChain tool-end input payload into a JSON-serializable dict.
 
@@ -211,6 +242,10 @@ async def run_agent(
     error_msg = None
     # Track when each tool run started so on_tool_end can record real latency.
     tool_started_at: dict[str, float] = {}
+    # Authoritative sources the agent actually retrieved (R1). Deduped by URL,
+    # in first-seen order, and surfaced on the `final` event.
+    collected_sources: list[dict[str, str]] = []
+    seen_source_urls: set[str] = set()
 
     try:
         context_str = json.dumps(context) if context else ""
@@ -305,6 +340,15 @@ async def run_agent(
                 )
 
                 output_data = str(tool_output) if tool_output else ""
+
+                # Record the R1 sources this tool actually returned so the
+                # final event (and the proxy) can distinguish real citations
+                # from URLs the model may invent in its prose.
+                for src_url in _extract_source_urls(output_data):
+                    if src_url not in seen_source_urls:
+                        seen_source_urls.add(src_url)
+                        collected_sources.append({"url": src_url, "tool": tool_name})
+
                 yield {
                     "event": "tool_result",
                     "data": {
@@ -370,6 +414,7 @@ async def run_agent(
                 "output": final_output,
                 "step_count": step_count,
                 "token_usage": token_usage,
+                "sources": collected_sources,
             },
         }
 
