@@ -168,6 +168,91 @@ describe('Ingest framework — idempotency', () => {
     expect(result).toBe('updated');
   });
 
+  it('source_writer reuses the solicitation row when SAM re-issues a notice', async () => {
+    const { upsertOpportunityWithSources } = await import('../../src/ingest/framework/source_writer.js');
+
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // rewire to the new notice id
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: '13' }] }); // source
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: '100', was_inserted: false }] }); // opp
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // citation
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const result = await upsertOpportunityWithSources(
+      {
+        sam_notice_id: 'notice-day-2',
+        title: 'OASIS+ Unrestricted Continuously Open Solicitation',
+        agency: 'GENERAL SERVICES ADMINISTRATION',
+        sub_agency: null,
+        department: null,
+        solicitation_number: '47QRCA23R0006-P2',
+        status: 'discovery',
+        value_min: null,
+        value_max: null,
+        naics: null,
+        psc: null,
+        set_aside: null,
+        place_of_performance: null,
+        response_due_at: null,
+        posted_at: null,
+        description: null,
+        data_source: 'sam.gov',
+        tags: [],
+        opportunity_type: 'solicitation',
+      },
+      [{ field: 'title', source_url: 'https://sam.gov/opp/notice-day-2/view' }],
+      'sam_gov',
+    );
+
+    // The re-post updates the solicitation we already track instead of adding a
+    // second opportunity for it.
+    expect(result).toBe('updated');
+    expect(mockQuery.mock.calls[1][0]).toContain('UPDATE opportunities SET sam_notice_id');
+    expect(mockQuery.mock.calls[1][1]).toEqual([
+      'notice-day-2',
+      '47QRCA23R0006-P2',
+      'GENERAL SERVICES ADMINISTRATION',
+      'solicitation',
+    ]);
+  });
+
+  it('source_writer does not hunt for a prior notice when no solicitation number is stated', async () => {
+    const { upsertOpportunityWithSources } = await import('../../src/ingest/framework/source_writer.js');
+
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: '14' }] }); // source
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: '101', was_inserted: true }] }); // opp
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // citation
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    await upsertOpportunityWithSources(
+      {
+        sam_notice_id: 'no-solicitation-001',
+        title: 'Unnumbered notice',
+        agency: 'DOD',
+        sub_agency: null,
+        department: null,
+        solicitation_number: '   ',
+        status: 'discovery',
+        value_min: null,
+        value_max: null,
+        naics: null,
+        psc: null,
+        set_aside: null,
+        place_of_performance: null,
+        response_due_at: null,
+        posted_at: null,
+        description: null,
+        data_source: 'sam.gov',
+        tags: [],
+      },
+      [{ field: 'title', source_url: 'https://sam.gov/opp/no-solicitation-001/view' }],
+      'sam_gov',
+    );
+
+    expect(mockQuery.mock.calls[1][0]).toContain('INSERT INTO sources');
+  });
+
   it('source_writer rolls back on error', async () => {
     const { upsertOpportunityWithSources } = await import('../../src/ingest/framework/source_writer.js');
 
