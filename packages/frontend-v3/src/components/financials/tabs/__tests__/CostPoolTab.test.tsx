@@ -178,6 +178,30 @@ describe("CostPoolTab", () => {
     expect(indirect?.data).toEqual([30_000, null]);
   });
 
+  it("keeps every trend series separately legendable", () => {
+    render(data());
+    const metricSelect = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Metric"]',
+    )!;
+    // The stacked bars already show direct and indirect cost, so offering them
+    // as the overlaid line would put two series under one legend entry.
+    expect(Array.from(metricSelect.options).map((o) => o.value)).toEqual([
+      "revenue",
+      "gross_profit",
+      "profit",
+    ]);
+
+    for (const value of ["gross_profit", "profit", "revenue"]) {
+      act(() => {
+        metricSelect.value = value;
+        metricSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      const trend = chartOptions.at(-1) as { series: Array<{ name: string }> };
+      const names = trend.series.map((s) => s.name);
+      expect(new Set(names).size).toBe(names.length);
+    }
+  });
+
   it("offers only the filter values the book states", () => {
     render(data());
     const contractSelect = container.querySelector<HTMLSelectElement>(
