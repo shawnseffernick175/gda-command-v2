@@ -642,11 +642,13 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
         bottom: 0,
         textStyle: { fontSize: 12, color: "#7A7974" }, // allowed-hex
       },
+      // 45°-rotated YYYY-MM labels are ~40px tall, so the grid has to reserve
+      // that plus the legend band below it or the two overlap.
       grid: {
         left: 80,
         right: showRevenue && showProfit ? 80 : 40,
         top: 40,
-        bottom: 60,
+        bottom: 96,
       },
       xAxis: {
         type: "category",
@@ -719,7 +721,7 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
           Funded TOs only {"\u2014"} IDIQs excluded
         </span>
       </div>
-      <div ref={chartRef} style={{ height: 380, width: "100%" }} />
+      <div ref={chartRef} style={{ height: 420, width: "100%" }} />
     </div>
   );
 }

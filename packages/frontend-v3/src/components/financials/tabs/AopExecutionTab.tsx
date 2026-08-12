@@ -133,7 +133,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
           </p>
           <ReactEChartsCore
             echarts={echarts}
-            style={{ height: 260 }}
+            style={{ height: 300 }}
             notMerge
             option={{
               tooltip: {
@@ -142,11 +142,14 @@ export function AopExecutionTab({ fy }: { fy: string }) {
                 formatter: (params: Array<{ seriesName: string; value: number; marker: string }>) =>
                   params.map((p) => `${p.marker} ${p.seriesName}: ${formatMoneyFull(p.value)}`).join("<br/>"),
               },
+              // Legend pinned below the plot; the grid reserves room for the
+              // rotated element labels plus the legend band so they can't collide.
               legend: {
                 data: ["Planned", "Actual"],
+                bottom: 0,
                 textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
               },
-              grid: { left: 60, right: 16, top: 32, bottom: 48 },
+              grid: { left: 60, right: 16, top: 32, bottom: 76 },
               xAxis: {
                 type: "category" as const,
                 data: elementTotals.map((e) =>
