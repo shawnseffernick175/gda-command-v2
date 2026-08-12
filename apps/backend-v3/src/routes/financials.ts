@@ -9,6 +9,7 @@ import {
   isSupportedAopFy,
 } from '../services/financials/aop-target.js';
 import { parseCalendarMode, getMonthsForMode, fiscalMonthIndex, type CalendarMode } from '../lib/fiscal-calendar.js';
+import { rollUpFiscalYearToDate, fiscalYearToDateLabel } from '../lib/financial-ytd.js';
 import { classifyFinancialDoc } from '../services/financials/reingest-doc.js';
 import { CANONICAL_DIRECT_COST_LINES } from '../services/financials/deterministic-parsers.js';
 import {
@@ -2668,17 +2669,6 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/financials/p2?period=MAR-26
   app.get('/v3/financials/p2', async (req, reply) => {
     noStore(reply);
-    // KPI tiles from financial_actuals (latest quarter)
-    const { rows: kpiRows } = await pool.query(
-      `SELECT period, fiscal_year, quarter,
-              actual_orders, actual_sales, actual_ebit,
-              actual_gross_margin, actual_ros
-       FROM financial_actuals
-       WHERE source = 'income_statement' AND period LIKE '%Q%'
-       ORDER BY fiscal_year DESC, quarter DESC
-       LIMIT 1`,
-    );
-
     // Monthly actuals — income_statement source only for the Income Statement
     // section. l1_actual rows are a separate project-revenue ledger and must not
     // appear as bare "l1_actual" labels in the CEO view.
@@ -2701,15 +2691,15 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY fiscal_year, quarter`,
     );
 
-    // Plan data
+    // Plan quarters for the same book, rolled up to the same year-to-date scope
+    // below so the tiles compare like with like.
     const { rows: planRows } = await pool.query(
       `SELECT period, fiscal_year, quarter, source,
               plan_orders, plan_sales, plan_ebit,
               plan_gross_margin, plan_ros
        FROM financial_plan
        WHERE period LIKE '%Q%'
-       ORDER BY fiscal_year DESC, quarter DESC
-       LIMIT 1`,
+       ORDER BY fiscal_year, quarter`,
     );
 
     // Cost detail aggregated by pool (contract P&L proxy). Per-period
@@ -2808,21 +2798,49 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY vd.filename`,
     );
 
-    const kpi = kpiRows[0];
-    const plan = planRows[0];
+    // The tiles read "YTD", so they cover every quarter the Income Statement
+    // states for the current fiscal year — one latest-quarter row is a quarter,
+    // not the year to date, and showed FY26 Q2's $9.18M as year-to-date revenue
+    // where Q1 + Q2 is the $19.03M the cost-pool book reconciles to. The plan is
+    // trimmed to the same elapsed quarters so both sides of the comparison span
+    // the same months.
+    const kpi = rollUpFiscalYearToDate(
+      quarterRows.map((r) => ({
+        fiscal_year: Number(r.fiscal_year),
+        quarter: Number(r.quarter),
+        sales: Number(r.actual_sales),
+        ebit: Number(r.actual_ebit),
+        orders: Number(r.actual_orders),
+        gross_margin_pct: r.actual_gross_margin != null ? Number(r.actual_gross_margin) : null,
+      })),
+    );
+
+    const plan = rollUpFiscalYearToDate(
+      planRows
+        .filter((r) => kpi === null || Number(r.fiscal_year) === kpi.fiscal_year)
+        .map((r) => ({
+          fiscal_year: Number(r.fiscal_year),
+          quarter: Number(r.quarter),
+          sales: Number(r.plan_sales),
+          ebit: Number(r.plan_ebit),
+          orders: Number(r.plan_orders),
+          gross_margin_pct: r.plan_gross_margin != null ? Number(r.plan_gross_margin) : null,
+        })),
+      kpi?.through_quarter,
+    );
 
     const kpiData = kpi ? {
-      ytd_revenue: Number(kpi.actual_sales),
-      ytd_expenses: Number(kpi.actual_sales) - Number(kpi.actual_ebit),
-      ytd_profit: Number(kpi.actual_ebit),
-      ytd_margin: Number(kpi.actual_gross_margin),
-      period: kpi.period as string,
+      ytd_revenue: kpi.sales,
+      ytd_expenses: kpi.sales - kpi.ebit,
+      ytd_profit: kpi.ebit,
+      ytd_margin: kpi.gross_margin_pct,
+      period: fiscalYearToDateLabel(kpi),
     } : null;
 
     const planData = plan ? {
-      plan_sales: Number(plan.plan_sales),
-      plan_ebit: Number(plan.plan_ebit),
-      plan_gross_margin: Number(plan.plan_gross_margin),
+      plan_sales: plan.sales,
+      plan_ebit: plan.ebit,
+      plan_gross_margin: plan.gross_margin_pct,
     } : null;
 
     // Build full income statement line items per period from the stored metrics.

@@ -286,6 +286,12 @@ export function P2FinancialsTab({
   return (
     <div className="space-y-6">
       {/* KPI Tiles */}
+      {kpi && (
+        <p className="text-xs text-slate-500">
+          {kpi.period} — Income Statement, summed across the elapsed quarters;
+          plan figures cover the same span.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <Kpi
           label="YTD Revenue"
@@ -303,9 +309,13 @@ export function P2FinancialsTab({
         />
         <Kpi
           label="YTD Margin"
-          value={kpi ? `${kpi.ytd_margin.toFixed(1)}%` : "\u2014"}
+          value={
+            kpi?.ytd_margin != null ? `${kpi.ytd_margin.toFixed(1)}%` : "\u2014"
+          }
           subtitle={
-            plan ? `Plan: ${plan.plan_gross_margin.toFixed(1)}%` : null
+            plan?.plan_gross_margin != null
+              ? `Plan: ${plan.plan_gross_margin.toFixed(1)}%`
+              : null
           }
         />
         <Kpi
