@@ -22,6 +22,12 @@ import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 import { FinSourceStrip } from "@/components/financials/FinSourceStrip";
+import {
+  PeriodScopeSelector,
+  usePeriodScope,
+  periodLabel,
+  shortPeriod,
+} from "@/components/financials/primitives/PeriodScope";
 import { cn } from "@/lib/utils";
 import type {
   CostPoolField,
@@ -48,24 +54,6 @@ const POOL_LABELS: Record<CostPoolField, string> = {
   ind_mhx: "Material Handling (MHx)",
   ind_gna: "G&A",
 };
-
-const MONTH_NAMES: Record<string, string> = {
-  Jan: "January", Feb: "February", Mar: "March", Apr: "April",
-  May: "May", Jun: "June", Jul: "July", Aug: "August",
-  Sep: "September", Oct: "October", Nov: "November", Dec: "December",
-};
-const QUARTER_MONTHS: Record<string, string> = {
-  Q1: "Jan–Mar", Q2: "Apr–Jun", Q3: "Jul–Sep", Q4: "Oct–Dec",
-};
-
-function periodLabel(p: string): string {
-  if (p === "YTD") return "YTD";
-  if (/^Q[1-4]$/.test(p)) return `${p} (${QUARTER_MONTHS[p]})`;
-  return MONTH_NAMES[p.slice(-3)] ?? p;
-}
-function shortPeriod(p: string): string {
-  return p === "YTD" || /^Q[1-4]$/.test(p) ? p : p.slice(-3);
-}
 
 /* ── Chart / metric selection ─────────────────────────────────── */
 
@@ -103,9 +91,6 @@ const TREND_METRICS = METRICS.filter((m) => !STACKED_METRICS.has(m.id));
 function metricLabelOf(id: MetricKey): string {
   return METRICS.find((m) => m.id === id)?.label ?? "Revenue";
 }
-
-type ViewMode = "Month" | "Quarter" | "YTD";
-const VIEW_MODES: ViewMode[] = ["Month", "Quarter", "YTD"];
 
 const SORT_COLS: ColumnSortConfig[] = [
   { field: "project_name", type: "string" },
@@ -167,9 +152,7 @@ export function CostPoolTab({
 }: {
   projectFilter?: string[];
 }) {
-  const [view, setView] = useState<ViewMode>("YTD");
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [selectedQuarter, setSelectedQuarter] = useState<string | null>(null);
+  const scope = usePeriodScope();
   const [chartMode, setChartMode] = useState<ChartMode>("trend");
   const [metric, setMetric] = useState<MetricKey>("revenue");
   const [contractLabel, setContractLabel] = useState("");
@@ -177,12 +160,7 @@ export function CostPoolTab({
   const [projType, setProjType] = useState("");
   const [division, setDivision] = useState("");
 
-  const selectedPeriod =
-    view === "YTD"
-      ? "YTD"
-      : view === "Quarter"
-        ? selectedQuarter ?? "YTD"
-        : selectedMonth ?? "YTD";
+  const selectedPeriod = scope.period;
 
   const { data, isLoading } = useCostPoolSummary(selectedPeriod, projectFilter, {
     contract_label: contractLabel,
@@ -200,16 +178,6 @@ export function CostPoolTab({
   const indirectPools = data?.pools.indirect ?? [];
   const monthOptions = data?.available_months ?? [];
   const quarterOptions = data?.available_quarters ?? [];
-
-  const switchView = (m: ViewMode) => {
-    setView(m);
-    if (m === "Month" && !selectedMonth && monthOptions.length > 0) {
-      setSelectedMonth(monthOptions[monthOptions.length - 1]);
-    }
-    if (m === "Quarter" && !selectedQuarter && quarterOptions.length > 0) {
-      setSelectedQuarter(quarterOptions[quarterOptions.length - 1]);
-    }
-  };
 
   const sortedRows = useMemo(() => {
     if (!sortBy) return rows;
@@ -436,72 +404,18 @@ export function CostPoolTab({
     <div className="space-y-6">
       {/* Controls: period scope, chart mode, metric, attribute filters */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] uppercase tracking-wider text-muted-foreground">
-                View
-              </span>
-              <div className="inline-flex rounded border border-border bg-card p-0.5">
-                {VIEW_MODES.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => switchView(m)}
-                    className={cn(
-                      "rounded px-2.5 py-1 text-xs transition-colors",
-                      view === m
-                        ? "bg-gda-green/15 text-gda-green"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {view === "Month" && (
-              <select
-                aria-label="Month"
-                value={selectedMonth ?? ""}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground"
-              >
-                {monthOptions.length === 0 && <option value="">No months</option>}
-                {monthOptions.map((p) => (
-                  <option key={p} value={p}>
-                    {periodLabel(p)}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {view === "Quarter" && (
-              <select
-                aria-label="Quarter"
-                value={selectedQuarter ?? ""}
-                onChange={(e) => setSelectedQuarter(e.target.value)}
-                className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground"
-              >
-                {quarterOptions.length === 0 && (
-                  <option value="">No quarters</option>
-                )}
-                {quarterOptions.map((q) => (
-                  <option key={q} value={q}>
-                    {periodLabel(q)}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <p className="text-sm font-medium text-foreground">
-            {periodLabel(data?.selected_period ?? selectedPeriod)}
-            {" — "}
-            {formatMoneyFull(totals?.revenue ?? null)} revenue
-          </p>
-        </div>
+        <PeriodScopeSelector
+          scope={scope}
+          monthOptions={monthOptions}
+          quarterOptions={quarterOptions}
+          right={
+            <p className="text-sm font-medium text-foreground">
+              {periodLabel(data?.selected_period ?? selectedPeriod)}
+              {" \u2014 "}
+              {formatMoneyFull(totals?.revenue ?? null)} revenue
+            </p>
+          }
+        />
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="inline-flex rounded border border-border bg-card p-0.5">

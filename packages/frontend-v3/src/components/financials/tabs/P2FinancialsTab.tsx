@@ -328,7 +328,7 @@ export function P2FinancialsTab({
           </p>
           <ReactEChartsCore
             echarts={echarts}
-            style={{ height: 260 }}
+            style={{ height: 288 }}
             notMerge
             option={{
               tooltip: {
@@ -346,11 +346,15 @@ export function P2FinancialsTab({
                   return [header, ...lines].join("<br/>");
                 },
               },
+              // Legend pinned below the plot with the grid reserving room for
+              // both the x-axis labels and the legend band, so the two never
+              // render on top of each other.
               legend: {
                 data: ["Revenue", "Gross Profit", "Gross Margin %", "Return on Sales %"],
+                bottom: 0,
                 textStyle: { color: "var(--color-fin-stone)", fontSize: 12 },
               },
-              grid: { left: 60, right: 56, top: 32, bottom: 32 },
+              grid: { left: 60, right: 56, top: 32, bottom: 56 },
               xAxis: {
                 type: "category" as const,
                 data: months.map((m) => shortPeriod(m.period)),

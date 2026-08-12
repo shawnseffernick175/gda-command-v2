@@ -11,6 +11,12 @@ import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 import { ArContractMatrix } from "@/components/financials/tabs/ArContractMatrix";
 import { FinSourceStrip } from "@/components/financials/FinSourceStrip";
 import { orderBuckets, bucketColor } from "@/lib/aging";
+import {
+  PeriodScopeSelector,
+  usePeriodScope,
+  periodInScope,
+  periodOptionsFrom,
+} from "@/components/financials/primitives/PeriodScope";
 import { cn } from "@/lib/utils";
 
 const AR_SORT_COLS: ColumnSortConfig[] = [
@@ -37,7 +43,16 @@ export function ArTab({ projectFilter = [] }: { projectFilter?: string[] }) {
     if (filterActive) setMatrixOpen(true);
   }
 
-  const items = useMemo(() => data?.items ?? [], [data]);
+  const scope = usePeriodScope();
+  const allItems = useMemo(() => data?.items ?? [], [data]);
+  const { months: monthOptions, quarters: quarterOptions } = useMemo(
+    () => periodOptionsFrom(allItems.map((r) => r.period)),
+    [allItems],
+  );
+  const items = useMemo(
+    () => allItems.filter((r) => periodInScope(r.period, scope)),
+    [allItems, scope],
+  );
 
   const sortedItems = useMemo(() => {
     if (!sortBy) return items;
@@ -53,7 +68,7 @@ export function ArTab({ projectFilter = [] }: { projectFilter?: string[] }) {
     return <div className="h-48 animate-pulse rounded bg-gda-skeleton" />;
   }
 
-  if (items.length === 0) {
+  if (allItems.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
         AR data not yet ingested. Upload an Aged AR report to populate.
@@ -83,7 +98,12 @@ export function ArTab({ projectFilter = [] }: { projectFilter?: string[] }) {
   const topCustomerLabel = topCustomers[0]?.[0] ?? "—";
 
   const periods = [...new Set(items.map((r) => r.period))];
-  const periodLabel = periods.length === 1 ? periods[0] : `${periods.length} periods`;
+  const periodLabel =
+    scope.view === "YTD"
+      ? periods.length === 1
+        ? periods[0]
+        : `${periods.length} periods`
+      : scope.label;
 
   // Horizontal 100%-stacked aging bar — reads at laptop width without scroll.
   const agingBar = {
@@ -172,6 +192,23 @@ export function ArTab({ projectFilter = [] }: { projectFilter?: string[] }) {
 
   return (
     <div className="space-y-6">
+      <PeriodScopeSelector
+        scope={scope}
+        monthOptions={monthOptions}
+        quarterOptions={quarterOptions}
+        right={
+          <p className="text-sm font-medium text-foreground">
+            {periodLabel} — {formatMoneyFull(total)} open
+          </p>
+        }
+      />
+
+      {items.length === 0 && (
+        <p className="py-4 text-center text-xs text-muted-foreground">
+          No receivables stated for {periodLabel}.
+        </p>
+      )}
+
       {filterActive && (
         <p className="rounded border border-gda-cyan/30 bg-gda-cyan/5 px-3 py-2 text-[12px] text-muted-foreground">
           Project filter applies to the Receivables-by-Contract matrix below.
