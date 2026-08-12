@@ -49,6 +49,30 @@ export type {
 
 
 
+/**
+ * Rows the Active view drops as stale: the stated response date has passed and
+ * nobody has taken the opportunity past interest.
+ *
+ * Active previously applied no date logic at all, so a solicitation stayed in
+ * the working list forever unless someone changed its stage — the list filled
+ * with deadlines that had already come and gone. Staleness is judged from
+ * inaction, not the date alone: once an opportunity is qualified, pursued, in
+ * solicitation or post-submittal, a passed response date means a proposal is
+ * out and awaiting award, so it must keep showing. A missing response date is
+ * never treated as past due (missing is not zero).
+ *
+ * Constant literals only; `o` is the opportunities alias used by both list
+ * query builders.
+ */
+const UNWORKED_PAST_DUE_SQL = `NOT (
+  o.response_due_at IS NOT NULL
+  AND o.response_due_at < NOW()
+  AND NOT EXISTS (
+    SELECT 1 FROM pipeline_items pi3
+     WHERE pi3.opportunity_id = o.id AND pi3.stage <> 'interest'
+  )
+)`;
+
 const FIELD_SOURCE_TABLES: Record<string, { table: string; fk: string }> = {
   title: { table: 'opportunity_title_sources', fk: 'opportunity_id' },
   agency: { table: 'opportunity_agency_sources', fk: 'opportunity_id' },
@@ -406,6 +430,9 @@ export async function listOpportunities(
     conditions.push(
       `(EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage IN (${activeList})) OR NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id))`,
     );
+    if (!filters.include_past_due && filters.due !== 'past_due') {
+      conditions.push(UNWORKED_PAST_DUE_SQL);
+    }
   } else if (filters.stage && filters.stage !== 'passed') {
     const normalized = normalizePipelineStage(filters.stage) ?? filters.stage;
     if (normalized === 'interest') {
@@ -652,6 +679,9 @@ function buildFilterConditions(
     conditions.push(
       `(EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage IN (${activeList})) OR NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id))`,
     );
+    if (!filters.include_past_due && filters.due !== 'past_due') {
+      conditions.push(UNWORKED_PAST_DUE_SQL);
+    }
   } else if (filters.stage && filters.stage !== 'passed') {
     const normalized = normalizePipelineStage(filters.stage) ?? filters.stage;
     if (normalized === 'interest') {
@@ -766,6 +796,15 @@ export async function listOpportunitiesPaged(
   );
   stageCounts['passed'] = passedRes.rows[0]?.cnt ?? 0;
 
+  // How many rows Active is dropping as stale. Counted from the stage-free base
+  // filters (the same population the tab badges use) so the badge can subtract
+  // it and agree with the rows actually listed.
+  const pastDueRes = await pool.query<{ cnt: number }>(
+    `SELECT COUNT(*)::int AS cnt FROM opportunities o ${baseWhere ? `${baseWhere} AND` : 'WHERE'} NOT (${UNWORKED_PAST_DUE_SQL})`,
+    baseParams,
+  );
+  const activePastDueHidden = pastDueRes.rows[0]?.cnt ?? 0;
+
   let dataParamIdx = paramIdx;
   const orderBy = buildOrderByClause(filters.sort_by, filters.sort_dir);
   const dataSql = `
@@ -811,6 +850,7 @@ export async function listOpportunitiesPaged(
     idiq_count: metaRow?.idiq_count ?? 0,
     sb_play_count: metaRow?.sb_play_count ?? 0,
     stage_counts: stageCounts,
+    active_past_due_hidden: activePastDueHidden,
   };
 
   return { items: summaries, total, page, totalPages, meta };

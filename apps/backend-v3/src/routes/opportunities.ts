@@ -554,6 +554,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     const sbPlayRaw = query.sb_play as string | undefined;
     const sb_play = sbPlayRaw === '1' || sbPlayRaw === 'true';
 
+    // Active hides unworked past-due solicitations unless asked for explicitly.
+    const includePastDueRaw = query.include_past_due as string | undefined;
+    const include_past_due = includePastDueRaw === '1' || includePastDueRaw === 'true';
+
     const opportunityClass = parseOpportunityClass(query.opportunity_class as string | undefined);
 
     const filters: ListFilters = {
@@ -576,6 +580,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       idiq,
       opportunity_class: opportunityClass ?? undefined,
       sb_play: sb_play || undefined,
+      include_past_due: include_past_due || undefined,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor as string | undefined,
       page: query.page ? Number(query.page) : undefined,

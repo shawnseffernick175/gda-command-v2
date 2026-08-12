@@ -232,6 +232,14 @@ export interface ListFilters {
   opportunity_class?: 'baa' | 'ota' | 'idiq' | 'standard';
   /** When true, show only SB Play opportunities (employee-based NAICS + SB set-aside) */
   sb_play?: boolean;
+  /**
+   * Keep unworked past-due solicitations in the Active view. Active hides them
+   * by default: the response date has passed with nobody acting on it, so it is
+   * no longer a live pursuit. Only affects rows still sitting at interest (or
+   * with no pipeline card) — anything qualified or further along stays visible
+   * regardless of its date, because work in progress is not stale.
+   */
+  include_past_due?: boolean;
   limit?: number;
   cursor?: string;
   page?: number;
@@ -270,6 +278,13 @@ export interface OpportunityMeta {
   idiq_count: number;
   sb_play_count: number;
   stage_counts: Record<string, number>;
+  /**
+   * Rows the Active view is currently hiding as stale (response date passed,
+   * never taken past interest). Reported so the Active tab badge can match the
+   * rows it actually lists, and so the count of missed solicitations stays
+   * visible instead of silently vanishing.
+   */
+  active_past_due_hidden: number;
 }
 
 export interface PagedResult<T> {
