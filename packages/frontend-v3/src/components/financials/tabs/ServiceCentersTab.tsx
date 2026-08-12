@@ -8,6 +8,12 @@ import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { FinSourceStrip } from "@/components/financials/FinSourceStrip";
+import {
+  PeriodScopeSelector,
+  usePeriodScope,
+  periodOptionsFrom,
+  quarterOfPeriod,
+} from "@/components/financials/primitives/PeriodScope";
 import type { ServiceCenterRow } from "@/lib/types";
 
 const MONTHS = [
@@ -31,19 +37,60 @@ function fmtRate(v: number | null): string {
 export function ServiceCentersTab() {
   const { data, isLoading } = useServiceCenters();
   const { sortBy, sortDir, handleSort } = useTableSort("servicecenters");
+  const scope = usePeriodScope();
 
   const centers = useMemo(() => data?.centers ?? [], [data]);
 
+  const allMonths = useMemo(() => data?.months ?? [], [data]);
+  const fiscalYear = data?.fiscal_year ?? null;
+  const fyPrefix = fiscalYear != null ? `FY${String(fiscalYear).slice(2)} ` : "";
+  // The GL ledger states fiscal period numbers; the shared control speaks in
+  // "FY26 Apr" periods, so translate in both directions rather than showing a
+  // different period vocabulary on this tab.
+  const monthPeriodOf = (m: number) => `${fyPrefix}${MONTHS[m]}`;
+  const { months: monthOptions, quarters: quarterOptions } = useMemo(
+    () => periodOptionsFrom(allMonths.map((m) => `${fyPrefix}${MONTHS[m]}`)),
+    [allMonths, fyPrefix],
+  );
+  // Month/Quarter narrow which ledger periods every figure below covers; the
+  // roll-up column always sums exactly the visible months.
+  const months = useMemo(
+    () =>
+      allMonths.filter((m) => {
+        if (scope.period === "YTD") return true;
+        if (/^Q[1-4]$/.test(scope.period)) {
+          return quarterOfPeriod(monthPeriodOf(m)) === scope.period;
+        }
+        return monthPeriodOf(m) === scope.period;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allMonths, scope.period, fyPrefix],
+  );
+  const monthSet = new Set(months.map(String));
+  /** Row total over the scoped months only (YTD when nothing is narrowed). */
+  const scopedTotal = (byMonth: Record<string, number | null>, ytd: number) =>
+    scope.period === "YTD"
+      ? ytd
+      : [...monthSet].reduce((s, k) => s + (byMonth[k] ?? 0), 0);
+
   const sortedCenters = useMemo(() => {
-    // Default: highest YTD cost first, so the biggest service centers lead.
-    if (!sortBy) return [...centers].sort((a, b) => b.ytd - a.ytd);
+    const totalOf = (r: ServiceCenterRow) => scopedTotal(r.months, r.ytd);
+    // Default: highest scoped cost first, so the biggest service centers lead.
+    if (!sortBy) return [...centers].sort((a, b) => totalOf(b) - totalOf(a));
+    // The roll-up column shows the scoped total, so sorting it must too.
+    if (sortBy === "ytd") {
+      return [...centers].sort((a, b) =>
+        sortDir === "asc" ? totalOf(a) - totalOf(b) : totalOf(b) - totalOf(a),
+      );
+    }
     return sortData(
       centers as unknown as Record<string, unknown>[],
       sortBy,
       sortDir,
       SC_SORT_COLS,
     ) as unknown as ServiceCenterRow[];
-  }, [centers, sortBy, sortDir]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centers, sortBy, sortDir, scope.period, months]);
 
   if (isLoading) {
     return <div className="h-48 animate-pulse rounded bg-gda-skeleton" />;
@@ -59,12 +106,11 @@ export function ServiceCentersTab() {
     );
   }
 
-  const months = data?.months ?? [];
   const pools = data?.pools ?? [];
   const rates = data?.rates ?? [];
-  const fiscalYear = data?.fiscal_year ?? null;
 
-  const totalYtd = centers.reduce((s, r) => s + r.ytd, 0);
+  const scopedLabel = scope.period === "YTD" ? "YTD" : scope.label;
+  const total = centers.reduce((s, r) => s + scopedTotal(r.months, r.ytd), 0);
   const monthRange =
     months.length > 0
       ? `${MONTHS[months[0]]}–${MONTHS[months[months.length - 1]]}`
@@ -72,19 +118,36 @@ export function ServiceCentersTab() {
   // The GL Detail is a fiscal-period ledger, so period is stated explicitly
   // (this view is fiscal-year native and does not switch to a calendar basis).
   const periodLabel =
-    fiscalYear != null
+    fiscalYear != null && months.length > 0
       ? `FY${String(fiscalYear).slice(2)} · ${monthRange} (fiscal PD ${months[0]}–${months[months.length - 1]})`
       : monthRange;
 
   return (
     <div className="space-y-6">
+      <PeriodScopeSelector
+        scope={scope}
+        monthOptions={monthOptions}
+        quarterOptions={quarterOptions}
+        right={
+          <p className="text-sm font-medium text-foreground">
+            {periodLabel} — {formatMoneyFull(total)} indirect
+          </p>
+        }
+      />
+
       {/* KPI tiles */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Kpi label="Total Indirect Cost — YTD" value={formatMoney(totalYtd)} subtitle={periodLabel} />
+        <Kpi label={`Total Indirect Cost — ${scopedLabel}`} value={formatMoney(total)} subtitle={periodLabel} />
         <Kpi label="Service Centers" value={String(centers.length)} subtitle="INDIRECT cost centers" />
         <Kpi label="Cost Pools" value={String(pools.length)} subtitle="PAG groups" />
         <Kpi label="Periods" value={monthRange} subtitle={fiscalYear != null ? `FY${String(fiscalYear).slice(2)}` : "—"} />
       </div>
+
+      {months.length === 0 && (
+        <p className="text-center text-xs text-muted-foreground">
+          No ledger periods stated for {scopedLabel}.
+        </p>
+      )}
 
       {/* Trend SIE pool-rate strip */}
       <div className="rounded border border-border bg-card p-4">
@@ -137,7 +200,7 @@ export function ServiceCentersTab() {
               {months.map((m) => (
                 <th key={m} className="px-3 py-2 text-right font-medium">{MONTHS[m]}</th>
               ))}
-              <th className="px-3 py-2 text-right font-medium">YTD</th>
+              <th className="px-3 py-2 text-right font-medium">{scopedLabel}</th>
             </tr>
           </thead>
           <tbody>
@@ -150,7 +213,7 @@ export function ServiceCentersTab() {
                   </td>
                 ))}
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
-                  {formatMoneyFull(p.ytd)}
+                  {formatMoneyFull(scopedTotal(p.months, p.ytd))}
                 </td>
               </tr>
             ))}
@@ -165,7 +228,7 @@ export function ServiceCentersTab() {
                 );
               })}
               <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
-                {formatMoneyFull(totalYtd)}
+                {formatMoneyFull(total)}
               </td>
             </tr>
           </tbody>
@@ -184,7 +247,7 @@ export function ServiceCentersTab() {
               {months.map((m) => (
                 <th key={m} className="px-3 py-2 text-right font-medium">{MONTHS[m]}</th>
               ))}
-              <SortableHeader label="YTD" field="ytd" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label={scopedLabel} field="ytd" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
             </tr>
           </thead>
           <tbody>
@@ -200,7 +263,7 @@ export function ServiceCentersTab() {
                   </td>
                 ))}
                 <td className="px-3 py-2 text-right font-medium tabular-nums text-foreground">
-                  {formatMoneyFull(r.ytd)}
+                  {formatMoneyFull(scopedTotal(r.months, r.ytd))}
                 </td>
               </tr>
             ))}

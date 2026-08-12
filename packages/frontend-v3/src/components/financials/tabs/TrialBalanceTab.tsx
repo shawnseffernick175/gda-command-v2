@@ -10,6 +10,12 @@ import { FinSourceStrip } from "@/components/financials/FinSourceStrip";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+import {
+  PeriodScopeSelector,
+  usePeriodScope,
+  periodInScope,
+  periodOptionsFrom,
+} from "@/components/financials/primitives/PeriodScope";
 
 const TB_COLUMNS: ColumnSortConfig[] = [
   { field: "account_code", type: "number" },
@@ -49,13 +55,22 @@ export function TrialBalanceTab() {
   const [query, setQuery] = useState("");
   const { sortBy, sortDir, handleSort } = useTableSort("tb");
 
-  const items = useMemo(() => data?.items ?? [], [data]);
+  const scope = usePeriodScope();
+  const allItems = useMemo(() => data?.items ?? [], [data]);
+  const { months: monthOptions, quarters: quarterOptions } = useMemo(
+    () => periodOptionsFrom(allItems.map((r) => r.period)),
+    [allItems],
+  );
+  const items = useMemo(
+    () => allItems.filter((r) => periodInScope(r.period, scope)),
+    [allItems, scope],
+  );
 
   if (isLoading) {
     return <div className="h-48 animate-pulse rounded bg-gda-skeleton" />;
   }
 
-  if (items.length === 0) {
+  if (allItems.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
         Trial balance data not yet ingested. Upload a Trial Balance report to
@@ -91,7 +106,12 @@ export function TrialBalanceTab() {
   }).filter((c) => c.rows.length > 0);
 
   const periods = [...new Set(items.map((r) => r.period))];
-  const periodLabel = periods.length === 1 ? periods[0] : `${periods.length} periods`;
+  const periodLabel =
+    scope.view === "YTD"
+      ? periods.length === 1
+        ? periods[0]
+        : `${periods.length} periods`
+      : scope.label;
 
   // Class-composition chart: net balance magnitude by class
   const compChart = {
@@ -133,6 +153,23 @@ export function TrialBalanceTab() {
 
   return (
     <div className="space-y-6">
+      <PeriodScopeSelector
+        scope={scope}
+        monthOptions={monthOptions}
+        quarterOptions={quarterOptions}
+        right={
+          <p className="text-sm font-medium text-foreground">
+            {periodLabel} — {items.length} accounts
+          </p>
+        }
+      />
+
+      {items.length === 0 && (
+        <p className="py-4 text-center text-xs text-muted-foreground">
+          No trial-balance accounts stated for {periodLabel}.
+        </p>
+      )}
+
       {/* Summary tiles */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Total Debits" value={formatMoney(totalDebit)} subtitle={`${items.length} accounts`} />

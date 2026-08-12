@@ -10,6 +10,12 @@ import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 import { FinSourceStrip } from "@/components/financials/FinSourceStrip";
 import { orderBuckets, bucketColor, isOverdue } from "@/lib/aging";
+import {
+  PeriodScopeSelector,
+  usePeriodScope,
+  periodInScope,
+  periodOptionsFrom,
+} from "@/components/financials/primitives/PeriodScope";
 
 const AP_SORT_COLS: ColumnSortConfig[] = [
   { field: "period", type: "period" },
@@ -34,8 +40,19 @@ function statusColor(status: string): string {
 export function ApTab() {
   const { data, isLoading } = useApData();
   const { sortBy, sortDir, handleSort } = useTableSort("ap");
+  const scope = usePeriodScope();
 
-  const items = useMemo(() => data?.items ?? [], [data]);
+  const allItems = useMemo(() => data?.items ?? [], [data]);
+  const { months: monthOptions, quarters: quarterOptions } = useMemo(
+    () => periodOptionsFrom(allItems.map((r) => r.period)),
+    [allItems],
+  );
+  // Every tile, chart and row below reads the scoped set, so the whole tab
+  // always describes one span.
+  const items = useMemo(
+    () => allItems.filter((r) => periodInScope(r.period, scope)),
+    [allItems, scope],
+  );
 
   const sortedItems = useMemo(() => {
     if (!sortBy) return items;
@@ -51,7 +68,7 @@ export function ApTab() {
     return <div className="h-48 animate-pulse rounded bg-gda-skeleton" />;
   }
 
-  if (items.length === 0) {
+  if (allItems.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
         AP data not yet ingested. Upload an Open AP Report to populate.
@@ -93,7 +110,12 @@ export function ApTab() {
   const topVendors = [...byVendor.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
 
   const periods = [...new Set(items.map((r) => r.period))];
-  const periodLabel = periods.length === 1 ? periods[0] : `${periods.length} periods`;
+  const periodLabel =
+    scope.view === "YTD"
+      ? periods.length === 1
+        ? periods[0]
+        : `${periods.length} periods`
+      : scope.label;
 
   // Risk-colored aging bars — green (current) → red (over 90)
   const agingBar = {
@@ -211,6 +233,23 @@ export function ApTab() {
 
   return (
     <div className="space-y-6">
+      <PeriodScopeSelector
+        scope={scope}
+        monthOptions={monthOptions}
+        quarterOptions={quarterOptions}
+        right={
+          <p className="text-sm font-medium text-foreground">
+            {periodLabel} — {formatMoneyFull(total)} open
+          </p>
+        }
+      />
+
+      {items.length === 0 && (
+        <p className="py-4 text-center text-xs text-muted-foreground">
+          No payables stated for {periodLabel}.
+        </p>
+      )}
+
       {/* Summary tiles */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Total Payables" value={formatMoney(total)} subtitle={`${items.length} open items`} />
