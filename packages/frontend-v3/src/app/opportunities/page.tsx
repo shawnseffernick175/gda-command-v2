@@ -236,6 +236,7 @@ interface OppsListState {
   idiqFilter: "only" | "exclude" | undefined;
   classFilter: "baa" | "ota" | undefined;
   sbPlayOnly: boolean;
+  includePastDue: boolean;
   stageTab: string;
   groupBy: "none" | "vehicle";
   page: number;
@@ -278,6 +279,9 @@ function OpportunityList() {
   // Vehicle-class isolation (report item 1). IDIQ keeps its own is_idiq chip.
   const [classFilter, setClassFilter] = useState<'baa' | 'ota' | undefined>(saved?.classFilter);
   const [sbPlayOnly, setSbPlayOnly] = useState(saved?.sbPlayOnly ?? false);
+  // Active drops unworked solicitations whose response date has passed; this
+  // brings them back for a deliberate look at what was missed.
+  const [includePastDue, setIncludePastDue] = useState(saved?.includePastDue ?? false);
   const [stageTab, setStageTab] = useState(saved?.stageTab ?? "active");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">(saved?.groupBy ?? "none");
   const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
@@ -324,11 +328,12 @@ function OpportunityList() {
       idiq: idiqFilter,
       opportunity_class: classFilter,
       sb_play: sbPlayOnly || undefined,
+      include_past_due: includePastDue || undefined,
       sort_by: querySortBy,
       sort_dir: querySortDir,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, classFilter, sbPlayOnly, querySortBy, querySortDir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, classFilter, sbPlayOnly, includePastDue, querySortBy, querySortDir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -418,13 +423,17 @@ function OpportunityList() {
           .reduce((sum, [, v]) => sum + v, 0);
       }
       if (key === "active") {
-        return Object.entries(sc)
+        const total = Object.entries(sc)
           .filter(([k]) => !["won", "lost", "no_bid", "gov_cancelled", "passed", "qualify"].includes(k))
           .reduce((sum, [, v]) => sum + v, 0);
+        // Stage counts are stage-free by design, so they still include the
+        // stale rows Active drops; subtract them or the badge would promise
+        // more rows than the tab lists.
+        return includePastDue ? total : total - (meta.active_past_due_hidden ?? 0);
       }
       return sc[key] ?? 0;
     },
-    [meta],
+    [meta, includePastDue],
   );
 
   // Persist the current view so it survives navigating into a detail and back
@@ -442,6 +451,7 @@ function OpportunityList() {
       idiqFilter,
       classFilter,
       sbPlayOnly,
+      includePastDue,
       stageTab,
       groupBy,
       page,
@@ -453,7 +463,7 @@ function OpportunityList() {
     } catch {
       // sessionStorage unavailable (private mode / quota) — non-fatal.
     }
-  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, relevantOnly, idiqFilter, classFilter, sbPlayOnly, stageTab, groupBy, page, sortBy, sortDir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, relevantOnly, idiqFilter, classFilter, sbPlayOnly, includePastDue, stageTab, groupBy, page, sortBy, sortDir]);
 
   return (
     <div className="flex flex-col h-full">
@@ -558,6 +568,22 @@ function OpportunityList() {
             />
             <span className="text-[12px] text-muted-foreground whitespace-nowrap">Relevant Only (IT/Consulting)</span>
           </label>
+          {stageTab === "active" && (
+            <label
+              className="flex items-center gap-1.5 cursor-pointer select-none"
+              title="Active hides solicitations whose response date has passed with nobody working them. Anything qualified or further along stays listed regardless of its date. Check this to review what was missed."
+            >
+              <input
+                type="checkbox"
+                checked={includePastDue}
+                onChange={(e) => setIncludePastDue(e.target.checked)}
+                className="accent-gda-green h-3.5 w-3.5"
+              />
+              <span className="text-[12px] text-muted-foreground whitespace-nowrap">
+                Show past due{meta?.active_past_due_hidden ? ` (${meta.active_past_due_hidden})` : ""}
+              </span>
+            </label>
+          )}
           {hasActiveFilters && (
             <button
               type="button"

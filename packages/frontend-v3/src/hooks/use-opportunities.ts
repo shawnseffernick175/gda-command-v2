@@ -22,6 +22,8 @@ export interface OpportunityMeta {
   idiq_count: number;
   sb_play_count: number;
   stage_counts: Record<string, number>;
+  /** Rows Active is hiding as stale (response date passed, never worked). */
+  active_past_due_hidden?: number;
 }
 
 interface OpportunitiesPagedResponse {
@@ -83,6 +85,8 @@ export interface UseOpportunitiesPagedParams {
   idiq?: 'only' | 'exclude';
   opportunity_class?: 'baa' | 'ota' | 'idiq' | 'standard';
   sb_play?: boolean;
+  /** Keep unworked past-due solicitations in the Active view (hidden by default). */
+  include_past_due?: boolean;
   sort_by?: string;
   sort_dir?: "asc" | "desc";
 }
@@ -112,6 +116,7 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         idiq: params.idiq,
         opportunity_class: params.opportunity_class,
         sb_play: params.sb_play ? '1' : undefined,
+        include_past_due: params.include_past_due ? '1' : undefined,
         sort_by: params.sort_by,
         sort_dir: params.sort_dir,
       }),
