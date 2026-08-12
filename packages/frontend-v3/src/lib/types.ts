@@ -765,6 +765,117 @@ export interface ProjectIncomeStatementData {
   };
 }
 
+/* ── Revenue Summary by Cost Pool (Financial Bible) ───────────── */
+
+/**
+ * Cost-pool column keys. The API states which are direct and which are indirect
+ * (`pools.direct` / `pools.indirect`) in the book's own column order, so the UI
+ * never hard-codes that classification.
+ */
+export type CostPoolField =
+  | "dc_dl_offsite"
+  | "dc_dl_onsite"
+  | "dc_direct_travel"
+  | "dc_subk_labor"
+  | "dc_subk_travel"
+  | "dc_subk_material"
+  | "dc_consultant_labor"
+  | "dc_consultant_travel"
+  | "dc_direct_material"
+  | "dc_direct_odc"
+  | "ind_oh_offsite"
+  | "ind_oh_onsite"
+  | "ind_mhx"
+  | "ind_gna";
+
+/**
+ * Every dollar figure is `number | null`: null means the book did not state it
+ * for this scope ("—"), which is NOT the same as a stated $0.
+ */
+export interface CostPoolFigures {
+  revenue: number | null;
+  direct_cost: number | null;
+  gross_profit: number | null;
+  indirect_cost: number | null;
+  total_indirect_tgt: number | null;
+  /** signed: positive = actual indirect overran the provisional-rate target */
+  rate_variance: number | null;
+  /** fully burdened cost (direct + indirect) */
+  cost: number | null;
+  /** Op Income-ACT */
+  profit: number | null;
+  itd_revenue: number | null;
+  contract_value: number | null;
+  total_funded: number | null;
+  dc_dl_offsite: number | null;
+  dc_dl_onsite: number | null;
+  dc_direct_travel: number | null;
+  dc_subk_labor: number | null;
+  dc_subk_travel: number | null;
+  dc_subk_material: number | null;
+  dc_consultant_labor: number | null;
+  dc_consultant_travel: number | null;
+  dc_direct_material: number | null;
+  dc_direct_odc: number | null;
+  ind_oh_offsite: number | null;
+  ind_oh_onsite: number | null;
+  ind_mhx: number | null;
+  ind_gna: number | null;
+  margin_pct: number | null;
+  gross_profit_pct: number | null;
+  source_doc_ids: number[];
+}
+
+export interface CostPoolProjectRow extends CostPoolFigures {
+  project_id: string | null;
+  project_name: string;
+  contract_number: string | null;
+  division: string | null;
+  /** the contract / vehicle / program label, e.g. "RS3 - STEP" */
+  contract_label: string | null;
+  /** "PRIME", or the prime's name when Envision is the sub */
+  prime_or_sub: string | null;
+  /** T&M / CPFF / FIXED PRICE */
+  proj_type: string | null;
+  org_id: string | null;
+  pop_start: string | null;
+  pop_end: string | null;
+  is_active: boolean | null;
+}
+
+export interface CostPoolPeriodPoint extends CostPoolFigures {
+  period: string;
+  month_num: number | null;
+}
+
+export interface CostPoolSummaryData {
+  rows: CostPoolProjectRow[];
+  totals: CostPoolFigures;
+  /** every ingested month, for the trend chart (independent of the period slice) */
+  by_period: CostPoolPeriodPoint[];
+  pools: {
+    direct: CostPoolField[];
+    indirect: CostPoolField[];
+  };
+  /** filter options, derived from the data so only stated values are offered */
+  filters: {
+    contract_labels: string[];
+    prime_or_subs: string[];
+    proj_types: string[];
+    divisions: string[];
+  };
+  available_periods: string[];
+  available_months: string[];
+  available_quarters: string[];
+  selected_period: string;
+  meta: {
+    table: string;
+    row_count: number;
+    project_count: number;
+    source: string;
+  };
+}
+
 /* ── Cost Service Centers (Financial Bible) ───────────────────── */
 
 export interface ServiceCenterRow {

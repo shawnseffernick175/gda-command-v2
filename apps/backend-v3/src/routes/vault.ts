@@ -203,6 +203,10 @@ export async function extractTextFromBuffer(buf: Buffer, filename: string): Prom
         const values = Array.isArray(row.values) ? row.values.slice(1) : [];
         const cells = values.map((v) => {
           if (v === null || v === undefined) return '';
+          // Date cells arrive as Date instances, which carry none of the shapes
+          // below; without this they extracted as empty and every date column in
+          // a workbook was silently lost.
+          if (v instanceof Date) return v.toISOString().slice(0, 10);
           if (typeof v === 'object') {
             const o = v as { text?: string; result?: unknown; richText?: { text: string }[] };
             if (typeof o.text === 'string') return o.text;

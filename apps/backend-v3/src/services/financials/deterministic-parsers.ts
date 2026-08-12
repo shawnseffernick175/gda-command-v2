@@ -1676,7 +1676,10 @@ export function parseRevenueSummaryByCostPool(
       const projectName =
         projNameIdx >= 0 && projNameIdx < cols.length ? (cols[projNameIdx] || '').trim() : '';
 
-      const revenue = parseNum(getCol(cols, colMap, 'revenue'));
+      // Revenue is headed "Pd <n> Revenue" in the current layout and plain
+      // "Revenue" in older ones. The period-qualified header is tried first so
+      // the substring fallback can never land on "ITD Revenue-ACT".
+      const revenue = parseNum(getCol(cols, colMap, `pd ${pdNum} revenue`, 'revenue'));
       const directCost = parseNum(getCol(cols, colMap, 'total direct cost'));
       const indirectCost = parseNum(getCol(cols, colMap, 'total indirect-act', 'total indirect'));
       const opIncome = parseNum(getCol(cols, colMap, 'op income-act', 'op income'));
@@ -1717,6 +1720,44 @@ export function parseRevenueSummaryByCostPool(
         return Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
       };
 
+      // Descriptive attributes are matched EXACTLY, never by substring: "Contract"
+      // is a distinct column from "Contract Value"/"Contract Number", and a
+      // substring match would read the wrong cell (or claim a column exists in an
+      // older layout that omits it).
+      const rawCell = (...keys: string[]): string | null => {
+        for (const key of keys) {
+          const idx = colMap.get(key.toLowerCase());
+          if (idx !== undefined && idx < cols.length) return (cols[idx] ?? '').trim();
+        }
+        return null;
+      };
+      const text = (...keys: string[]): string | null => {
+        const v = rawCell(...keys);
+        return v ? v : null;
+      };
+      /** ISO date from an extracted date cell (ISO or M/D/YYYY); null if unparseable. */
+      const date = (...keys: string[]): string | null => {
+        const v = rawCell(...keys);
+        if (!v) return null;
+        const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+        if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+        const us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(v);
+        if (us) {
+          const [, m, d, y] = us;
+          return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+        return null;
+      };
+      /** Y/N flag as stated in the book; null when absent or not a Y/N value. */
+      const bool = (...keys: string[]): boolean | null => {
+        const v = rawCell(...keys);
+        if (!v) return null;
+        const c = v.trim().toLowerCase();
+        if (c === 'y' || c === 'yes' || c === 'true') return true;
+        if (c === 'n' || c === 'no' || c === 'false') return false;
+        return null;
+      };
+
       const period = `FY${String(fiscalYear).slice(2)} ${MONTHS[pdNum - 1]}`;
 
       rows.push({
@@ -1734,7 +1775,10 @@ export function parseRevenueSummaryByCostPool(
         profit,
         margin_pct: marginPct,
         dc_dl_offsite: money('dl - co offsite', 'dl-co offsite'),
-        dc_dl_onsite: money('dl - co onsite', 'dl-co onsite'),
+        // The book heads onsite direct labor "DL - CL Onsite" (client-site) in
+        // its current layout and "DL - CO Onsite" in older ones; both are read
+        // so onsite labor is never silently dropped.
+        dc_dl_onsite: money('dl - cl onsite', 'dl-cl onsite', 'dl - co onsite', 'dl-co onsite'),
         dc_direct_travel: money('direct travel'),
         dc_subk_labor: money('subk labor'),
         dc_subk_travel: money('subk travel'),
@@ -1751,6 +1795,17 @@ export function parseRevenueSummaryByCostPool(
         gross_profit_pct: pct('gross profit %'),
         total_indirect_tgt: money('total indirect-tgt', 'total indirect tgt'),
         rate_variance: money('rate variance'),
+        division: text('division'),
+        contract_label: text('contract'),
+        prime_or_sub: text('prime or sub'),
+        proj_type: text('proj type'),
+        org_id: text('organization id'),
+        pop_start: date('start date'),
+        pop_end: date('end date'),
+        is_active: bool('active (y/n)', 'active'),
+        contract_value: money('contract value'),
+        total_funded: money('total funded'),
+        itd_revenue: money('itd revenue-act', 'itd revenue'),
       });
     }
   }

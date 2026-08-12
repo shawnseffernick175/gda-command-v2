@@ -20,6 +20,7 @@ import type {
   TrialBalanceData,
   ProjectRevenueData,
   ProjectIncomeStatementData,
+  CostPoolSummaryData,
   ServiceCentersData,
   IngestionCoverageData,
 } from "@/lib/types";
@@ -293,6 +294,42 @@ export function useProjectIncomeStatement(
         `/v3/financials/project-income-statement${qs ? `?${qs}` : ""}`,
       ),
     enabled,
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+// Revenue Summary by Cost Pool. `period` is "YTD", a quarter ("Q2") or a month
+// ("FY26 Jun"); the backend derives quarter/YTD by summing the official monthly
+// rows. `projects` are contract identities from the header Project selector,
+// pipe-joined so names containing commas stay intact. The attribute filters go
+// to the API too, so the KPIs, chart and table are aggregated from one scoped
+// row set instead of being re-filtered independently in the client.
+export function useCostPoolSummary(
+  period: string,
+  projects: string[],
+  attrs?: {
+    contract_label?: string;
+    prime_or_sub?: string;
+    proj_type?: string;
+    division?: string;
+  },
+) {
+  const params = new URLSearchParams();
+  if (period) params.set("period", period);
+  if (projects.length > 0) params.set("projects", projects.join("|"));
+  for (const key of ["contract_label", "prime_or_sub", "proj_type", "division"] as const) {
+    const value = attrs?.[key];
+    if (value) params.set(key, value);
+  }
+  const qs = params.toString();
+  return useQuery({
+    queryKey: ["financials", "cost-pool-summary", period, projects, attrs ?? null],
+    queryFn: () =>
+      apiGet<CostPoolSummaryData>(
+        `/v3/financials/cost-pool-summary${qs ? `?${qs}` : ""}`,
+      ),
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",

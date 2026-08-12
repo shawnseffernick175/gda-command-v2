@@ -23,6 +23,14 @@ import {
   aggregateProjectIncomeStatement,
   type ProjectCostPoolRow,
 } from '../lib/project-income-statement.js';
+import {
+  aggregateCostPoolRows,
+  buildCostPoolProjectRows,
+  buildCostPoolPeriodSeries,
+  DIRECT_POOL_FIELDS,
+  INDIRECT_POOL_FIELDS,
+  type CostPoolSourceRow,
+} from '../lib/cost-pool-summary.js';
 
 // Live, user-specific financials read from the DB on every request. They must
 // never be served from an HTTP cache (browser/proxy) or a 304 revalidation,
@@ -1184,6 +1192,217 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         table: 'project_revenue_actuals',
         project_count: columns.length,
         source: 'project cost-pool book (Full Proj Revenue Summary)',
+      },
+    }, req.requestId));
+  });
+
+  // GET /v3/financials/cost-pool-summary?period=YTD|Q2|FY26 Jun&projects=a|b
+  // Revenue Summary by Cost Pool (Financial Bible tab). Presents the official
+  // cost-pool book as Finance reads it: one row per contract for the selected
+  // period with every direct/indirect pool as its own column, the book's
+  // roll-ups (Total Direct, Gross Profit, Total Indirect ACT/TGT, Rate Variance,
+  // Op Income) and the per-row contract attributes the chart/filters group by.
+  // A monthly series over the whole year backs the trend view. Quarter and YTD
+  // are derived by summing the official monthly rows — never fabricated — and a
+  // pool the book did not state stays null so "not available" ≠ $0 (R1).
+  //
+  // Attribute filters (contract/vehicle, prime-vs-sub, contract type, division)
+  // are applied HERE rather than in the client so the KPIs, the chart and the
+  // table are all aggregated from the same scoped row set and cannot disagree.
+  // The offered filter options stay derived from the unscoped rows, so choosing
+  // one filter never makes the others disappear.
+  app.get('/v3/financials/cost-pool-summary', async (req, reply) => {
+    noStore(reply);
+    const qp = req.query as Record<string, string>;
+
+    const MONTH_ORDER: Record<string, number> = {
+      Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
+      Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+    };
+    const calQuarter = (mon: string): number => Math.ceil((MONTH_ORDER[mon] ?? 0) / 3);
+
+    // Selected contracts / task orders (pipe-separated: names may contain commas).
+    const projects = (qp.projects || '')
+      .split('|')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const params: unknown[] = [];
+    let projectClause = '';
+    if (projects.length > 0) {
+      params.push(projects);
+      projectClause = `AND (
+        project_name = ANY($1)
+        OR COALESCE(project_id, '') = ANY($1)
+        OR COALESCE(contract_number, '') = ANY($1)
+      )`;
+    }
+
+    // Every month the cost-pool book populated. The whole year is read once: the
+    // table view slices it to the selected period and the chart trends all of it.
+    const { rows: raw } = await pool.query(
+      `SELECT period, project_id, project_name, contract_number,
+              division, contract_label, prime_or_sub, proj_type, org_id,
+              pop_start, pop_end, is_active,
+              revenue, direct_cost, indirect_cost, cost, profit,
+              gross_profit, total_indirect_tgt, rate_variance,
+              dc_dl_offsite, dc_dl_onsite, dc_direct_travel,
+              dc_subk_labor, dc_subk_travel, dc_subk_material,
+              dc_consultant_labor, dc_consultant_travel,
+              dc_direct_material, dc_direct_odc,
+              ind_oh_offsite, ind_oh_onsite, ind_mhx, ind_gna,
+              itd_value, itd_funding, actual_itd_revenue,
+              source_doc_id
+         FROM project_revenue_actuals
+        WHERE source = 'proj_revenue'
+          AND period NOT LIKE '%Q%' AND period <> 'YTD'
+          ${projectClause}`,
+      params,
+    );
+
+    const num = (v: unknown): number | null =>
+      v === null || v === undefined ? null : Number(v);
+    const str = (v: unknown): string | null =>
+      v === null || v === undefined || v === '' ? null : String(v);
+    const isoDate = (v: unknown): string | null => {
+      if (v === null || v === undefined) return null;
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return String(v).slice(0, 10);
+    };
+
+    const allRows: CostPoolSourceRow[] = raw.map((r) => ({
+      period: r.period as string,
+      month_num: MONTH_ORDER[(r.period as string).slice(-3)] ?? null,
+      project_id: str(r.project_id),
+      project_name: (r.project_name as string) ?? '',
+      contract_number: str(r.contract_number),
+      division: str(r.division),
+      contract_label: str(r.contract_label),
+      prime_or_sub: str(r.prime_or_sub),
+      proj_type: str(r.proj_type),
+      org_id: str(r.org_id),
+      pop_start: isoDate(r.pop_start),
+      pop_end: isoDate(r.pop_end),
+      is_active: r.is_active === null || r.is_active === undefined ? null : Boolean(r.is_active),
+      revenue: num(r.revenue),
+      direct_cost: num(r.direct_cost),
+      indirect_cost: num(r.indirect_cost),
+      cost: num(r.cost),
+      profit: num(r.profit),
+      gross_profit: num(r.gross_profit),
+      total_indirect_tgt: num(r.total_indirect_tgt),
+      rate_variance: num(r.rate_variance),
+      dc_dl_offsite: num(r.dc_dl_offsite),
+      dc_dl_onsite: num(r.dc_dl_onsite),
+      dc_direct_travel: num(r.dc_direct_travel),
+      dc_subk_labor: num(r.dc_subk_labor),
+      dc_subk_travel: num(r.dc_subk_travel),
+      dc_subk_material: num(r.dc_subk_material),
+      dc_consultant_labor: num(r.dc_consultant_labor),
+      dc_consultant_travel: num(r.dc_consultant_travel),
+      dc_direct_material: num(r.dc_direct_material),
+      dc_direct_odc: num(r.dc_direct_odc),
+      ind_oh_offsite: num(r.ind_oh_offsite),
+      ind_oh_onsite: num(r.ind_oh_onsite),
+      ind_mhx: num(r.ind_mhx),
+      ind_gna: num(r.ind_gna),
+      contract_value: num(r.itd_value),
+      total_funded: num(r.itd_funding),
+      itd_revenue: num(r.actual_itd_revenue),
+      source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+    }));
+
+    // Options come from the data itself, so the UI can only offer values the
+    // book actually states — computed BEFORE the attribute filters are applied.
+    const optionsFor = (
+      key: 'contract_label' | 'prime_or_sub' | 'proj_type' | 'division',
+    ): string[] =>
+      [...new Set(allRows.map((r) => r[key]).filter((v): v is string => !!v))].sort();
+
+    const attrFilter = (key: 'contract_label' | 'prime_or_sub' | 'proj_type' | 'division') => {
+      const wanted = (qp[key] || '')
+        .split('|')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return wanted.length > 0 ? new Set(wanted) : null;
+    };
+    const wantedLabels = attrFilter('contract_label');
+    const wantedRoles = attrFilter('prime_or_sub');
+    const wantedTypes = attrFilter('proj_type');
+    const wantedDivisions = attrFilter('division');
+
+    // A row whose attribute the book left blank cannot be claimed to match a
+    // requested value, so it drops out of a filtered view rather than being
+    // silently counted in it.
+    const attrRows = allRows.filter(
+      (r) =>
+        (!wantedLabels || (r.contract_label !== null && wantedLabels.has(r.contract_label))) &&
+        (!wantedRoles || (r.prime_or_sub !== null && wantedRoles.has(r.prime_or_sub))) &&
+        (!wantedTypes || (r.proj_type !== null && wantedTypes.has(r.proj_type))) &&
+        (!wantedDivisions || (r.division !== null && wantedDivisions.has(r.division))),
+    );
+
+    const rawPeriods = [...new Set(allRows.map((r) => r.period))].sort(
+      (a, b) => (MONTH_ORDER[a.slice(-3)] ?? 99) - (MONTH_ORDER[b.slice(-3)] ?? 99),
+    );
+    const availableQuarters = [
+      ...new Set(rawPeriods.map((p) => calQuarter(p.slice(-3))).filter((q) => q >= 1)),
+    ]
+      .sort((a, b) => a - b)
+      .map((q) => `Q${q}`);
+
+    // Resolve the requested period to the month set it spans.
+    const requested = (qp.period || '').trim();
+    const qMatch = /^Q([1-4])$/i.exec(requested);
+    let effectivePeriod = 'YTD';
+    let monthPeriods = rawPeriods;
+    if (qMatch) {
+      const qn = Number(qMatch[1]);
+      const months = rawPeriods.filter((p) => calQuarter(p.slice(-3)) === qn);
+      if (months.length > 0) {
+        effectivePeriod = `Q${qn}`;
+        monthPeriods = months;
+      }
+    } else if (requested && requested.toUpperCase() !== 'YTD') {
+      const match = rawPeriods.find((p) => p.toUpperCase() === requested.toUpperCase());
+      if (match) {
+        effectivePeriod = match;
+        monthPeriods = [match];
+      }
+    }
+
+    const inScope = new Set(monthPeriods);
+    const scopedRows = attrRows.filter((r) => inScope.has(r.period));
+
+    const rows = buildCostPoolProjectRows(scopedRows);
+    const totals = aggregateCostPoolRows(scopedRows);
+    // The trend spans the whole ingested year (not just the selected period) so
+    // the chart shows the selected slice in context; it honors every filter.
+    const by_period = buildCostPoolPeriodSeries(attrRows);
+
+    return reply.send(successEnvelope({
+      rows,
+      totals,
+      by_period,
+      pools: {
+        direct: DIRECT_POOL_FIELDS,
+        indirect: INDIRECT_POOL_FIELDS,
+      },
+      filters: {
+        contract_labels: optionsFor('contract_label'),
+        prime_or_subs: optionsFor('prime_or_sub'),
+        proj_types: optionsFor('proj_type'),
+        divisions: optionsFor('division'),
+      },
+      available_periods: ['YTD', ...availableQuarters, ...rawPeriods],
+      available_months: rawPeriods,
+      available_quarters: availableQuarters,
+      selected_period: effectivePeriod,
+      meta: {
+        table: 'project_revenue_actuals',
+        row_count: scopedRows.length,
+        project_count: rows.length,
+        source: 'Revenue Summary by Cost Pool',
       },
     }, req.requestId));
   });

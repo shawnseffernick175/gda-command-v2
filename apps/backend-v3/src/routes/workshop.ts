@@ -213,6 +213,9 @@ async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<str
         const values = Array.isArray(row.values) ? row.values.slice(1) : [];
         const cells = values.map((v) => {
           if (v === null || v === undefined) return '';
+          // Date cells arrive as Date instances and match none of the shapes
+          // below, so without this they extract as empty.
+          if (v instanceof Date) return v.toISOString().slice(0, 10);
           if (typeof v === 'object') {
             const o = v as { text?: string; result?: unknown; richText?: { text: string }[] };
             if (typeof o.text === 'string') return o.text;

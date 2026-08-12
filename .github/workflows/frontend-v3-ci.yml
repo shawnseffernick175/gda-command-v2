@@ -211,7 +211,11 @@ jobs:
           # is NOT duplicated) so single-opportunity views are shareable/
           # bookmarkable; total lands at ~752KB. Small headroom so this route +
           # gzip cross-runner jitter don't flap at the ceiling.
-          MAX_MAIN_KB=755
+          # 755→760: Revenue-by-Cost-Pool Financial Bible tab adds one tab
+          # component (three chart modes + filters) reusing the shared ECharts
+          # setup, so nothing new is pulled in; total lands at ~756KB. Small
+          # headroom so this tab + gzip cross-runner jitter don't flap.
+          MAX_MAIN_KB=760
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 

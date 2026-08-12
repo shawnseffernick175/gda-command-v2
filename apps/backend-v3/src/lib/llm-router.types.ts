@@ -786,6 +786,31 @@ export interface ProjectCostPoolExtractOutput {
     /** Rate Variance = Total Indirect-ACT − Total Indirect-TGT (signed);
      *  negative = actual indirect underran target (favorable). */
     rate_variance?: number | null;
+    // Per-contract descriptive attributes. The book's current layout states these
+    // on every monthly sheet; older layouts omit them, in which case they are
+    // null ("not available") rather than an invented value.
+    /** "Division" (e.g. Envision) */
+    division?: string | null;
+    /** "Contract" — the contract/vehicle/program label, e.g. "RS3 - STEP" */
+    contract_label?: string | null;
+    /** "Prime or Sub" — "PRIME", or the prime's name when Envision is the sub */
+    prime_or_sub?: string | null;
+    /** "Proj Type" — T&M / CPFF / FIXED PRICE */
+    proj_type?: string | null;
+    /** "Organization ID" */
+    org_id?: string | null;
+    /** period of performance start, ISO date */
+    pop_start?: string | null;
+    /** period of performance end, ISO date */
+    pop_end?: string | null;
+    /** "Active (Y/N)" as stated in the book */
+    is_active?: boolean | null;
+    /** "Contract Value" */
+    contract_value?: number | null;
+    /** "Total Funded" */
+    total_funded?: number | null;
+    /** "ITD Revenue-ACT" — inception-to-date revenue */
+    itd_revenue?: number | null;
   }[];
   notes: string;
   model_used: string;
