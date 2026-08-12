@@ -90,6 +90,20 @@ const METRICS: { id: MetricKey; label: string }[] = [
   { id: "profit", label: "Operating Income" },
 ];
 
+// The trend chart already stacks direct and indirect cost as bars, so offering
+// either as the overlaid line would draw the same figure twice under a shared
+// legend entry (one legend click would hide both). The line only offers metrics
+// the stack does not already show.
+const STACKED_METRICS: ReadonlySet<MetricKey> = new Set([
+  "direct_cost",
+  "indirect_cost",
+]);
+const TREND_METRICS = METRICS.filter((m) => !STACKED_METRICS.has(m.id));
+
+function metricLabelOf(id: MetricKey): string {
+  return METRICS.find((m) => m.id === id)?.label ?? "Revenue";
+}
+
 type ViewMode = "Month" | "Quarter" | "YTD";
 const VIEW_MODES: ViewMode[] = ["Month", "Quarter", "YTD"];
 
@@ -207,6 +221,9 @@ export function CostPoolTab({
     ) as unknown as CostPoolProjectRow[];
   }, [rows, sortBy, sortDir]);
 
+  // Keeps the By-Contract selection intact when the user flips to the trend.
+  const trendMetric: MetricKey = STACKED_METRICS.has(metric) ? "revenue" : metric;
+
   const filtersActive =
     !!contractLabel || !!primeOrSub || !!projType || !!division;
   const anyFilterActive = filtersActive || projectFilter.length > 0;
@@ -271,11 +288,11 @@ export function CostPoolTab({
         itemStyle: { color: "var(--color-fin-chart-orange)" },
       },
       {
-        name: METRICS.find((m) => m.id === metric)?.label ?? "Revenue",
+        name: metricLabelOf(trendMetric),
         type: "line" as const,
         smooth: false,
         symbolSize: 6,
-        data: series.map((p) => p[metric]),
+        data: series.map((p) => p[trendMetric]),
         itemStyle: { color: "var(--color-fin-teal)" },
         lineStyle: { color: "var(--color-fin-teal)", width: 2 },
       },
@@ -342,7 +359,7 @@ export function CostPoolTab({
   };
 
   // By contract: the selected metric per contract, largest first.
-  const metricLabel = METRICS.find((m) => m.id === metric)?.label ?? "Revenue";
+  const metricLabel = metricLabelOf(metric);
   const contractEntries = rows
     .map((r) => ({ name: r.project_name, value: r[metric] }))
     .filter((e): e is { name: string; value: number } => e.value != null)
@@ -408,7 +425,7 @@ export function CostPoolTab({
 
   const chartCaption =
     chartMode === "trend"
-      ? `Monthly cost composition with ${metricLabel} — every ingested month`
+      ? `Monthly cost composition with ${metricLabelOf(trendMetric)} — every month the book states for this scope`
       : chartMode === "composition"
         ? `Cost pools — ${periodLabel(data?.selected_period ?? selectedPeriod)}`
         : `${metricLabel} by contract — ${periodLabel(data?.selected_period ?? selectedPeriod)}`;
@@ -512,11 +529,11 @@ export function CostPoolTab({
               </span>
               <select
                 aria-label="Metric"
-                value={metric}
+                value={chartMode === "trend" ? trendMetric : metric}
                 onChange={(e) => setMetric(e.target.value as MetricKey)}
                 className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground"
               >
-                {METRICS.map((m) => (
+                {(chartMode === "trend" ? TREND_METRICS : METRICS).map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
                   </option>
