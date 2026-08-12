@@ -5,6 +5,7 @@
  * Follows R1: every data point has a clickable source.
  */
 
+import type { PoolClient } from 'pg';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../../lib/queue.js';
@@ -125,6 +126,56 @@ export interface ExternalOpportunityRow {
 export type UpsertOutcome = 'inserted' | 'updated' | 'skipped';
 
 /**
+ * Point an existing opportunity at a newly issued notice id for the same
+ * solicitation, and report whether it did.
+ *
+ * SAM re-publishes a recurring solicitation — a "continuously open" on-ramp
+ * such as the OASIS+ pools, or an amended notice — under a brand new notice id
+ * while the solicitation number stays put. Keying idempotency on the notice id
+ * alone therefore inserted another opportunity on every re-post, so one
+ * solicitation accumulated a row per poll (six rows for OASIS+ 47QRCA23R0001-P2
+ * in eleven days) and the list showed the same pursuit repeatedly.
+ *
+ * A solicitation is identified by its number plus the issuing agency and notice
+ * type; matching on the number alone would collapse a presolicitation into the
+ * solicitation that follows it, and reused numbers across agencies into each
+ * other. Rewiring the row that already exists (rather than inserting and
+ * merging later) keeps the opportunity's id, so its stage, capture, analysis
+ * and vehicle links survive the re-post. Every notice keeps its own `sources`
+ * row and citations, so the superseded notices stay searchable (R1).
+ */
+async function rewireSupersededNotice(
+  client: PoolClient,
+  next: {
+    sam_notice_id: string;
+    solicitation_number: string | null;
+    agency: string | null;
+    opportunity_type?: string | null;
+  },
+): Promise<boolean> {
+  const solicitation = next.solicitation_number?.trim();
+  if (!solicitation) return false;
+
+  const { rowCount } = await client.query(
+    `UPDATE opportunities SET sam_notice_id = $1, updated_at = NOW()
+      WHERE id = (
+        SELECT id FROM opportunities
+         WHERE solicitation_number = $2
+           AND sam_notice_id IS DISTINCT FROM $1
+           AND deleted_at IS NULL
+           AND agency IS NOT DISTINCT FROM $3
+           AND opportunity_type IS NOT DISTINCT FROM $4
+         ORDER BY posted_at DESC NULLS LAST, id DESC
+         LIMIT 1
+      )
+      AND NOT EXISTS (SELECT 1 FROM opportunities WHERE sam_notice_id = $1)`,
+    [next.sam_notice_id, solicitation, next.agency, next.opportunity_type ?? null],
+  );
+
+  return (rowCount ?? 0) > 0;
+}
+
+/**
  * Upsert one opportunity + write per-field source citations.
  * Uses ON CONFLICT on sam_notice_id for idempotency.
  */
@@ -145,6 +196,19 @@ export async function upsertOpportunityWithSources(
     // skip every other side effect (no contacts, no analysis enqueue, no
     // unified mirror).
     const xReason = rejectReason(validated);
+
+    // A re-issued notice for a solicitation we already track updates that
+    // opportunity instead of adding another one.
+    const rewired = await rewireSupersededNotice(client, validated);
+    if (rewired) {
+      logger.info(
+        {
+          sam_notice_id: validated.sam_notice_id,
+          solicitation_number: validated.solicitation_number,
+        },
+        'opportunity_notice_superseded — reusing the existing solicitation row',
+      );
+    }
 
     const sourceUrl = citations[0]?.source_url ?? null;
     const { rows: sourceRows } = await client.query(
