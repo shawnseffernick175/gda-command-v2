@@ -425,7 +425,7 @@ export function CostPoolTab({
 
   const chartCaption =
     chartMode === "trend"
-      ? `Monthly cost composition with ${metricLabelOf(trendMetric)} — every ingested month`
+      ? `Monthly cost composition with ${metricLabelOf(trendMetric)} — every month the book states for this scope`
       : chartMode === "composition"
         ? `Cost pools — ${periodLabel(data?.selected_period ?? selectedPeriod)}`
         : `${metricLabel} by contract — ${periodLabel(data?.selected_period ?? selectedPeriod)}`;

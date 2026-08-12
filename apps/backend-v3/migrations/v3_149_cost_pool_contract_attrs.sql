@@ -1,10 +1,11 @@
 -- Per-contract descriptive attributes carried by the "Revenue Summary by Cost
--- Pool" book. The current layout of that book states, on every monthly sheet,
--- the contract/program label, prime-vs-sub posture, contract type, division, org
--- and period of performance for each row. Those attributes were dropped at
--- ingest, so the Financial Bible could show cost-pool dollars but could not
--- group or filter them the way Finance reads the book (by contract/vehicle,
--- prime vs sub, contract type).
+-- Pool" book: the contract/program label, prime-vs-sub posture, contract type,
+-- division, org and period of performance for each row. Which of these a given
+-- monthly sheet actually states varies by layout -- the JUN-26 book, for one,
+-- states only contract type, org and active-flag -- so each is stored only when
+-- the sheet states it. They were dropped at ingest entirely, so the Financial
+-- Bible could show cost-pool dollars but could not group or filter them the way
+-- Finance reads the book (by contract/vehicle, prime vs sub, contract type).
 --
 -- Columns are nullable with NO default so a row sourced from an older layout
 -- (which omits these columns) reads as "not available" (R1) rather than a
