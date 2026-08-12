@@ -581,7 +581,7 @@ export function CostPoolTab({
           No cost-pool rows for{" "}
           {periodLabel(data?.selected_period ?? selectedPeriod)}
           {anyFilterActive ? " with the selected filters" : ""}. Upload a
-          &ldquo;Revenue Summary by Cost Pool&rdquo; book to the Vault to
+          “Revenue Summary by Cost Pool” book to the Vault to
           populate this view.
         </p>
       ) : (
