@@ -1124,6 +1124,20 @@ export async function ingestProjectCostPoolRows(
           r.total_indirect_tgt ?? null, r.rate_variance ?? null,
         ];
 
+        // Per-contract descriptive attributes stated on each row of the book.
+        const attrs = [
+          r.division ?? null, r.contract_label ?? null, r.prime_or_sub ?? null,
+          r.proj_type ?? null, r.org_id ?? null,
+          r.pop_start ?? null, r.pop_end ?? null, r.is_active ?? null,
+        ];
+        // Contract value / funding / ITD revenue have canonical columns fed by the
+        // Full Proj Revenue Summary book. This book states them too, so they are
+        // written only where that book left them absent — one column per figure,
+        // with Full-Proj precedence preserved.
+        const itd = [
+          r.contract_value ?? null, r.total_funded ?? null, r.itd_revenue ?? null,
+        ];
+
         if (!costPoolOnly.has(r.period)) {
           const upd = await client.query(
             `UPDATE project_revenue_actuals SET
@@ -1138,14 +1152,25 @@ export async function ingestProjectCostPoolRows(
                dc_direct_material = $24, dc_direct_odc = $25,
                ind_oh_offsite = $26, ind_oh_onsite = $27, ind_mhx = $28, ind_gna = $29,
                gross_profit = $30, gross_profit_pct = $31,
-               total_indirect_tgt = $32, rate_variance = $33
+               total_indirect_tgt = $32, rate_variance = $33,
+               division = COALESCE($34, division),
+               contract_label = COALESCE($35, contract_label),
+               prime_or_sub = COALESCE($36, prime_or_sub),
+               proj_type = COALESCE($37, proj_type),
+               org_id = COALESCE($38, org_id),
+               pop_start = COALESCE($39, pop_start),
+               pop_end = COALESCE($40, pop_end),
+               is_active = COALESCE($41, is_active),
+               itd_value = COALESCE(NULLIF(itd_value, 0), $42),
+               itd_funding = COALESCE(NULLIF(itd_funding, 0), $43),
+               actual_itd_revenue = COALESCE(NULLIF(actual_itd_revenue, 0), $44)
              WHERE source = 'proj_revenue' AND period = $12 AND contract_number = $13`,
             [
               r.project_id, r.revenue, r.cost, margin,
               r.revenue, r.cost, r.profit,
               y.rev, y.cost, y.profit,
               sourceDocId ?? null, r.period, r.contract_number,
-              ...comp,
+              ...comp, ...attrs, ...itd,
             ],
           );
           if (upd.rowCount && upd.rowCount > 0) {
@@ -1167,10 +1192,15 @@ export async function ingestProjectCostPoolRows(
               dc_direct_material, dc_direct_odc,
               ind_oh_offsite, ind_oh_onsite, ind_mhx, ind_gna,
               gross_profit, gross_profit_pct, total_indirect_tgt, rate_variance,
+              division, contract_label, prime_or_sub, proj_type, org_id,
+              pop_start, pop_end, is_active,
+              itd_value, itd_funding, actual_itd_revenue,
               source, source_doc_id)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                    $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
                    $29, $30, $31, $32, $33, $34, $35, $36,
+                   $37, $38, $39, $40, $41, $42, $43, $44,
+                   $45, $46, $47,
                    'proj_revenue', $16)
            ON CONFLICT (source, period, project_name, (COALESCE(project_id, '')))
            DO UPDATE SET
@@ -1205,6 +1235,17 @@ export async function ingestProjectCostPoolRows(
              gross_profit_pct = EXCLUDED.gross_profit_pct,
              total_indirect_tgt = EXCLUDED.total_indirect_tgt,
              rate_variance = EXCLUDED.rate_variance,
+             division = COALESCE(EXCLUDED.division, project_revenue_actuals.division),
+             contract_label = COALESCE(EXCLUDED.contract_label, project_revenue_actuals.contract_label),
+             prime_or_sub = COALESCE(EXCLUDED.prime_or_sub, project_revenue_actuals.prime_or_sub),
+             proj_type = COALESCE(EXCLUDED.proj_type, project_revenue_actuals.proj_type),
+             org_id = COALESCE(EXCLUDED.org_id, project_revenue_actuals.org_id),
+             pop_start = COALESCE(EXCLUDED.pop_start, project_revenue_actuals.pop_start),
+             pop_end = COALESCE(EXCLUDED.pop_end, project_revenue_actuals.pop_end),
+             is_active = COALESCE(EXCLUDED.is_active, project_revenue_actuals.is_active),
+             itd_value = COALESCE(NULLIF(project_revenue_actuals.itd_value, 0), EXCLUDED.itd_value),
+             itd_funding = COALESCE(NULLIF(project_revenue_actuals.itd_funding, 0), EXCLUDED.itd_funding),
+             actual_itd_revenue = COALESCE(NULLIF(project_revenue_actuals.actual_itd_revenue, 0), EXCLUDED.actual_itd_revenue),
              source_doc_id = EXCLUDED.source_doc_id`,
           [
             r.period, r.fiscal_year, r.quarter, r.project_name, r.contract_number, r.project_id,
@@ -1212,7 +1253,7 @@ export async function ingestProjectCostPoolRows(
             r.revenue, r.cost, r.profit,
             y.rev, y.cost, y.profit,
             sourceDocId ?? null,
-            ...comp,
+            ...comp, ...attrs, ...itd,
           ],
         );
         localCount++;

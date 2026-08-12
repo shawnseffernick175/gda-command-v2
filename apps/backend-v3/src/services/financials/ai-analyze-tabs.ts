@@ -32,6 +32,7 @@ const TAB_LABELS: Record<string, string> = {
   execution: 'AOP Execution',
   waterfall: 'Contract Waterfall',
   'project-revenue': 'Project Revenue',
+  'cost-pool': 'Revenue by Cost Pool',
   'ingestion-coverage': 'Ingestion Coverage',
   definitions: 'Definitions',
   'financial-bible': 'Financial Bible (Pricing)',
@@ -94,6 +95,8 @@ export async function buildTabAnalysisInput(
       return finish(await buildWaterfall(base), tab, tab_label);
     case 'project-revenue':
       return finish(await buildProjectRevenue(base, opts?.period), tab, tab_label);
+    case 'cost-pool':
+      return finish(await buildCostPool(base), tab, tab_label);
     case 'ingestion-coverage':
       return finish(await buildIngestionCoverage(base), tab, tab_label);
     case 'financial-bible':
@@ -588,6 +591,99 @@ async function buildProjectRevenue(
       profit: Math.round(r.profit * 100) / 100,
       margin_pct: r.margin_pct != null ? Math.round(r.margin_pct * 100) / 100 : null,
     })),
+  };
+  return base;
+}
+
+// ── cost-pool (Revenue Summary by Cost Pool) ─────────────────────────────────
+// YTD cost-pool composition as the tab shows it: the official monthly rows summed
+// per pool, plus the contracts with the largest indirect rate variance — the
+// figures an executive actually asks about on this tab. A pool the book never
+// stated stays absent rather than being reported as $0 (R1).
+async function buildCostPool(base: FinancialAnalyzeInput): Promise<FinancialAnalyzeInput> {
+  const POOLS = [
+    'dc_dl_offsite', 'dc_dl_onsite', 'dc_direct_travel',
+    'dc_subk_labor', 'dc_subk_travel', 'dc_subk_material',
+    'dc_consultant_labor', 'dc_consultant_travel',
+    'dc_direct_material', 'dc_direct_odc',
+    'ind_oh_offsite', 'ind_oh_onsite', 'ind_mhx', 'ind_gna',
+  ] as const;
+
+  const { rows } = await pool.query(
+    `SELECT SUM(revenue) AS revenue, SUM(direct_cost) AS direct_cost,
+            SUM(gross_profit) AS gross_profit, SUM(indirect_cost) AS indirect_cost,
+            SUM(total_indirect_tgt) AS total_indirect_tgt,
+            SUM(rate_variance) AS rate_variance, SUM(profit) AS profit,
+            COUNT(*) AS row_count,
+            COUNT(DISTINCT contract_number) AS contract_count,
+            COUNT(DISTINCT period) AS period_count,
+            ${POOLS.map((p) => `SUM(${p}) AS ${p}`).join(', ')}
+       FROM project_revenue_actuals
+      WHERE source = 'proj_revenue' AND period NOT LIKE '%Q%' AND period <> 'YTD'`,
+  );
+  const agg = rows[0];
+  if (!agg || Number(agg.row_count ?? 0) === 0) {
+    base.tab_data = {
+      not_ingested:
+        'No cost-pool rows ingested yet. Source needed: the "Revenue Summary by Cost Pool" book.',
+    };
+    return base;
+  }
+
+  const money = (v: unknown): number | null =>
+    v === null || v === undefined ? null : Math.round(n(v) * 100) / 100;
+  const revenue = money(agg.revenue);
+
+  const pools: Record<string, number> = {};
+  for (const p of POOLS) {
+    const v = agg[p];
+    if (v !== null && v !== undefined) pools[p] = Math.round(n(v) * 100) / 100;
+  }
+
+  const { rows: variance } = await pool.query(
+    `SELECT contract_number, MIN(project_name) AS project_name,
+            MIN(contract_label) AS contract_label, MIN(proj_type) AS proj_type,
+            SUM(rate_variance) AS rate_variance, SUM(revenue) AS revenue
+       FROM project_revenue_actuals
+      WHERE source = 'proj_revenue' AND period NOT LIKE '%Q%' AND period <> 'YTD'
+        AND rate_variance IS NOT NULL
+      GROUP BY contract_number
+      ORDER BY ABS(SUM(rate_variance)) DESC
+      LIMIT $1`,
+    [ROW_CAP],
+  );
+
+  base.ytd_revenue = revenue;
+  base.ytd_profit = money(agg.profit);
+  base.margin =
+    revenue != null && revenue !== 0 && agg.profit != null
+      ? Math.round((n(agg.profit) / revenue) * 100 * 100) / 100
+      : null;
+
+  base.tab_data = {
+    selected_period: 'YTD',
+    period_note: 'YTD summed from the official monthly cost-pool sheets.',
+    row_count: Number(agg.row_count ?? 0),
+    contract_count: Number(agg.contract_count ?? 0),
+    period_count: Number(agg.period_count ?? 0),
+    revenue,
+    total_direct_cost: money(agg.direct_cost),
+    gross_profit: money(agg.gross_profit),
+    total_indirect_act: money(agg.indirect_cost),
+    total_indirect_tgt: money(agg.total_indirect_tgt),
+    // Signed: positive = actual indirect overran the provisional-rate target.
+    rate_variance: money(agg.rate_variance),
+    operating_income: money(agg.profit),
+    pools,
+    largest_rate_variance_contracts: variance.map((r) => ({
+      project_name: r.project_name as string,
+      contract_number: (r.contract_number as string) ?? null,
+      contract_label: (r.contract_label as string) ?? null,
+      proj_type: (r.proj_type as string) ?? null,
+      rate_variance: money(r.rate_variance),
+      revenue: money(r.revenue),
+    })),
+    source: 'project_revenue_actuals — Revenue Summary by Cost Pool',
   };
   return base;
 }

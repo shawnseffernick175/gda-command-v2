@@ -19,6 +19,7 @@ import type { CalendarMode } from "@/lib/types";
 export const PROJECT_FILTERABLE_TABS = [
   "p2",
   "project-revenue",
+  "cost-pool",
   "waterfall",
   "ar",
 ] as const;
@@ -243,6 +244,39 @@ function ProjectRevenueFilter({
   );
 }
 
+function CostPoolFilter({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  // Same book the cost-pool tab reads (`project_revenue_actuals`), keyed by
+  // project name; the full YTD set so the options don't change with the period.
+  const { data, isLoading } = useProjectRevenue("YTD");
+  const options = useMemo(
+    () =>
+      dedupeOptions(
+        (data?.items ?? []).map((r) => ({
+          value: r.project_name,
+          label: r.contract_number
+            ? `${r.project_name} (${r.contract_number})`
+            : r.project_name,
+        })),
+      ),
+    [data],
+  );
+  return (
+    <ProjectMultiSelect
+      options={options}
+      selected={selected}
+      onChange={onChange}
+      isLoading={isLoading}
+      note="Scopes the chart, cost pools and totals to the selected contracts."
+    />
+  );
+}
+
 function IncomeStatementFilter({
   selected,
   onChange,
@@ -357,6 +391,9 @@ export function ProjectFilter({
   }
   if (tab === "project-revenue") {
     return <ProjectRevenueFilter selected={selected} onChange={onChange} />;
+  }
+  if (tab === "cost-pool") {
+    return <CostPoolFilter selected={selected} onChange={onChange} />;
   }
   if (tab === "waterfall") {
     return <WaterfallFilter selected={selected} onChange={onChange} />;

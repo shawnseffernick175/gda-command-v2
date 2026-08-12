@@ -14,6 +14,7 @@ import { ApTab } from "@/components/financials/tabs/ApTab";
 import { ArTab } from "@/components/financials/tabs/ArTab";
 import { TrialBalanceTab } from "@/components/financials/tabs/TrialBalanceTab";
 import { ProjectRevenueTab } from "@/components/financials/tabs/ProjectRevenueTab";
+import { CostPoolTab } from "@/components/financials/tabs/CostPoolTab";
 import { ServiceCentersTab } from "@/components/financials/tabs/ServiceCentersTab";
 import { IngestionCoverageTab } from "@/components/financials/tabs/IngestionCoverageTab";
 import { FinancialBibleTab } from "@/components/financials/tabs/FinancialBibleTab";
@@ -33,6 +34,7 @@ type Tab =
   | "trial-balance"
   | "indirect-expenses"
   | "project-revenue"
+  | "cost-pool"
   | "cost-service-centers"
   | "ingestion-coverage"
   | "definitions"
@@ -73,6 +75,7 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { id: "waterfall", label: "Contract Waterfall" },
       { id: "project-revenue", label: "Project Revenue" },
+      { id: "cost-pool", label: "Revenue by Cost Pool" },
     ],
   },
   {
@@ -133,6 +136,8 @@ function tabTitle(tab: Tab): string {
       return "Trial Balance";
     case "project-revenue":
       return "Project Revenue";
+    case "cost-pool":
+      return "Revenue Summary by Cost Pool";
     case "cost-service-centers":
       return "Cost Service Centers";
     case "indirect-expenses":
@@ -309,6 +314,9 @@ export default function FinancialsPage() {
         {activeTab === "trial-balance" && <TrialBalanceTab />}
         {activeTab === "project-revenue" && (
           <ProjectRevenueTab projectFilter={projectSel["project-revenue"] ?? []} />
+        )}
+        {activeTab === "cost-pool" && (
+          <CostPoolTab projectFilter={projectSel["cost-pool"] ?? []} />
         )}
         {activeTab === "cost-service-centers" && <ServiceCentersTab />}
         {activeTab === "indirect-expenses" && <IndirectExpensePanel />}
