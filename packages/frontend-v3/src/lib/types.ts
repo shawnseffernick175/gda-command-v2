@@ -1657,13 +1657,14 @@ export interface P2FinancialsData {
     ytd_revenue: number;
     ytd_expenses: number;
     ytd_profit: number;
-    ytd_margin: number;
+    /** Revenue-weighted across the elapsed quarters; null when revenue is zero. */
+    ytd_margin: number | null;
     period: string;
   } | null;
   plan: {
     plan_sales: number;
     plan_ebit: number;
-    plan_gross_margin: number;
+    plan_gross_margin: number | null;
   } | null;
   income_statement: {
     months: IncomeStatementLineItem[];
