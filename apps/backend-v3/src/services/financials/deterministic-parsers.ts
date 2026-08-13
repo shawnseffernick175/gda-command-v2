@@ -2129,6 +2129,34 @@ export function canonicalDirectCostElement(raw: string): string | null {
   return null;
 }
 
+// The canonical Operating-Expense (indirect) pools. These MUST match the
+// frontend P2FinancialsTab indirect detailKeys exactly (case-insensitive) or the
+// Income Statement renders "—" for the line.
+export const CANONICAL_INDIRECT_POOLS = ['Fringe', 'Overhead', 'SMH', 'G&A'] as const;
+
+/**
+ * Collapse a raw indirect pool label (the Cost of Operations subsection header
+ * on the statement, or a Cost Service Center pool name) to one of the canonical
+ * operating-expense pools. Returns null for subtotals and for labels that are
+ * not an operating-expense pool, so the caller can leave them out of the
+ * statement's indirect breakdown.
+ *
+ * WHY: the trended statement labels the pools "Fringe Benefits" / "Overhead" /
+ * "G&A" and the SIE trend labels them "Fringe" / "OH Offsite" / "SMH"; matching
+ * those raw strings against the frontend keys left Fringe Benefits — over half
+ * of Total Operating Expenses — rendering as "—".
+ */
+export function canonicalIndirectPool(raw: string): string | null {
+  const s = (raw || '').trim().toLowerCase();
+  if (!s) return null;
+  if (/^total\b/.test(s)) return null;
+  if (/fringe/.test(s)) return 'Fringe';
+  if (/\bg\s*&\s*a\b|\bgna\b|general\s*(and|&)\s*admin/.test(s)) return 'G&A';
+  if (/\bsmh\b|s\s*,?\s*m\s*&\s*h|selling|marketing|material\s*handling/.test(s)) return 'SMH';
+  if (/overhead|\boh\b/.test(s)) return 'Overhead';
+  return null;
+}
+
 /**
  * Collapse raw cost-detail rows (from any source doc) to the canonical, DIRECT-
  * only, deduplicated cost-of-revenue set: one row per (period, canonical line).
