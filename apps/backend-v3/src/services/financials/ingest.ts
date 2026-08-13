@@ -33,7 +33,7 @@
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { aggregateDirectCostRows } from './deterministic-parsers.js';
-import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput, ApExtractOutput, ArExtractOutput, TrialBalanceExtractOutput, ProjectRevenueExtractOutput, ProjectCostPoolExtractOutput, ServiceCenterExtractOutput, PoolRateExtractOutput } from '../../lib/llm-router.types.js';
+import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput, ApExtractOutput, ArExtractOutput, TrialBalanceExtractOutput, ProjectRevenueExtractOutput, ProjectCostPoolExtractOutput, ServiceCenterExtractOutput, PoolRateExtractOutput, WageDistributionExtractOutput } from '../../lib/llm-router.types.js';
 
 type FinancialRow = FinancialStatementExtractOutput['rows'][number];
 
@@ -710,6 +710,79 @@ export async function ingestPoolRateRows(
     } catch (err) {
       await client.query('ROLLBACK');
       logger.warn({ err, fy }, 'Pool-rate snapshot ingest failed; rolled back to prior snapshot');
+    } finally {
+      client.release();
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Wage Distribution ingest — payroll Wages book, per employee per cost pool.
+// ---------------------------------------------------------------------------
+
+type WageDistributionRow = WageDistributionExtractOutput['rows'][number];
+
+/**
+ * Snapshot-replace wage ingest, keyed per (fiscal year, period). Payroll issues
+ * one book per fiscal period, and a period is occasionally re-issued after a
+ * payroll correction — so a re-ingest purges that period's rows and re-inserts
+ * the freshly-parsed set in one transaction. Replacing per PERIOD (not per
+ * fiscal year, as the GL snapshot does) is what lets each month's book be
+ * ingested independently without wiping the months already loaded.
+ */
+export async function ingestWageDistributionRows(
+  rows: WageDistributionRow[],
+  sourceDocId?: number | null,
+  source = 'payroll_wages',
+): Promise<number> {
+  const valid = rows.filter((r) => r.period && r.fiscal_year && r.month_num && r.employee_id);
+  if (valid.length === 0) return 0;
+
+  const byPeriod = new Map<string, WageDistributionRow[]>();
+  for (const r of valid) {
+    const key = `${r.fiscal_year}|||${r.month_num}`;
+    const list = byPeriod.get(key);
+    if (list) list.push(r);
+    else byPeriod.set(key, [r]);
+  }
+
+  let count = 0;
+  for (const group of byPeriod.values()) {
+    const { fiscal_year: fy, month_num: pd } = group[0];
+    const client = await pool.connect();
+    // Only fold into the returned total AFTER COMMIT (see ingestServiceCenterRows).
+    let seq = 0;
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM wage_distribution_actuals
+          WHERE source = $1 AND fiscal_year = $2 AND month_num = $3`,
+        [source, fy, pd],
+      );
+      for (const row of group) {
+        await client.query(
+          `INSERT INTO wage_distribution_actuals
+             (period, fiscal_year, quarter, month_num, employee_id, employee_name,
+              direct_co, direct_cl, fringe_excl_vhps, ind_oh, ind_mhx, ind_ga,
+              vhps, ucot, unallow_unbill, total_wages, source, source_doc_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+          [
+            row.period, row.fiscal_year, row.quarter, row.month_num,
+            row.employee_id, row.employee_name,
+            row.direct_co, row.direct_cl, row.fringe_excl_vhps,
+            row.ind_oh, row.ind_mhx, row.ind_ga,
+            row.vhps, row.ucot, row.unallow_unbill, row.total_wages,
+            source, sourceDocId ?? null,
+          ],
+        );
+        seq++;
+      }
+      await client.query('COMMIT');
+      count += seq;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.warn({ err, fy, pd }, 'Wage-distribution snapshot ingest failed; rolled back to prior snapshot');
     } finally {
       client.release();
     }

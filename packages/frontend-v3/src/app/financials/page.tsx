@@ -16,6 +16,7 @@ import { TrialBalanceTab } from "@/components/financials/tabs/TrialBalanceTab";
 import { ProjectRevenueTab } from "@/components/financials/tabs/ProjectRevenueTab";
 import { CostPoolTab } from "@/components/financials/tabs/CostPoolTab";
 import { ServiceCentersTab } from "@/components/financials/tabs/ServiceCentersTab";
+import { LaborDistributionTab } from "@/components/financials/tabs/LaborDistributionTab";
 import { IngestionCoverageTab } from "@/components/financials/tabs/IngestionCoverageTab";
 import { FinancialBibleTab } from "@/components/financials/tabs/FinancialBibleTab";
 import { ProjectFilter } from "@/components/financials/ProjectFilter";
@@ -36,6 +37,7 @@ type Tab =
   | "project-revenue"
   | "cost-pool"
   | "cost-service-centers"
+  | "labor-distribution"
   | "ingestion-coverage"
   | "definitions"
   | "financial-bible";
@@ -53,6 +55,7 @@ const TAB_GROUPS: TabGroup[] = [
       { id: "balance-sheet", label: "Balance Sheet" },
       { id: "trial-balance", label: "Trial Balance" },
       { id: "cost-service-centers", label: "Cost Service Centers" },
+      { id: "labor-distribution", label: "Labor Distribution" },
       { id: "indirect-expenses", label: "Indirect Expenses" },
     ],
   },
@@ -140,6 +143,8 @@ function tabTitle(tab: Tab): string {
       return "Revenue Summary by Cost Pool";
     case "cost-service-centers":
       return "Cost Service Centers";
+    case "labor-distribution":
+      return "Labor Distribution";
     case "indirect-expenses":
       return "Indirect Expenses";
     case "ingestion-coverage":
@@ -319,6 +324,7 @@ export default function FinancialsPage() {
           <CostPoolTab projectFilter={projectSel["cost-pool"] ?? []} />
         )}
         {activeTab === "cost-service-centers" && <ServiceCentersTab />}
+        {activeTab === "labor-distribution" && <LaborDistributionTab />}
         {activeTab === "indirect-expenses" && <IndirectExpensePanel />}
         {activeTab === "ingestion-coverage" && <IngestionCoverageTab />}
         {activeTab === "definitions" && <DefinitionsTab />}

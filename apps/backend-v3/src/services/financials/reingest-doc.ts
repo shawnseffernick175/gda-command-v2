@@ -31,6 +31,7 @@ import {
   ingestProjectCostPoolRows,
   ingestServiceCenterRows,
   ingestPoolRateRows,
+  ingestWageDistributionRows,
   assessAgingBatch,
 } from './ingest.js';
 import {
@@ -44,6 +45,7 @@ import {
   parseTrendedStatement,
   parseServiceCenterGlDetail,
   parsePoolRateSummary,
+  parseWageDistribution,
   sanitizeExtractedText,
 } from './deterministic-parsers.js';
 
@@ -80,6 +82,12 @@ export interface FinancialDocClassification {
   is_gl_service_center: boolean;
   /** L2/L1 ACTUAL & TARGET company P&L (DataSetLandTbl "Period Cost/Prof/Rev"). */
   is_project_actuals_targets: boolean;
+  /**
+   * Payroll's monthly wage distribution book ("<MON>-<YY> Wages.xlsx") — the
+   * LABOR side of the same books, per employee per cost pool. Deterministic-only
+   * (parseWageDistribution); suppresses the generic P&L parser.
+   */
+  is_wage_distribution: boolean;
   /**
    * Trended Income Statement / Trended Balance Sheet — recognized by the
    * structural fingerprint (an "Account Name | Jan | Feb | ..." month grid with
@@ -209,6 +217,13 @@ export function classifyFinancialDoc(
     /gl.?detail|ytd.?gl/i.test(fn) ||
     /proj classification/.test(headNorm);
 
+  // Payroll's wage distribution book. Recognised by a wage/payroll filename OR
+  // by its own header signature (FY + PD + the Total Wages column), so a renamed
+  // export still routes. Employee-level labor dollars, never a P&L.
+  const is_wage_distribution =
+    /wage|payroll|labor.?distribution/i.test(fn) ||
+    (/\bfy\b/.test(headNorm) && /\bpd\b/.test(headNorm) && /total wages/.test(headNorm));
+
   // Trended Income Statement structural fingerprint (content, not filename): an
   // "Account Name | Jan | Feb | Mar | ..." month grid together with the Total
   // Direct Costs / Total Cost of Operations F/S subtotals. Scanned over a wide
@@ -245,6 +260,7 @@ export function classifyFinancialDoc(
     is_project_cost_pool ||
     is_gl_service_center ||
     is_project_actuals_targets ||
+    is_wage_distribution ||
     is_income_statement;
 
   // Generic P&L / KPI parser. The keyword set is intentionally broad (it must
@@ -267,6 +283,7 @@ export function classifyFinancialDoc(
     is_project_cost_pool,
     is_gl_service_center,
     is_project_actuals_targets,
+    is_wage_distribution,
     is_income_statement,
   };
 }
@@ -285,6 +302,7 @@ export interface ReingestResult {
   project_cost_pool: number;
   service_center: number;
   pool_rate: number;
+  wage_distribution: number;
   income_statement: number;
   parsers_run: string[];
   parsers_skipped: string[];
@@ -326,6 +344,7 @@ export async function reingestFinancialDoc(params: {
     project_cost_pool: 0,
     service_center: 0,
     pool_rate: 0,
+    wage_distribution: 0,
     income_statement: 0,
     parsers_run: [],
     parsers_skipped: [],
@@ -488,6 +507,26 @@ export async function reingestFinancialDoc(params: {
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: service-center parser failed');
+    }
+  }
+
+  // --- Parser 3c: Wage Distribution (payroll Wages book, LABOR side) ---
+  // One row per employee per fiscal period, wages split across the pools the
+  // hours were charged to (wage_distribution_actuals). Deterministic-only: the
+  // book is a structured grid, so there is no LLM fallback. Snapshot-replaces
+  // each (fiscal year, period) it carries, so a re-ingest self-cleans.
+  if (cls.is_wage_distribution && !skipParsers.includes('wage_distribution_extract')) {
+    try {
+      const detWage = parseWageDistribution(extractedText, filename);
+      if (detWage && detWage.rows.length > 0) {
+        result.parsers_run.push('wage_distribution_extract (deterministic)');
+        result.wage_distribution = await ingestWageDistributionRows(detWage.rows, docId);
+        if (result.wage_distribution > 0) result.any_ingested = true;
+      } else {
+        result.parse_warnings.push('wage_distribution_extract: 0 employee rows (not a payroll Wages book, or no FY/PD grid)');
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: wage distribution parser failed');
     }
   }
 
@@ -805,6 +844,7 @@ export function computeVerdict(r: ReingestResult): VerdictResult {
     if (r.project_cost_pool > 0) parts.push(`project_cost_pool=${r.project_cost_pool}`);
     if (r.service_center > 0) parts.push(`service_center=${r.service_center}`);
     if (r.pool_rate > 0) parts.push(`pool_rate=${r.pool_rate}`);
+    if (r.wage_distribution > 0) parts.push(`wage_distribution=${r.wage_distribution}`);
     return { verdict: 'INGESTED', detail: parts.join(', ') || 'rows ingested' };
   }
   const handlerAttempted = r.parsers_run.length > 0 || r.parse_warnings.length > 0;

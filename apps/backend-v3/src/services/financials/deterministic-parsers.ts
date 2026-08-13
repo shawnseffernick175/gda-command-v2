@@ -22,6 +22,7 @@ import type { ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js'
 import type { ProjectCostPoolExtractOutput } from '../../lib/llm-router.types.js';
 import type { ServiceCenterExtractOutput } from '../../lib/llm-router.types.js';
 import type { PoolRateExtractOutput } from '../../lib/llm-router.types.js';
+import type { WageDistributionExtractOutput } from '../../lib/llm-router.types.js';
 import type { FinancialStatementExtractOutput } from '../../lib/llm-router.types.js';
 import type { BalanceSheetExtractOutput } from '../../lib/llm-router.types.js';
 
@@ -1598,6 +1599,178 @@ export function parseServiceCenterGlDetail(
     is_service_center: true,
     rows,
     notes: `Deterministic parser: extracted ${rows.length} service-center cost rows across ${periodsSeen} period(s) from ${filename}`,
+    model_used: 'deterministic',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Parser: Wage Distribution — payroll's "<MON>-<YY> Wages" book (LABOR side).
+// One sheet per fiscal period ("Period 7"), one row per employee, wages split
+// across the pools the hours were charged to. Every sheet in the book is parsed,
+// so a multi-period workbook lands all its periods in one pass. FY/PD come from
+// the row itself (the book states them per row), so the filename only matters
+// for classification. The trailing "Overall - Total" row is skipped — subtotals
+// are recomputed from employee rows so a stale total can never inflate the tab.
+// ---------------------------------------------------------------------------
+
+const WAGE_HEADER_SIGNATURE = ['fy', 'pd', 'id', 'name', 'total wages'];
+
+/** Normalize a wage header cell to a lookup key: lowercase, alphanumerics only. */
+function wageHeaderKey(s: string): string {
+  return cleanHeaderText(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Source header cell -> column. Keys are wageHeaderKey()-normalized, so
+// "IND-G&A" -> "indga" and "Fringe excl VHPS" -> "fringeexclvhps". Matching is
+// exact (never substring) because several headers nest inside each other:
+// "vhps" is a suffix of "fringeexclvhps", and a substring match would silently
+// read the fringe column as leave.
+const WAGE_COLUMNS: { field: WageField; keys: string[] }[] = [
+  { field: 'direct_co', keys: ['directco'] },
+  { field: 'direct_cl', keys: ['directcl'] },
+  { field: 'fringe_excl_vhps', keys: ['fringeexclvhps', 'fringeexcludingvhps', 'fringe'] },
+  { field: 'ind_oh', keys: ['indoh', 'indirectoh', 'overhead'] },
+  { field: 'ind_mhx', keys: ['indmhx', 'indirectmhx', 'mhx'] },
+  { field: 'ind_ga', keys: ['indga', 'indirectga', 'ga'] },
+  { field: 'vhps', keys: ['vhps'] },
+  { field: 'ucot', keys: ['ucot'] },
+  { field: 'unallow_unbill', keys: ['unalloworunbill', 'unallowunbill', 'unallowable'] },
+  { field: 'total_wages', keys: ['totalwages'] },
+];
+
+type WageField =
+  | 'direct_co' | 'direct_cl' | 'fringe_excl_vhps' | 'ind_oh' | 'ind_mhx'
+  | 'ind_ga' | 'vhps' | 'ucot' | 'unallow_unbill' | 'total_wages';
+
+const WAGE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function parseWageDistribution(
+  extractedText: string,
+  filename: string,
+): WageDistributionExtractOutput | null {
+  const sheetNames = getAllSheetNames(extractedText);
+  const blocks: string[][] = [];
+  if (sheetNames.length === 0) {
+    const lines = extractedText.split('\n').filter((l) => l.trim().length > 0);
+    if (lines.length > 0) blocks.push(lines);
+  } else {
+    for (const name of sheetNames) {
+      const lines = getSheetLines(extractedText, name);
+      if (lines && lines.length >= 2) blocks.push(lines);
+    }
+  }
+  if (blocks.length === 0) return null;
+
+  const fallbackFy = inferPeriod(filename)?.fiscal_year ?? null;
+  // Keyed by (fy, pd, employee), and a repeated key ACCUMULATES rather than
+  // replaces: payroll legitimately states an employee twice in one period when
+  // their name changed mid-period (e.g. APR-26 pays 000407 as both "Huntley,
+  // Veronica P" and "Parker, Veronica P"). Keeping only the last row would drop
+  // real wages and the tab would fall short of the book's stated total.
+  const byKey = new Map<string, WageDistributionExtractOutput['rows'][number]>();
+
+  for (const lines of blocks) {
+    const headerIdx = findHeaderRow(lines, WAGE_HEADER_SIGNATURE);
+    if (headerIdx === -1) continue;
+
+    const headerCols = splitRow(lines[headerIdx]);
+    const headerKeys = headerCols.map(wageHeaderKey);
+    if (!headerKeys.includes('totalwages')) continue;
+
+    const fyIdx = headerKeys.indexOf('fy');
+    const pdIdx = headerKeys.indexOf('pd');
+    const idIdx = headerKeys.indexOf('id');
+    const nameIdx = headerKeys.indexOf('name');
+    if (fyIdx === -1 || pdIdx === -1 || idIdx === -1) continue;
+
+    // The Name cell carries a comma ("Doe, Jane"), which splits the row on a
+    // comma-delimited export. Every money column sits to the right of Name, so
+    // address them by distance from the END of the row — stable in both the
+    // pipe-delimited and comma-delimited extractions.
+    const fromEnd = new Map<WageField, number>();
+    for (const { field, keys } of WAGE_COLUMNS) {
+      const idx = headerKeys.findIndex((k) => keys.includes(k));
+      if (idx === -1) continue;
+      fromEnd.set(field, headerCols.length - 1 - idx);
+    }
+    if (!fromEnd.has('total_wages')) continue;
+    const moneyCols = headerCols.length - 1 - Math.max(nameIdx, idIdx);
+
+    for (let i = headerIdx + 1; i < lines.length; i++) {
+      const cols = splitRow(lines[i]);
+      if (cols.length < 4) continue;
+
+      const fyRaw = (cols[fyIdx] || '').trim();
+      const pdNum = parseInt((cols[pdIdx] || '').trim(), 10);
+      // Skips the "Overall - Total" footer and any banner/blank row: neither
+      // states a 4-digit FY plus a 1..12 period.
+      if (!/^\d{4}$/.test(fyRaw)) continue;
+      if (isNaN(pdNum) || pdNum < 1 || pdNum > 12) continue;
+
+      const employeeId = (cols[idIdx] || '').trim();
+      if (!employeeId) continue;
+
+      const read = (field: WageField): number => {
+        const off = fromEnd.get(field);
+        if (off === undefined) return 0;
+        const idx = cols.length - 1 - off;
+        return idx >= 0 && idx < cols.length ? parseNum(cols[idx]) : 0;
+      };
+
+      // Name may itself have been split into several cells; rejoin everything
+      // between Name and the first money column.
+      const name =
+        nameIdx === -1
+          ? ''
+          : cols
+              .slice(nameIdx, Math.max(nameIdx, cols.length - moneyCols))
+              .join(', ')
+              .replace(/\s+/g, ' ')
+              .trim();
+
+      const fyNum = parseInt(fyRaw, 10) || fallbackFy;
+      if (!fyNum) continue;
+
+      const row = {
+        period: `FY${String(fyNum).slice(2)} ${WAGE_MONTHS[pdNum - 1]}`,
+        fiscal_year: fyNum,
+        quarter: Math.ceil(pdNum / 3),
+        month_num: pdNum,
+        employee_id: employeeId,
+        employee_name: name || null,
+        direct_co: read('direct_co'),
+        direct_cl: read('direct_cl'),
+        fringe_excl_vhps: read('fringe_excl_vhps'),
+        ind_oh: read('ind_oh'),
+        ind_mhx: read('ind_mhx'),
+        ind_ga: read('ind_ga'),
+        vhps: read('vhps'),
+        ucot: read('ucot'),
+        unallow_unbill: read('unallow_unbill'),
+        total_wages: read('total_wages'),
+      };
+      const key = `${fyNum}|||${pdNum}|||${employeeId}`;
+      const prior = byKey.get(key);
+      if (!prior) {
+        byKey.set(key, row);
+        continue;
+      }
+      for (const { field } of WAGE_COLUMNS) {
+        prior[field] = Math.round((prior[field] + row[field]) * 100) / 100;
+      }
+      // First name stated wins; the alternate spelling is the same employee.
+      prior.employee_name = prior.employee_name ?? row.employee_name;
+    }
+  }
+
+  const rows = [...byKey.values()];
+  if (rows.length === 0) return null;
+
+  const periodsSeen = new Set(rows.map((r) => r.period)).size;
+  return {
+    is_wage_distribution: true,
+    rows,
+    notes: `Deterministic parser: extracted ${rows.length} employee wage rows across ${periodsSeen} period(s) from ${filename}`,
     model_used: 'deterministic',
   };
 }

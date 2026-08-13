@@ -155,3 +155,4 @@ v3_146_project_revenue_identity.sql
 v3_147_project_cost_composition.sql
 v3_148_pipeline_items_archived_at.sql
 v3_149_cost_pool_contract_attrs.sql
+v3_150_wage_distribution_actuals.sql

@@ -1552,6 +1552,155 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }, req.requestId));
   });
 
+  // GET /v3/financials/labor-distribution?fy=2026
+  // Labor Distribution (Financial Bible). The LABOR side of the books: payroll's
+  // monthly Wages workbook, per employee, split across the cost pools the hours
+  // were charged to. Returns per-pool monthly + YTD subtotals and per-employee
+  // detail, all recomputed from the stored employee rows (the workbook's own
+  // "Overall - Total" row is never ingested, so a stale footer cannot inflate a
+  // figure). Every row is source-linked via source_doc_id (R1).
+  app.get('/v3/financials/labor-distribution', async (req, reply) => {
+    noStore(reply);
+    const qp = req.query as Record<string, string>;
+    const fyFilter = qp.fy ? parseInt(qp.fy, 10) : null;
+
+    const { rows: fyRows } = await pool.query(
+      `SELECT DISTINCT fiscal_year FROM wage_distribution_actuals ORDER BY fiscal_year DESC`,
+    );
+    const availableYears = fyRows.map((r) => Number(r.fiscal_year));
+    const fiscalYear = fyFilter ?? availableYears[0] ?? null;
+
+    // Wage pools, in the source workbook's column order. `kind` drives the
+    // roll-ups the tab shows (direct labor / indirect labor / leave / other) so
+    // the grouping lives with the column definition, not in the UI.
+    const CATEGORIES: { key: string; label: string; kind: 'direct' | 'indirect' | 'leave' | 'other' }[] = [
+      { key: 'direct_co', label: 'Direct-CO', kind: 'direct' },
+      { key: 'direct_cl', label: 'Direct-CL', kind: 'direct' },
+      { key: 'fringe_excl_vhps', label: 'Fringe excl VHPS', kind: 'indirect' },
+      { key: 'ind_oh', label: 'IND-OH', kind: 'indirect' },
+      { key: 'ind_mhx', label: 'IND-MHx', kind: 'indirect' },
+      { key: 'ind_ga', label: 'IND-G&A', kind: 'indirect' },
+      { key: 'vhps', label: 'V-H-P-S', kind: 'leave' },
+      { key: 'ucot', label: 'UCOT', kind: 'other' },
+      { key: 'unallow_unbill', label: 'UNALLOW or UNBILL', kind: 'other' },
+    ];
+
+    if (fiscalYear == null) {
+      return reply.send(successEnvelope({
+        fiscal_year: null,
+        available_years: [],
+        months: [],
+        categories: CATEGORIES.map((c) => ({ ...c, months: {}, ytd: 0 })),
+        employees: [],
+        meta: { table: 'wage_distribution_actuals', row_count: 0, employee_count: 0, sources: [] },
+      }, req.requestId));
+    }
+
+    const { rows } = await pool.query(
+      `SELECT employee_id, employee_name, month_num, quarter,
+              direct_co, direct_cl, fringe_excl_vhps, ind_oh, ind_mhx, ind_ga,
+              vhps, ucot, unallow_unbill, total_wages, source_doc_id
+       FROM wage_distribution_actuals
+       WHERE fiscal_year = $1
+       ORDER BY employee_name NULLS LAST, employee_id, month_num`,
+      [fiscalYear],
+    );
+
+    const monthsPresent = new Set<number>();
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+
+    type CategoryAgg = { key: string; label: string; kind: string; months: Record<number, number>; ytd: number };
+    const categories: CategoryAgg[] = CATEGORIES.map((c) => ({ ...c, months: {}, ytd: 0 }));
+
+    // Employee detail is kept per MONTH per pool (not just a fiscal-year total)
+    // so the tab's month/quarter scope narrows the pool columns exactly the same
+    // way it narrows the totals — a scoped view never mixes a YTD pool figure
+    // with a single-period total.
+    type EmployeeAgg = {
+      employee_id: string;
+      employee_name: string | null;
+      months: Record<number, number>;
+      by_category_month: Record<number, Record<string, number>>;
+      ytd: number;
+      source_doc_id: number | null;
+    };
+    const employeeMap = new Map<string, EmployeeAgg>();
+
+    for (const r of rows) {
+      const monthNum = Number(r.month_num);
+      monthsPresent.add(monthNum);
+      const employeeId = r.employee_id as string;
+
+      let emp = employeeMap.get(employeeId);
+      if (!emp) {
+        emp = {
+          employee_id: employeeId,
+          employee_name: (r.employee_name as string) ?? null,
+          months: {},
+          by_category_month: {},
+          ytd: 0,
+          source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+        };
+        employeeMap.set(employeeId, emp);
+      }
+
+      const totalWages = Number(r.total_wages);
+      emp.months[monthNum] = (emp.months[monthNum] ?? 0) + totalWages;
+      emp.ytd += totalWages;
+      const empMonth = emp.by_category_month[monthNum] ?? {};
+      emp.by_category_month[monthNum] = empMonth;
+
+      for (const cat of categories) {
+        const v = Number(r[cat.key]);
+        if (!Number.isFinite(v)) continue;
+        cat.months[monthNum] = (cat.months[monthNum] ?? 0) + v;
+        cat.ytd += v;
+        empMonth[cat.key] = round2((empMonth[cat.key] ?? 0) + v);
+      }
+    }
+
+    for (const cat of categories) {
+      cat.ytd = round2(cat.ytd);
+      for (const m of Object.keys(cat.months)) cat.months[Number(m)] = round2(cat.months[Number(m)]);
+    }
+    const employees = [...employeeMap.values()]
+      .map((e) => ({
+        ...e,
+        ytd: round2(e.ytd),
+        months: Object.fromEntries(Object.entries(e.months).map(([k, v]) => [k, round2(v)])),
+      }))
+      .sort((a, b) => b.ytd - a.ytd);
+
+    // Source docs behind these rows, newest first (R1: the tab names the books).
+    const { rows: srcDocs } = await pool.query(
+      `SELECT DISTINCT v.id AS vault_doc_id, v.filename, v.uploaded_at AS ingested_at
+       FROM wage_distribution_actuals w
+       JOIN vault_documents v ON v.id = w.source_doc_id
+       WHERE w.fiscal_year = $1 AND v.deleted_at IS NULL
+       ORDER BY v.uploaded_at DESC`,
+      [fiscalYear],
+    );
+
+    return reply.send(successEnvelope({
+      fiscal_year: fiscalYear,
+      available_years: availableYears,
+      months: [...monthsPresent].sort((a, b) => a - b),
+      categories,
+      employees,
+      meta: {
+        table: 'wage_distribution_actuals',
+        row_count: rows.length,
+        employee_count: employees.length,
+        sources: srcDocs.map((d) => ({
+          vault_doc_id: Number(d.vault_doc_id),
+          filename: d.filename as string,
+          ingested_at: d.ingested_at as string,
+          parser: 'wage_distribution_extract',
+        })),
+      },
+    }, req.requestId));
+  });
+
   // GET /v3/financials/ingestion-coverage
   // For each financial vault doc, show destination table + row count, or an
   // explicit, human-readable reason it did not ingest. Zero-touch requirement
@@ -1576,6 +1725,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       'ar_actuals',
       'trial_balance',
       'project_revenue_actuals',
+      'wage_distribution_actuals',
     ];
 
     // One grouped query per table (not one per doc) → destinations per doc_id.

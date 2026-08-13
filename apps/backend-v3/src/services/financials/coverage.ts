@@ -44,6 +44,7 @@ const SPECIALIZED_TYPES: Array<[keyof FinancialDocClassification, string]> = [
   ['is_ap', 'ap'],
   ['is_ar', 'ar'],
   ['is_project_actuals_targets', 'project_actuals_targets'],
+  ['is_wage_distribution', 'wage_distribution'],
   ['is_project_revenue', 'project_revenue'],
   ['is_cost_detail', 'cost_detail'],
 ];
