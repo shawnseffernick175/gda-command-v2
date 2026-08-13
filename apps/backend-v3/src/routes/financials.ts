@@ -11,7 +11,7 @@ import {
 import { parseCalendarMode, getMonthsForMode, fiscalMonthIndex, type CalendarMode } from '../lib/fiscal-calendar.js';
 import { rollUpFiscalYearToDate, fiscalYearToDateLabel } from '../lib/financial-ytd.js';
 import { classifyFinancialDoc } from '../services/financials/reingest-doc.js';
-import { CANONICAL_DIRECT_COST_LINES } from '../services/financials/deterministic-parsers.js';
+import { CANONICAL_DIRECT_COST_LINES, canonicalIndirectPool } from '../services/financials/deterministic-parsers.js';
 import {
   classifyCoverage,
   primaryTypeOf,
@@ -2896,15 +2896,19 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // Build indirect expense detail map: { period -> { pool -> amount } }
+    // Build indirect expense detail map: { period -> { pool -> amount } }.
+    // Raw pool labels vary by source doc ("Fringe Benefits" on the trended
+    // statement, "Fringe" / "OH Offsite" on the SIE trend), so they are folded to
+    // the canonical pools the statement renders; unmappable labels keep their raw
+    // label rather than being silently merged into a pool they do not belong to.
     const indirectByPeriod: Record<string, { label: string; amount: number }[]> = {};
     for (const r of indirectRows) {
       const period = r.period as string;
       if (!indirectByPeriod[period]) indirectByPeriod[period] = [];
-      indirectByPeriod[period].push({
-        label: r.pool as string,
-        amount: Number(r.amount),
-      });
+      const label = canonicalIndirectPool(r.pool as string) ?? (r.pool as string);
+      const existing = indirectByPeriod[period].find((i) => i.label === label);
+      if (existing) existing.amount += Number(r.amount);
+      else indirectByPeriod[period].push({ label, amount: Number(r.amount) });
     }
 
     return reply.send(successEnvelope({

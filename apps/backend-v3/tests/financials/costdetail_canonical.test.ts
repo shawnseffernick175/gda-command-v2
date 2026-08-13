@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   canonicalDirectCostElement,
+  canonicalIndirectPool,
   aggregateDirectCostRows,
   ownedCostDetailMonths,
   CANONICAL_DIRECT_COST_LINES,
@@ -52,6 +53,40 @@ describe('canonicalDirectCostElement — raw variant -> statement line', () => {
     expect(canonicalDirectCostElement('MSB Operating')).toBeNull();
     expect(canonicalDirectCostElement('Total Direct Costs')).toBeNull();
     expect(canonicalDirectCostElement('')).toBeNull();
+  });
+});
+
+describe('canonicalIndirectPool — raw pool label -> statement line', () => {
+  it('maps the statement and SIE pool labels to a frontend detailKey', () => {
+    expect(canonicalIndirectPool('Fringe Benefits')).toBe('Fringe');
+    expect(canonicalIndirectPool('Fringe')).toBe('Fringe');
+    expect(canonicalIndirectPool('Overhead')).toBe('Overhead');
+    expect(canonicalIndirectPool('OH Offsite')).toBe('Overhead');
+    expect(canonicalIndirectPool('G&A')).toBe('G&A');
+    expect(canonicalIndirectPool('General & Administrative')).toBe('G&A');
+    expect(canonicalIndirectPool('SMH')).toBe('SMH');
+    expect(canonicalIndirectPool('Selling, Marketing & Handling')).toBe('SMH');
+    expect(canonicalIndirectPool('Material Handling')).toBe('SMH');
+  });
+
+  it('reconciles: the FY26 Jan pools sum to Total Cost of Operations', () => {
+    // Cost of Operations block of the FY26 Jun Trended IS (Jan column).
+    const jan: Array<[string, number]> = [
+      ['Fringe Benefits', 262351.58],
+      ['Overhead', 71766.38],
+      ['G&A', 148157.89],
+    ];
+    const sum = jan.reduce(
+      (a, [label, amt]) => (canonicalIndirectPool(label) ? a + amt : a),
+      0,
+    );
+    expect(sum).toBeCloseTo(482275.85, 2);
+  });
+
+  it('drops subtotals and non-pool labels', () => {
+    expect(canonicalIndirectPool('Total Cost of Operations')).toBeNull();
+    expect(canonicalIndirectPool('Unclassified')).toBeNull();
+    expect(canonicalIndirectPool('')).toBeNull();
   });
 });
 
