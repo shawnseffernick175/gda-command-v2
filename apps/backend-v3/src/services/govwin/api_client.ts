@@ -121,6 +121,8 @@ export interface GovWinApiOpportunity {
   naics: string | null;
   setAside: string | null;
   incumbent: string | null;
+  /** Strength of the derived incumbency; null when no incumbent was found. */
+  incumbentConfidence?: 'high' | 'medium' | null;
   competitors: string[];
   valueMin: number | null;
   valueMax: number | null;
@@ -404,11 +406,27 @@ interface DeltekCompaniesResponse {
   content?: DeltekCompany[];
 }
 
+interface DeltekContractCompany {
+  id?: number | string;
+  name?: string;
+}
+
 interface DeltekContract {
-  /** Deltek exposes the incumbent flag as a Boolean String ("true"/"false"). */
+  /**
+   * Documented in the Deltek V3 spec but ABSENT from the tier we are entitled
+   * to (0 of 617 sampled prod payloads contain it), so incumbency is derived
+   * from award recency instead — see `resolveContractIncumbency`.
+   */
   incumbent?: boolean | string;
-  /** The awardee company lives on the nested `company` object ({id, name}). */
-  company?: { id?: string; name?: string };
+  /**
+   * The awardee. GovWin returns an ARRAY of {id,name} here (joint ventures list
+   * several); older docs describe a bare object, so both are tolerated.
+   */
+  company?: DeltekContractCompany[] | DeltekContractCompany;
+  /** ISO timestamp; contracts arrive sorted awardDate desc. */
+  awardDate?: string;
+  expirationDate?: string;
+  contractNumber?: string;
   // Tolerate legacy/flat shapes seen in earlier payloads.
   isIncumbent?: boolean;
   primeContractor?: string;
@@ -486,26 +504,84 @@ function isIncumbentCompany(c: DeltekCompany): boolean {
   return role.includes('incumbent');
 }
 
-/** The Contracts object carries the authoritative incumbent flag (Boolean String). */
-function isIncumbentContract(c: DeltekContract): boolean {
+/** An explicit incumbent flag, when the entitlement tier actually provides one. */
+function isFlaggedIncumbent(c: DeltekContract): boolean {
   if (typeof c.incumbent === 'boolean') return c.incumbent;
   if (typeof c.incumbent === 'string') return c.incumbent.trim().toLowerCase() === 'true';
   return c.isIncumbent === true;
 }
 
-/** Resolve the awardee company name from a contract (nested or flat shape). */
-function contractCompanyName(c: DeltekContract): string | null {
-  return (
-    (
-      c.company?.name ??
-      c.primeContractor ??
-      c.contractor ??
-      c.vendorName ??
-      c.awardee ??
-      c.companyName ??
-      ''
-    ).trim() || null
+/**
+ * Resolve every awardee name on a contract. `company` is an array in live
+ * payloads (a joint venture lists each member); a bare object and the older
+ * flat string fields are also accepted.
+ */
+function contractCompanyNames(c: DeltekContract): string[] {
+  const fromCompany = (Array.isArray(c.company) ? c.company : c.company ? [c.company] : [])
+    .map((co) => (co?.name ?? '').trim())
+    .filter((n) => n.length > 0);
+  if (fromCompany.length > 0) return fromCompany;
+
+  const flat = (
+    c.primeContractor ??
+    c.contractor ??
+    c.vendorName ??
+    c.awardee ??
+    c.companyName ??
+    ''
+  ).trim();
+  return flat ? [flat] : [];
+}
+
+function contractTime(value: string | undefined): number {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? Number.NEGATIVE_INFINITY : t;
+}
+
+export interface ContractIncumbency {
+  incumbent: string | null;
+  /** 'high' when the sourcing contract is still active, 'medium' when expired. */
+  confidence: 'high' | 'medium' | null;
+  competitors: string[];
+}
+
+/**
+ * Derive incumbency from contract history.
+ *
+ * Our GovWin entitlement omits the spec's `incumbent [Boolean]`, so the
+ * incumbent is taken to be the awardee of the most recently awarded contract,
+ * preferring one that has not yet expired. An explicitly flagged contract still
+ * wins when present. Every other awardee becomes a competitor.
+ */
+export function resolveContractIncumbency(
+  contracts: DeltekContract[],
+  now: number = Date.now(),
+): ContractIncumbency {
+  const flagged = contracts.find((c) => isFlaggedIncumbent(c) && contractCompanyNames(c).length > 0);
+
+  const withNames = contracts.filter((c) => contractCompanyNames(c).length > 0);
+  const byRecency = [...withNames].sort(
+    (a, b) => contractTime(b.awardDate) - contractTime(a.awardDate),
   );
+  const active = byRecency.find((c) => contractTime(c.expirationDate) > now);
+  const source = flagged ?? active ?? byRecency[0];
+
+  if (!source) {
+    return { incumbent: null, confidence: null, competitors: [] };
+  }
+
+  const [incumbent, ...jointVenturePartners] = contractCompanyNames(source);
+  const competitors = [
+    ...jointVenturePartners,
+    ...withNames.filter((c) => c !== source).flatMap(contractCompanyNames),
+  ];
+
+  return {
+    incumbent: incumbent ?? null,
+    confidence: flagged || source === active ? 'high' : 'medium',
+    competitors,
+  };
 }
 
 /** Convert a link href (absolute or relative) into a path under API_BASE. */
@@ -565,15 +641,21 @@ export async function fetchOpportunityCompanies(
 }
 
 /**
- * Fetch contract history for an opportunity. Per Deltek spec (p13/p14) the
- * incumbent flag lives on the Contracts object (`incumbent` Boolean String),
- * NOT on Related Companies. The incumbent is the contract where
- * `incumbent == true`; every other contract company is a competitor.
+ * Fetch contract history for an opportunity. Related Companies never carries
+ * incumbency, so the incumbent comes from here — derived from award recency,
+ * since our entitlement omits the spec's `incumbent` flag (see
+ * `resolveContractIncumbency`).
  */
 export async function fetchOpportunityContracts(
   govwinId: string,
   href?: string | null,
-): Promise<{ incumbent: string | null; competitors: string[]; raw?: unknown; count: number }> {
+): Promise<{
+  incumbent: string | null;
+  confidence: 'high' | 'medium' | null;
+  competitors: string[];
+  raw?: unknown;
+  count: number;
+}> {
   const data = isCasMode()
     ? await fetchOpportunitySubEndpointCas<DeltekContractsResponse | DeltekContract[]>(
         govwinId,
@@ -589,18 +671,8 @@ export async function fetchOpportunityContracts(
   // coerce any non-array shape to [] so iteration never throws.
   const list = Array.isArray(resolvedContracts) ? resolvedContracts : [];
 
-  let incumbent: string | null = null;
-  const competitors: string[] = [];
-  for (const c of list) {
-    const name = contractCompanyName(c);
-    if (!name) continue;
-    if (!incumbent && isIncumbentContract(c)) {
-      incumbent = name;
-    } else {
-      competitors.push(name);
-    }
-  }
-  return { incumbent, competitors, raw: data, count: list.length };
+  const { incumbent, confidence, competitors } = resolveContractIncumbency(list);
+  return { incumbent, confidence, competitors, raw: data, count: list.length };
 }
 
 /**
@@ -752,13 +824,14 @@ async function loadStoredUpdateDates(ids: string[]): Promise<Map<string, string>
 /**
  * Enrich a single relevant opportunity with incumbent + competitors.
  *
- * Per Deltek spec the incumbent flag lives on the Contracts object, so the
- * incumbent is sourced from `/contracts` (the contract where `incumbent==true`).
- * Competitors are the Related Companies (`/companies`) plus other, non-incumbent
- * contract companies, with the incumbent removed and duplicates collapsed.
+ * The incumbent is sourced from `/contracts` (most recent award — our tier has
+ * no incumbent flag). Competitors are the Related Companies (`/companies`) plus
+ * the other contract awardees, incumbent removed and duplicates collapsed.
  */
 export interface EnrichmentResult {
   incumbent: string | null;
+  /** Derived incumbency strength: 'high' if the source contract is active. */
+  incumbentConfidence: 'high' | 'medium' | null;
   competitors: string[];
   /** Sub-endpoint calls issued (companies + contracts). */
   calls: number;
@@ -781,6 +854,7 @@ export async function enrichIncumbentCompetitors(
 ): Promise<EnrichmentResult> {
   let calls = 0;
   let incumbent: string | null = null;
+  let confidence: 'high' | 'medium' | null = null;
   const competitorNames: string[] = [];
   let companiesCount = 0;
   let contractsCount = 0;
@@ -806,6 +880,7 @@ export async function enrichIncumbentCompetitors(
     contractsCount = contracts.count;
     await cacheSubEndpointRaw(govwinId, 'contracts', contracts.raw);
     incumbent = contracts.incumbent;
+    confidence = contracts.confidence;
     competitorNames.push(...contracts.competitors);
   } catch (err) {
     logger.warn(
@@ -815,6 +890,10 @@ export async function enrichIncumbentCompetitors(
   }
 
   const resolvedIncumbent = incumbent ?? fallbackIncumbent;
+  // A fallback incumbent comes from the detail payload rather than contract
+  // history, so it does not carry the derived-from-active-contract strength.
+  const resolvedConfidence: 'high' | 'medium' | null =
+    incumbent !== null ? confidence : resolvedIncumbent !== null ? 'medium' : null;
   competitorNames.push(...fallbackCompetitors);
   const competitors = dedupeCompetitors(competitorNames, resolvedIncumbent);
 
@@ -827,13 +906,19 @@ export async function enrichIncumbentCompetitors(
       contractsCount,
       incumbentFound: resolvedIncumbent !== null,
       incumbentSource: incumbent !== null ? 'contracts' : fallbackIncumbent !== null ? 'fallback' : 'none',
+      incumbentConfidence: resolvedConfidence,
       competitors: competitors.length,
       calls,
     },
     'govwin_enrich_result',
   );
 
-  return { incumbent: resolvedIncumbent, competitors, calls };
+  return {
+    incumbent: resolvedIncumbent,
+    incumbentConfidence: resolvedConfidence,
+    competitors,
+    calls,
+  };
 }
 
 async function enrichOneOpportunity(
@@ -842,7 +927,7 @@ async function enrichOneOpportunity(
 ): Promise<{ opp: GovWinApiOpportunity; calls: number }> {
   const merged = mergeDetailIntoSummary(summary, detail);
 
-  const { incumbent, competitors, calls } = await enrichIncumbentCompetitors(
+  const { incumbent, incumbentConfidence, competitors, calls } = await enrichIncumbentCompetitors(
     merged.govwinId,
     merged.links,
     merged.incumbent,
@@ -853,6 +938,7 @@ async function enrichOneOpportunity(
     opp: {
       ...merged,
       incumbent,
+      incumbentConfidence,
       competitors: competitors.length > 0 ? competitors : merged.competitors,
     },
     calls,
