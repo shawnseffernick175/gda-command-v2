@@ -916,6 +916,52 @@ export interface ServiceCentersData {
   meta: { table: string; row_count: number };
 }
 
+/* ── Labor Distribution (Financial Bible) ─────────────────────── */
+
+/** One wage pool column of payroll's Wages book, with its monthly + FY totals. */
+export interface LaborCategoryRow {
+  /** wage_distribution_actuals column name, e.g. "ind_ga" */
+  key: string;
+  /** source workbook header, e.g. "IND-G&A" */
+  label: string;
+  /** roll-up group the tab totals this column into */
+  kind: "direct" | "indirect" | "leave" | "other";
+  /** month number (1..12) → wages in this pool for that month */
+  months: Record<string, number>;
+  ytd: number;
+}
+
+export interface LaborEmployeeRow {
+  employee_id: string;
+  employee_name: string | null;
+  /** month number (1..12) → total wages for that month */
+  months: Record<string, number>;
+  /** month number (1..12) → category key → wages charged to that pool */
+  by_category_month: Record<string, Record<string, number>>;
+  ytd: number;
+  source_doc_id: number | null;
+}
+
+export interface LaborDistributionData {
+  fiscal_year: number | null;
+  available_years: number[];
+  /** fiscal periods present in the data (1..12) */
+  months: number[];
+  categories: LaborCategoryRow[];
+  employees: LaborEmployeeRow[];
+  meta: {
+    table: string;
+    row_count: number;
+    employee_count: number;
+    sources: {
+      vault_doc_id: number;
+      filename: string;
+      ingested_at: string;
+      parser: string;
+    }[];
+  };
+}
+
 /* ── Project Financial Drill-Down (F-628) ─────────────────────── */
 
 export interface ProjectFullRow {

@@ -22,6 +22,7 @@ import type {
   ProjectIncomeStatementData,
   CostPoolSummaryData,
   ServiceCentersData,
+  LaborDistributionData,
   IngestionCoverageData,
 } from "@/lib/types";
 
@@ -342,6 +343,18 @@ export function useServiceCenters(fy?: number | null) {
     queryKey: ["financials", "service-centers", fy ?? "latest"],
     queryFn: () =>
       apiGet<ServiceCentersData>(`/v3/financials/service-centers${qs}`),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useLaborDistribution(fy?: number | null) {
+  const qs = fy != null ? `?fy=${fy}` : "";
+  return useQuery({
+    queryKey: ["financials", "labor-distribution", fy ?? "latest"],
+    queryFn: () =>
+      apiGet<LaborDistributionData>(`/v3/financials/labor-distribution${qs}`),
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",

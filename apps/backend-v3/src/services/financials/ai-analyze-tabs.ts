@@ -36,6 +36,7 @@ const TAB_LABELS: Record<string, string> = {
   'ingestion-coverage': 'Ingestion Coverage',
   definitions: 'Definitions',
   'financial-bible': 'Financial Bible (Pricing)',
+  'labor-distribution': 'Labor Distribution (Wages by Cost Pool)',
   capture: 'AOP Capture',
 };
 
@@ -101,6 +102,8 @@ export async function buildTabAnalysisInput(
       return finish(await buildIngestionCoverage(base), tab, tab_label);
     case 'financial-bible':
       return finish(await buildFinancialBible(base), tab, tab_label);
+    case 'labor-distribution':
+      return finish(await buildLaborDistribution(base), tab, tab_label);
     case 'capture':
       return finish(await buildAopCapture(base), tab, tab_label);
     case 'definitions':
@@ -699,7 +702,7 @@ async function buildIngestionCoverage(base: FinancialAnalyzeInput): Promise<Fina
   const tables = [
     'financial_actuals', 'balance_sheet_actuals', 'cost_detail_actuals',
     'indirect_expense_actuals', 'ap_actuals', 'ar_actuals',
-    'trial_balance', 'project_revenue_actuals',
+    'trial_balance', 'project_revenue_actuals', 'wage_distribution_actuals',
   ];
   const destinationsByDoc = new Map<number, Array<{ table: string; row_count: number }>>();
   for (const table of tables) {
@@ -782,6 +785,74 @@ async function buildFinancialBible(base: FinancialAnalyzeInput): Promise<Financi
     odc_count: Number(v.odc_count),
     history_count: Number(v.history_count),
     summary_stats: v.summary_stats ?? null,
+  };
+  return base;
+}
+
+// ── labor-distribution — payroll Wages book, per employee per cost pool ──────
+// Summarized as the pool mix plus the labor ratios that drive the indirect
+// rates — the figures an owner reads this book for — and the top earners, capped
+// at ROW_CAP so the prompt never carries the whole roster.
+async function buildLaborDistribution(base: FinancialAnalyzeInput): Promise<FinancialAnalyzeInput> {
+  const { rows } = await pool.query(
+    `SELECT fiscal_year, month_num,
+            SUM(direct_co) AS direct_co, SUM(direct_cl) AS direct_cl,
+            SUM(fringe_excl_vhps) AS fringe_excl_vhps, SUM(ind_oh) AS ind_oh,
+            SUM(ind_mhx) AS ind_mhx, SUM(ind_ga) AS ind_ga, SUM(vhps) AS vhps,
+            SUM(ucot) AS ucot, SUM(unallow_unbill) AS unallow_unbill,
+            SUM(total_wages) AS total_wages, COUNT(DISTINCT employee_id) AS employees
+     FROM wage_distribution_actuals
+     WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM wage_distribution_actuals)
+     GROUP BY fiscal_year, month_num
+     ORDER BY month_num`,
+  );
+  if (!rows.length) {
+    base.tab_data = { not_ingested: 'No wage distribution ingested. Source needed: payroll\u2019s monthly Wages workbook (e.g. "JUL-26 Wages.xlsx").' };
+    return base;
+  }
+
+  const periods = rows.map((r) => ({
+    fiscal_year: Number(r.fiscal_year),
+    month_num: Number(r.month_num),
+    total_wages: n(r.total_wages),
+    direct: n(r.direct_co) + n(r.direct_cl),
+    indirect: n(r.fringe_excl_vhps) + n(r.ind_oh) + n(r.ind_mhx) + n(r.ind_ga),
+    leave: n(r.vhps),
+    ucot: n(r.ucot),
+    unallow_unbill: n(r.unallow_unbill),
+    employees: Number(r.employees),
+  }));
+  const sum = (pick: (p: typeof periods[number]) => number) => periods.reduce((s, p) => s + pick(p), 0);
+  const totalWages = sum((p) => p.total_wages);
+  const direct = sum((p) => p.direct);
+
+  const { rows: topRows } = await pool.query(
+    `SELECT employee_id, MAX(employee_name) AS employee_name,
+            SUM(direct_co + direct_cl) AS direct, SUM(total_wages) AS total_wages
+     FROM wage_distribution_actuals
+     WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM wage_distribution_actuals)
+     GROUP BY employee_id
+     ORDER BY SUM(total_wages) DESC
+     LIMIT $1`,
+    [ROW_CAP],
+  );
+
+  base.tab_data = {
+    fiscal_year: periods[0].fiscal_year,
+    periods,
+    total_wages: totalWages,
+    direct_labor: direct,
+    indirect_labor: sum((p) => p.indirect),
+    leave: sum((p) => p.leave),
+    ucot: sum((p) => p.ucot),
+    unallowable_unbillable: sum((p) => p.unallow_unbill),
+    direct_labor_pct: totalWages !== 0 ? Math.round((direct / totalWages) * 1000) / 10 : null,
+    top_employees: topRows.map((r) => ({
+      employee_id: r.employee_id as string,
+      employee_name: (r.employee_name as string) ?? null,
+      total_wages: n(r.total_wages),
+      direct: n(r.direct),
+    })),
   };
   return base;
 }

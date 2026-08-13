@@ -25,7 +25,7 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { logger } from '../lib/logger.js';
 import { ingestFinancialRows } from '../services/financials/ingest.js';
-import { reingestFinancialDoc, computeVerdict } from '../services/financials/reingest-doc.js';
+import { reingestFinancialDoc, computeVerdict, classifyFinancialDoc } from '../services/financials/reingest-doc.js';
 import { extractVehicleFromVaultDoc } from '../services/vehicles/vault-extract.js';
 
 const UPLOAD_DIR = join(process.cwd(), 'data', 'vault');
@@ -950,9 +950,14 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       // extract prompt keys on (TGT/TARGET/PLAN/PROJ/ACT/L1-TARGET) plus the
       // existing actuals tokens. The extract prompt remains the authority on
       // whether a given document actually yields KPI rows.
+      // A payroll Wages book is employee-level labor dollars, never a P&L: the
+      // generic KPI parser would reject every row (or worse, invent one), so it
+      // is suppressed here exactly as classifyFinancialDoc suppresses it on
+      // reingest. parseWageDistribution owns the file.
       const looksFinancial =
-        /financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\bact\b/i.test(filename) ||
-        docTypeConfirmed === 'financial';
+        (/financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\bact\b/i.test(filename) ||
+          docTypeConfirmed === 'financial') &&
+        !classifyFinancialDoc(filename, extractedText, docTypeConfirmed).is_wage_distribution;
       if (looksFinancial) {
         try {
           const finResult = await llmRouter.route({

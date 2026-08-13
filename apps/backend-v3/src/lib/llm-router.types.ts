@@ -837,6 +837,34 @@ export interface ServiceCenterExtractOutput {
   model_used: string;
 }
 
+// Labor Distribution (Financial Bible). Deterministic-only extraction from
+// payroll's monthly "<MON>-<YY> Wages" workbook — not part of the LLM router
+// task map. See parseWageDistribution. Amounts are exactly as stated per
+// employee per cost pool; nothing is derived here.
+export interface WageDistributionExtractOutput {
+  is_wage_distribution: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    month_num: number;
+    employee_id: string;
+    employee_name: string | null;
+    direct_co: number;
+    direct_cl: number;
+    fringe_excl_vhps: number;
+    ind_oh: number;
+    ind_mhx: number;
+    ind_ga: number;
+    vhps: number;
+    ucot: number;
+    unallow_unbill: number;
+    total_wages: number;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
 export interface PoolRateExtractOutput {
   is_pool_rate: boolean;
   rows: {
