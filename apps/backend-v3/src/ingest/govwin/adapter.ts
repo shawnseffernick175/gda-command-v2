@@ -47,7 +47,7 @@ function toNormalized(
     description: opp.description,
     // Enrichment carried through from the GovWin detail endpoint (#1134).
     incumbent: opp.incumbent,
-    incumbent_confidence: hasIncumbent ? 'high' : null,
+    incumbent_confidence: hasIncumbent ? opp.incumbentConfidence ?? 'medium' : null,
     incumbent_source: hasIncumbent ? 'govwin' : null,
     competitors: opp.competitors ?? [],
     value_min: opp.valueMin,

@@ -122,12 +122,17 @@ async function main(): Promise<void> {
           await pool.query(
             `UPDATE opportunities
                 SET incumbent = COALESCE($1, incumbent),
-                    incumbent_confidence = CASE WHEN $1 IS NOT NULL THEN 'high' ELSE incumbent_confidence END,
+                    incumbent_confidence = CASE WHEN $1 IS NOT NULL THEN $4 ELSE incumbent_confidence END,
                     incumbent_source = CASE WHEN $1 IS NOT NULL THEN 'govwin' ELSE incumbent_source END,
                     competitors = CASE WHEN jsonb_array_length($2::jsonb) > 0 THEN $2::jsonb ELSE competitors END,
                     updated_at = NOW()
               WHERE id = $3`,
-            [result.incumbent, JSON.stringify(result.competitors), row.id],
+            [
+              result.incumbent,
+              JSON.stringify(result.competitors),
+              row.id,
+              result.incumbentConfidence ?? 'medium',
+            ],
           );
         }
         report.enriched += 1;
